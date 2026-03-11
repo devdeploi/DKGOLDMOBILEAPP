@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "746804823376",
+    "project_id": "aurum-37ad9",
+    "storage_bucket": "aurum-37ad9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:746804823376:android:26fc5ee9218f26f694d855",
+        "android_client_info": {
+          "package_name": "com.jewelmobileapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAL5wNlsSqrR8Ka_yEWrMJd2xou3QOYSgM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

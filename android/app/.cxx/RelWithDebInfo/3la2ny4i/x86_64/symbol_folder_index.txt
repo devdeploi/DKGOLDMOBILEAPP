@@ -1,0 +1,1 @@
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/build/intermediates/cxx/RelWithDebInfo/3la2ny4i/obj/x86_64

@@ -1,0 +1,13 @@
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-community/datetimepicker/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-community/slider/android/src/main/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-google-signin/google-signin/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-html-to-pdf/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-image-picker/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-share/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-worklets/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt

@@ -1,0 +1,15 @@
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <!-- Customize your theme here. -->
+        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+    </style>
+
+    <style name="CheckoutTheme" parent="Theme.AppCompat.Light">
+        <item name="colorPrimary">#eb4d4b</item>
+        <item name="colorPrimaryDark">#c0392b</item>
+        <item name="colorAccent">#eb4d4b</item>
+    </style>
+
+</resources>
