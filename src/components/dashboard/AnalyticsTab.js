@@ -13,7 +13,7 @@ import SkeletonLoader from '../SkeletonLoader';
 import RNFS from 'react-native-fs';
 import { generatePDF } from 'react-native-html-to-pdf';
 import Share from 'react-native-share';
-import aurumLogo from '../../assets/AURUM.png';
+import dklogo from '../../assets/DK.png';
 import safproLogo from '../../../public/assests/Safpro-logo.png';
 
 import CustomAlert from '../CustomAlert';
@@ -169,16 +169,16 @@ const AnalyticsTab = ({ user }) => {
     const generateInvoice = async (payment, plan) => {
         setLoading(true);
         try {
-            let aurumLogoImgTag = 'AURUM';
+            let dkLogoImgTag = 'DK';
             let safproLogoImgTag = 'Safpro';
 
             if (Platform.OS === 'android' && !__DEV__) {
-                aurumLogoImgTag = `<img src="file:///android_asset/AURUM.png" style="width: 70px; height: auto;" />`;
+                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 70px; height: auto;" />`;
                 safproLogoImgTag = `<img src="file:///android_asset/Safpro-logo.png" style="width: 120px; height: auto;" />`;
             } else {
-                const aurumLogoUrl = Image.resolveAssetSource(aurumLogo).uri;
-                const aurumLogoBase64 = await fetchImageAsBase64(aurumLogoUrl);
-                if (aurumLogoBase64) aurumLogoImgTag = `<img src="${aurumLogoBase64}" style="width: 70px; height: auto;" />`;
+                const dklogoUrl = Image.resolveAssetSource(dklogo).uri;
+                const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
+                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 70px; height: auto;" />`;
 
                 const safproLogoUrl = Image.resolveAssetSource(safproLogo).uri;
                 const safproLogoBase64 = await fetchImageAsBase64(safproLogoUrl);
@@ -228,7 +228,7 @@ const AnalyticsTab = ({ user }) => {
                 </head>
                 <body>
                     <div class="header">
-                        <div class="logo-left">${aurumLogoImgTag}</div>
+                        <div class="logo-left">${dkLogoImgTag}</div>
                         <div class="header-center">
                             <h2>${merchantName}</h2>
                             <p>${plan.merchant?.address || ''}</p>
@@ -315,16 +315,16 @@ const AnalyticsTab = ({ user }) => {
     const generateStatement = async (plan) => {
         setLoading(true);
         try {
-            let aurumLogoImgTag = 'AURUM';
+            let dkLogoImgTag = 'DK';
             let safproLogoImgTag = 'Safpro';
 
             if (Platform.OS === 'android' && !__DEV__) {
-                aurumLogoImgTag = `<img src="file:///android_asset/AURUM.png" style="width: 70px; height: auto;" />`;
+                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 70px; height: auto;" />`;
                 safproLogoImgTag = `<img src="file:///android_asset/Safpro-logo.png" style="width: 120px; height: auto;" />`;
             } else {
-                const aurumLogoUrl = Image.resolveAssetSource(aurumLogo).uri;
-                const aurumLogoBase64 = await fetchImageAsBase64(aurumLogoUrl);
-                if (aurumLogoBase64) aurumLogoImgTag = `<img src="${aurumLogoBase64}" style="width: 70px; height: auto;" />`;
+                const dklogoUrl = Image.resolveAssetSource(dklogo).uri;
+                const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
+                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 70px; height: auto;" />`;
 
                 const safproLogoUrl = Image.resolveAssetSource(safproLogo).uri;
                 const safproLogoBase64 = await fetchImageAsBase64(safproLogoUrl);
@@ -391,7 +391,7 @@ const AnalyticsTab = ({ user }) => {
                 </head>
                 <body>
                     <div class="header">
-                        <div class="logo-left">${aurumLogoImgTag}</div>
+                        <div class="logo-left">${dkLogoImgTag}</div>
                         <div class="header-center">
                             <h2>${merchantName}</h2>
                             <p>${plan.merchant?.address || ''}</p>
@@ -752,8 +752,16 @@ const AnalyticsTab = ({ user }) => {
         const isExpanded = expandedCardId === plan._id;
         const isGoldPlan = plan.returnType?.toLowerCase() === 'gold';
         const showGold = (isUnlimited || isGoldPlan) && goldRate > 0;
-        // Use saved totalGoldWeight from DB if available, otherwise calculate live (for legacy/first payment)
-        const goldGrams = plan.totalGoldWeight ? plan.totalGoldWeight.toFixed(3) : (showGold ? (plan.totalSaved / goldRate).toFixed(3) : 0);
+        
+        // Calculate Remaining Balances
+        const deliveredWeight = plan.deliveredGoldWeight || 0;
+        const totalSavedAmount = plan.totalSaved || 0;
+        const deliveredAmount = plan.deliveredAmount || 0;
+        
+        const remainingGold = Math.max(0, (plan.totalGoldWeight || 0) - deliveredWeight);
+        const remainingSaved = Math.max(0, totalSavedAmount - deliveredAmount);
+        
+        const goldGrams = remainingGold.toFixed(3);
 
         return (
             <TouchableOpacity
@@ -785,11 +793,11 @@ const AnalyticsTab = ({ user }) => {
                     <View style={styles.compactStats}>
                         <View>
                             <Text style={styles.compactStatText}>
-                                ₹{plan.totalSaved ? plan.totalSaved.toLocaleString() : 0} saved
+                                ₹{remainingSaved ? remainingSaved.toLocaleString() : 0} Remaining
                             </Text>
                             {showGold && (
                                 <Text style={[styles.compactStatText, { color: '#B45309', fontWeight: 'bold', fontSize: 10 }]}>
-                                    {goldGrams}g Gold Saved
+                                    {goldGrams}g Gold Remaining
                                 </Text>
                             )}
                         </View>
@@ -967,13 +975,25 @@ const AnalyticsTab = ({ user }) => {
                                     plan.history.map((payment, index) => (
                                         <View key={payment._id || index} style={styles.historyItem}>
                                             <View style={styles.historyLeft}>
-                                                <Icon name="check-circle" size={10} color={payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : "#2E7D32"} style={{ marginTop: 2 }} />
+                                                <Icon 
+                                                    name={payment.isDelivered ? "gift" : "check-circle"} 
+                                                    size={10} 
+                                                    color={payment.isDelivered ? "#d4af37" : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : "#2E7D32")} 
+                                                    style={{ marginTop: 2 }} 
+                                                />
                                                 <View style={{ marginLeft: 8 }}>
-                                                    <Text style={styles.historyDate}>
-                                                        {new Date(payment.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                    </Text>
-                                                    <Text style={[styles.historyStatus, { color: payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : '#666' }]}>
-                                                        {payment.status || 'Paid'}
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <Text style={styles.historyDate}>
+                                                            {new Date(payment.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                        </Text>
+                                                        {payment.isDelivered && (
+                                                            <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                                                                <Text style={{ fontSize: 8, color: '#92400e', fontWeight: '800' }}>DELIVERED</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    <Text style={[styles.historyStatus, { color: payment.isDelivered ? '#d4af37' : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : '#666') }]}>
+                                                        {payment.isDelivered ? 'Delivered' : (payment.status || 'Paid')}
                                                     </Text>
                                                     {payment.notes && payment.status === 'Rejected' && (
                                                         <Text style={{ fontSize: 10, color: 'red', marginTop: 2 }}>{payment.notes}</Text>
@@ -981,18 +1001,20 @@ const AnalyticsTab = ({ user }) => {
                                                 </View>
                                             </View>
                                             <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={styles.historyAmount}>+ ₹{payment.amount}</Text>
+                                                <Text style={[styles.historyAmount, payment.isDelivered && { textDecorationLine: 'line-through', opacity: 0.6 }]}>
+                                                    + ₹{payment.amount}
+                                                </Text>
                                                 {payment.lockedGoldRate > 0 && plan.returnType?.toLowerCase() === 'gold' && (
                                                     <Text style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
                                                         Rate: ₹{payment.lockedGoldRate.toFixed(2)}/g
                                                     </Text>
                                                 )}
                                                 {payment.goldWeight > 0 && (
-                                                    <Text style={{ fontSize: 10, color: '#B45309', fontWeight: 'bold' }}>
+                                                    <Text style={[{ fontSize: 10, color: '#B45309', fontWeight: 'bold' }, payment.isDelivered && { textDecorationLine: 'line-through', opacity: 0.6 }]}>
                                                         {payment.goldWeight.toFixed(3)}g Gold
                                                     </Text>
                                                 )}
-                                                {(payment.status === 'Paid' || payment.status === 'Completed') && (
+                                                {(payment.status === 'Paid' || payment.status === 'Completed') && !payment.isDelivered && (
                                                     <TouchableOpacity onPress={() => generateInvoice(payment, plan)} style={{ marginTop: 6, padding: 4 }}>
                                                         <Icon name="file-invoice" size={14} color={COLORS?.primary} />
                                                     </TouchableOpacity>
@@ -1002,6 +1024,37 @@ const AnalyticsTab = ({ user }) => {
                                     ))
                                 ) : (
                                     <Text style={styles.noHistoryText}>No payments recorded yet.</Text>
+                                )}
+
+                                {plan.deliveryHistory && plan.deliveryHistory.length > 0 && (
+                                    <View style={{ marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#eee' }}>
+                                        <Text style={[styles.historyTitle, { color: '#915200', marginBottom: 10 }]}>Delivery History</Text>
+                                        {plan.deliveryHistory.map((delivery, dIdx) => (
+                                            <View key={dIdx} style={[styles.historyItem, { borderLeftWidth: 3, borderLeftColor: '#d4af37', paddingLeft: 10, backgroundColor: '#fffdf5' }]}>
+                                                <View style={styles.historyLeft}>
+                                                    <Icon name="truck-loading" size={10} color="#d4af37" style={{ marginTop: 2 }} />
+                                                    <View style={{ marginLeft: 8 }}>
+                                                        <Text style={styles.historyDate}>
+                                                            {new Date(delivery.deliveredDate).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                        </Text>
+                                                        <Text style={{ fontSize: 10, color: '#666' }}>{delivery.notes || 'Partial Delivery'}</Text>
+                                                    </View>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    {delivery.goldWeight > 0 && (
+                                                        <Text style={{ fontSize: 11, color: '#92400e', fontWeight: 'bold' }}>
+                                                            - {delivery.goldWeight.toFixed(3)}g Gold
+                                                        </Text>
+                                                    )}
+                                                    {delivery.amount > 0 && (
+                                                        <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: 'bold' }}>
+                                                            - ₹{delivery.amount.toLocaleString()}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
                                 )}
                             </View>
                         )}

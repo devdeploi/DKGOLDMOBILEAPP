@@ -369,7 +369,7 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
                 <SafeAreaView style={{ flex: 1 }}>
                     <ScrollView contentContainerStyle={styles.scrollContent}>
                         <View style={styles.card}>
-                            <Image source={require('../assets/AURUM.png')} style={styles.logo} />
+                        <Image source={require('../assets/DK.png')} style={styles.logo} />
                             <Text style={styles.title}>Reset Password</Text>
                             {/* <Text style={styles.subtitle}>Enter details to reset</Text> */}
 
@@ -515,7 +515,7 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
             <SafeAreaView style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.card}>
-                        <Image source={require('../assets/AURUM.png')} style={styles.logo} />
+                        <Image source={require('../assets/DK.png')} style={styles.logo} />
                         {/* <Text style={styles.appTitle}>DK GOLD</Text> */}
                         <Text style={styles.title}>SIGN IN</Text>
                         {/* <Text style={styles.subtitle}> </Text> */}

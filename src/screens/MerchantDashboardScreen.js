@@ -219,7 +219,11 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 phone: updatedData.phone,
                 email: updatedData.email,
                 upiId: updatedData.upiId,
-                upiNumber: updatedData.upiNumber
+                upiNumber: updatedData.upiNumber,
+                gstin: updatedData.gstin,
+                pancard: updatedData.pancard,
+                goldRate18k: updatedData.goldRate18k,
+                goldRate22k: updatedData.goldRate22k
             };
 
             const { data } = await axios.put(`${APIURL}/merchants/${id}`, payload, {

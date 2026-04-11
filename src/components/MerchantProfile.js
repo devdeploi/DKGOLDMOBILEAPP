@@ -235,6 +235,59 @@ const MerchantProfile = ({
                         />
                     </View>
 
+                    <View style={styles.inputGroup}>
+                        <Text style={[styles.inputLabel, { color: primaryColor }]}>GSTIN</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
+                            value={profileData.gstin}
+                            onChangeText={(text) => setProfileData({ ...profileData, gstin: text })}
+                            editable={isEditingProfile}
+                            placeholder="Enter GSTIN"
+                            placeholderTextColor="#999"
+                        />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={[styles.inputLabel, { color: primaryColor }]}>Pancard</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
+                            value={profileData.pancard}
+                            onChangeText={(text) => setProfileData({ ...profileData, pancard: text })}
+                            editable={isEditingProfile}
+                            placeholder="Enter Pancard Number"
+                            placeholderTextColor="#999"
+                        />
+                    </View>
+
+                    <Text style={[styles.sectionTitle, { color: primaryColor, marginTop: 10 }]}>Gold Rates (Selling / gm)</Text>
+                    <View style={{ flexDirection: 'row', gap: 15, marginBottom: 15 }}>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                            <Text style={[styles.inputLabel, { color: primaryColor }]}>22K Rate</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
+                                value={profileData.goldRate22k?.toString()}
+                                onChangeText={(text) => setProfileData({ ...profileData, goldRate22k: text.replace(/[^0-9]/g, '') })}
+                                editable={isEditingProfile}
+                                placeholder="Auto"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                            <Text style={[styles.inputLabel, { color: primaryColor }]}>18K Rate</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
+                                value={profileData.goldRate18k?.toString()}
+                                onChangeText={(text) => setProfileData({ ...profileData, goldRate18k: text.replace(/[^0-9]/g, '') })}
+                                editable={isEditingProfile}
+                                placeholder="Auto"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                            />
+                        </View>
+                    </View>
+                    <Text style={{ fontSize: 10, color: '#999', marginTop: -10, marginBottom: 15 }}>* Leave as "0" or empty to use Live Market rates as fallback.</Text>
+
                     <Text style={[styles.sectionTitle, { color: primaryColor, marginTop: 10 }]}>Store Branding</Text>
 
                     {/* Gallery Section */}

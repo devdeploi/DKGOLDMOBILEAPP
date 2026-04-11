@@ -87,7 +87,7 @@ const IntroScreen = ({ onFinish }) => {
             <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
                 <View style={styles.logoContainer}>
                     <Image
-                        source={require('../assets/AURUM.png')}
+                        source={require('../assets/DK.png')}
                         style={styles.logo}
                     />
                 </View>

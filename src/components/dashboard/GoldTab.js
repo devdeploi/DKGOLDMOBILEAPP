@@ -11,7 +11,8 @@ import {
     StatusBar,
     useWindowDimensions,
     PixelRatio,
-    TouchableOpacity
+    TouchableOpacity,
+    TextInput
 } from 'react-native';
 import { useGoldRate } from '../../context/GoldRateContext';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -110,6 +111,45 @@ const GoldTab = () => {
     const isSmallDevice = width < 375;
     const isTablet = width >= 768;
 
+    // --- Gold Price Calculator State ---
+    const [selectedCarat, setSelectedCarat] = useState('22k');
+    const [weightGrams, setWeightGrams] = useState('');
+    const [makingPct, setMakingPct] = useState('');
+    const [calcResult, setCalcResult] = useState(null);
+
+    // --- Calculator Logic ---
+    const getCaratRate = () => {
+        const rate22 = goldRates.rows.find(r => r.id === '22k_inr')?.sellRate || 0;
+        const rate18 = goldRates.rows.find(r => r.id === '18k_inr')?.sellRate || (rate22 * 18 / 22);
+        if (selectedCarat === '22k') return rate22;
+        if (selectedCarat === '18k') return rate18;
+        return rate22;
+    };
+
+    const handleCalculate = () => {
+        const rate = getCaratRate();
+        const w = parseFloat(weightGrams) || 0;
+        const mp = parseFloat(makingPct) || 0;
+        const goldAmount = w * rate;
+        const makingCharges = (mp / 100) * goldAmount;
+        const hallmarking = 40;
+        const packing = 100;
+        // Calculate GST on the total of gold + making + fees
+        const subtotal = goldAmount + makingCharges + hallmarking + packing;
+        const gst = subtotal * 0.03;
+        const finalAmount = subtotal + gst;
+        setCalcResult({ goldAmount, makingCharges, hallmarking, packing, gst, finalAmount, goldWeight: w, rate });
+    };
+
+    const handleReset = () => {
+        setSelectedCarat('22k');
+        setWeightGrams('');
+        setMakingPct('');
+        setCalcResult(null);
+    };
+
+    const formatINR = (val) => `₹${Math.round(val).toLocaleString('en-IN')}`;
+
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
@@ -128,105 +168,274 @@ const GoldTab = () => {
         );
     }
 
-    // Sort rows to put common items at top (Gold 24k, 22k)
-    const sortedRows = [...goldRates.rows].sort((a, b) => {
-        const priority = { 'gold_24k': 1, 'gold_22k': 2, 'silver_spot': 3 };
-        return (priority[a.id] || 99) - (priority[b.id] || 99);
-    });
-
-    const mainPrice = sortedRows[0] || { buyRate: 0, label: 'Gold' };
+    // Separate rows into groups
+    const usdRows = goldRates.rows.filter(r => ['24k_usd', 'silver_usd'].includes(r.id));
+    const inrRows = goldRates.rows.filter(r => ['24k_inr', 'silver_inr'].includes(r.id));
+    const retailNoGstRows = goldRates.rows.filter(r => ['22k_inr', '18k_inr'].includes(r.id));
+    const retailGstRows = goldRates.rows.filter(r => ['22k_gst', '18k_gst'].includes(r.id));
 
     return (
         <View style={styles.container}>
-            <View style={styles.tableWrapper}>
-                <View style={styles.tableHeader}>
-                    <Text style={[styles.headerColText, { flex: 2 }]}>COMMODITY</Text>
-                    <Text style={[styles.headerColText, { flex: 1.1, textAlign: 'center' }]}>BUY</Text>
-                    <Text style={[styles.headerColText, { flex: 1.1, textAlign: 'center' }]}>SELL</Text>
-                    <Text style={[styles.headerColText, { flex: 1.0, textAlign: 'right' }]}>H / L</Text>
-                </View>
-
-                <ScrollView
-                    style={styles.tableBody}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={[
-                        styles.scrollContent,
-                        { paddingBottom: isLandscape ? 80 : 140 }
-                    ]}
-                >
-                    {sortedRows.map((row, idx) => (
-                        <View
-                            key={row.id || idx}
-                            style={[
-                                styles.tableRow,
-                                idx % 2 === 0 ? styles.evenRow : styles.oddRow,
-                                isSmallDevice && styles.tableRowSmall
-                            ]}
-                        >
+            <ScrollView
+                style={styles.tableBody}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingBottom: isLandscape ? 80 : 140, paddingTop: 10 }
+                ]}
+            >
+                {/* --- Table 1: International Market (USD) --- */}
+                <View style={styles.tableWrapper}>
+                    <View style={styles.sectionHeaderBanner}>
+                        <LinearGradient colors={['#1a1a1a', '#4a4a4a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.jewelleryHeaderGradient}>
+                            <Icon name="globe-americas" size={14} color="#fff" style={{ marginRight: 8 }} />
+                            <Text style={styles.jewelleryHeaderTitle}>INTERNATIONAL MARKET ($)</Text>
+                        </LinearGradient>
+                    </View>
+                    <View style={styles.tableHeader}>
+                        <Text style={[styles.headerColText, { flex: 2 }]}>DESC</Text>
+                        <Text style={[styles.headerColText, { flex: 1.1, textAlign: 'center' }]}>SELL</Text>
+                        <Text style={[styles.headerColText, { flex: 1.0, textAlign: 'right' }]}>H / L</Text>
+                    </View>
+                    {usdRows.map((row, idx) => (
+                        <View key={row.id} style={[styles.tableRow, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}>
                             <View style={[styles.cell, { flex: 2, alignItems: 'flex-start' }]}>
-                                <Text style={styles.descriptionText}>
-                                    {row.label}
-                                </Text>
-                                <View style={styles.unitBadge}>
-                                    <Text style={styles.unitBadgeText}>{row.unit.toUpperCase()}</Text>
-                                </View>
+                                <Text style={styles.descriptionText}>{row.label}</Text>
+                                <View style={styles.unitBadge}><Text style={styles.unitBadgeText}>{row.unit.toUpperCase()}</Text></View>
                             </View>
-
-                            <AnimatedPriceCell
-                                value={row.buyRate}
-                                prevValue={row.prevBuy}
-                                rowId={row.id}
-                                flex={1.1}
-                            />
-
-                            <AnimatedPriceCell
-                                value={row.sellRate}
-                                prevValue={row.prevSell}
-                                rowId={row.id}
-                                flex={1.1}
-                            />
-
+                            <AnimatedPriceCell value={row.sellRate} prevValue={row.prevSell} rowId={row.id} flex={1.1} />
                             <View style={[styles.cell, { flex: 1.0, alignItems: 'flex-end' }]}>
                                 <View style={styles.rangeCol}>
-                                    <View style={styles.rangeItem}>
-                                        <Icon name="arrow-up" size={8} color="#22c55e" />
-                                        <Text style={styles.highText}>
-                                            {Math.round(row.high)}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.rangeItem}>
-                                        <Icon name="arrow-down" size={8} color="#ef4444" />
-                                        <Text style={styles.lowText}>
-                                            {Math.round(row.low)}
-                                        </Text>
-                                    </View>
+                                    <View style={styles.rangeItem}><Icon name="arrow-up" size={8} color="#22c55e" /><Text style={styles.highText}>{Math.round(row.high)}</Text></View>
+                                    <View style={styles.rangeItem}><Icon name="arrow-down" size={8} color="#ef4444" /><Text style={styles.lowText}>{Math.round(row.low)}</Text></View>
                                 </View>
                             </View>
                         </View>
                     ))}
+                </View>
 
-                    <View style={styles.disclaimerContainer}>
-                        <Icon name="info-circle" size={12} color="#915200" style={{ opacity: 0.5 }} />
-                        <Text style={styles.disclaimerText}>
-                            Prices are indicative and for reference only. Refresh happens every 10-15 seconds based on market volatility.
-                        </Text>
+                {/* --- Table 2: Indian Market (INR) --- */}
+                <View style={styles.tableWrapper}>
+                    <View style={styles.sectionHeaderBanner}>
+                        <LinearGradient colors={['#1e3a8a', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.jewelleryHeaderGradient}>
+                            <Icon name="map-marker-alt" size={14} color="#fff" style={{ marginRight: 8 }} />
+                            <Text style={styles.jewelleryHeaderTitle}>INDIAN MARKET (₹)</Text>
+                        </LinearGradient>
                     </View>
-                </ScrollView>
-            </View>
+                    <View style={styles.tableHeader}>
+                        <Text style={[styles.headerColText, { flex: 2 }]}>DESC</Text>
+                        <Text style={[styles.headerColText, { flex: 1.1, textAlign: 'center' }]}>SELL</Text>
+                        <Text style={[styles.headerColText, { flex: 1.0, textAlign: 'right' }]}>H / L</Text>
+                    </View>
+                    {inrRows.map((row, idx) => (
+                        <View key={row.id} style={[styles.tableRow, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}>
+                            <View style={[styles.cell, { flex: 2, alignItems: 'flex-start' }]}>
+                                <Text style={styles.descriptionText}>{row.label}</Text>
+                                <View style={styles.unitBadge}><Text style={styles.unitBadgeText}>{row.unit.toUpperCase()}</Text></View>
+                            </View>
+                            <AnimatedPriceCell value={row.sellRate} prevValue={row.prevSell} rowId={row.id} flex={1.1} />
+                            <View style={[styles.cell, { flex: 1.0, alignItems: 'flex-end' }]}>
+                                <View style={styles.rangeCol}>
+                                    <View style={styles.rangeItem}><Icon name="arrow-up" size={8} color="#22c55e" /><Text style={styles.highText}>{Math.round(row.high)}</Text></View>
+                                    <View style={styles.rangeItem}><Icon name="arrow-down" size={8} color="#ef4444" /><Text style={styles.lowText}>{Math.round(row.low)}</Text></View>
+                                </View>
+                            </View>
+                        </View>
+                    ))}
+                </View>
+
+                {/* --- Table 3: Retail Jewellery Rates (No GST) --- */}
+                <View style={styles.tableWrapper}>
+                    <View style={styles.sectionHeaderBanner}>
+                        <LinearGradient colors={['#915200', '#D4A964']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.jewelleryHeaderGradient}>
+                            <Icon name="gem" size={14} color="#fff" style={{ marginRight: 8 }} />
+                            <Text style={styles.jewelleryHeaderTitle}>RETAIL JEWELLERY RATES (NO GST)</Text>
+                        </LinearGradient>
+                    </View>
+                    <View style={styles.tableHeader}>
+                        <Text style={[styles.headerColText, { flex: 2 }]}>DESC</Text>
+                        <Text style={[styles.headerColText, { flex: 1.1, textAlign: 'center' }]}>SELL</Text>
+                        <Text style={[styles.headerColText, { flex: 1.0, textAlign: 'right' }]}>H / L</Text>
+                    </View>
+                    {retailNoGstRows.map((row, idx) => (
+                        <View key={row.id} style={[styles.tableRow, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}>
+                            <View style={[styles.cell, { flex: 2, alignItems: 'flex-start' }]}>
+                                <Text style={[styles.descriptionText, { color: '#915200' }]}>{row.label}</Text>
+                                <View style={[styles.unitBadge, { backgroundColor: '#f3e9bd' }]}><Text style={[styles.unitBadgeText, { color: '#915200' }]}>{row.unit.toUpperCase()}</Text></View>
+                            </View>
+                            <AnimatedPriceCell value={row.sellRate} prevValue={row.prevSell} rowId={row.id} flex={1.1} />
+                            <View style={[styles.cell, { flex: 1.0, alignItems: 'flex-end' }]}>
+                                <View style={styles.rangeCol}>
+                                    <View style={styles.rangeItem}><Text style={styles.highText}>{Math.round(row.high)}</Text></View>
+                                    <View style={styles.rangeItem}><Text style={styles.lowText}>{Math.round(row.low)}</Text></View>
+                                </View>
+                            </View>
+                        </View>
+                    ))}
+                </View>
+
+                {/* --- Table 4: Jewellery Rates (With GST) --- */}
+                <View style={styles.tableWrapper}>
+                    <View style={styles.sectionHeaderBanner}>
+                        <LinearGradient colors={['#064e3b', '#10b981']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.jewelleryHeaderGradient}>
+                            <Icon name="file-invoice-dollar" size={14} color="#fff" style={{ marginRight: 8 }} />
+                            <Text style={styles.jewelleryHeaderTitle}>RETAIL RATES (WITH 3% GST)</Text>
+                        </LinearGradient>
+                    </View>
+                    <View style={styles.tableHeader}>
+                        <Text style={[styles.headerColText, { flex: 2 }]}>DESC</Text>
+                        <Text style={[styles.headerColText, { flex: 1.1, textAlign: 'center' }]}>SELL</Text>
+                        <Text style={[styles.headerColText, { flex: 1.0, textAlign: 'right' }]}>H / L</Text>
+                    </View>
+                    {retailGstRows.map((row, idx) => (
+                        <View key={row.id} style={[styles.tableRow, idx % 2 === 0 ? styles.evenRow : styles.oddRow]}>
+                            <View style={[styles.cell, { flex: 2, alignItems: 'flex-start' }]}>
+                                <Text style={[styles.descriptionText, { color: '#064e3b' }]}>{row.label}</Text>
+                                <View style={[styles.unitBadge, { backgroundColor: '#d1fae5' }]}><Text style={[styles.unitBadgeText, { color: '#064e3b' }]}>{row.unit.toUpperCase()}</Text></View>
+                            </View>
+                            <AnimatedPriceCell value={row.sellRate} prevValue={row.prevSell} rowId={row.id} flex={1.1} />
+                            <View style={[styles.cell, { flex: 1.0, alignItems: 'flex-end' }]}>
+                                <View style={styles.rangeCol}>
+                                    <View style={styles.rangeItem}><Text style={styles.highText}>{Math.round(row.high)}</Text></View>
+                                    <View style={styles.rangeItem}><Text style={styles.lowText}>{Math.round(row.low)}</Text></View>
+                                </View>
+                            </View>
+                        </View>
+                    ))}
+                </View>
+
+                {/* ===== Gold Price Calculator ===== */}
+                <View style={styles.calcSection}>
+                    <View style={styles.calcHeaderBanner}>
+                        <View>
+                            <Text style={styles.calcBannerTitle}>Jewel Price Calculator</Text>
+                            <Text style={styles.calcBannerSub}>Carat · Weight · All charges included</Text>
+                        </View>
+                        <View style={styles.calcBannerBadge}><Icon name="coins" size={18} color="#FCD34D" solid /></View>
+                    </View>
+
+                    <Text style={styles.calcSectionLabel}>Select Carat</Text>
+                    <View style={styles.caratRow}>
+                        {['22k', '18k'].map(carat => {
+                            const caratId = carat === '22k' ? '22k_inr' : '18k_inr';
+                            const caratRate = goldRates.rows.find(r => r.id === caratId)?.sellRate || 0;
+                            const isActive = selectedCarat === carat;
+                            return (
+                                <TouchableOpacity
+                                    key={carat}
+                                    style={[styles.caratBtn, isActive && styles.caratBtnActive]}
+                                    onPress={() => { setSelectedCarat(carat); setCalcResult(null); }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[styles.caratBtnText, isActive && styles.caratBtnTextActive]}>{carat.toUpperCase()}</Text>
+                                    <Text style={[styles.caratRate, isActive && styles.caratRateActive]}>₹{Math.round(caratRate).toLocaleString('en-IN')}</Text>
+                                    <Text style={[styles.caratRatePer, isActive && styles.caratRatePerActive]}>/gm</Text>
+                                    {isActive && <View style={styles.caratActiveLine} />}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+
+                    <View style={styles.inputsContainer}>
+                        <View style={styles.inputGroup}>
+                            <View style={styles.inputIconLabel}>
+                                <View style={styles.inputIconCircle}><Icon name="weight" size={10} color="#fff" /></View>
+                                <Text style={styles.calcSectionLabel}>Gold Weight</Text>
+                            </View>
+                            <View style={styles.calcInputBox}>
+                                <TextInput
+                                    style={styles.calcInput}
+                                    value={weightGrams}
+                                    onChangeText={t => { setWeightGrams(t); setCalcResult(null); }}
+                                    keyboardType="decimal-pad"
+                                    placeholder="Enter grams…"
+                                    placeholderTextColor="#b0b8c4"
+                                />
+                                <View style={styles.unitPill}><Text style={styles.unitPillText}>grams</Text></View>
+                            </View>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <View style={styles.inputIconLabel}>
+                                <View style={[styles.inputIconCircle, { backgroundColor: '#7c3aed' }]}><Icon name="percentage" size={10} color="#fff" /></View>
+                                <Text style={styles.calcSectionLabel}>Making Charges</Text>
+                            </View>
+                            <View style={styles.calcInputBox}>
+                                <TextInput
+                                    style={styles.calcInput}
+                                    value={makingPct}
+                                    onChangeText={t => { setMakingPct(t); setCalcResult(null); }}
+                                    keyboardType="decimal-pad"
+                                    placeholder="Enter percentage…"
+                                    placeholderTextColor="#b0b8c4"
+                                />
+                                <View style={[styles.unitPill, { backgroundColor: '#ede9fe' }]}><Text style={[styles.unitPillText, { color: '#7c3aed' }]}>%</Text></View>
+                            </View>
+                        </View>
+                    </View>
+
+                    <View style={styles.fixedChargesStrip}>
+                        <Icon name="info-circle" size={10} color="#78350f" />
+                        <Text style={styles.fixedChargesText}>Fixed: Hallmarking ₹40 · Packing ₹100 · GST 3%</Text>
+                    </View>
+
+                    <View style={styles.calcBtnRow}>
+                        <TouchableOpacity style={styles.resetBtn} onPress={handleReset} activeOpacity={0.8}><Icon name="times" size={13} color="#64748b" /><Text style={styles.resetBtnText}>Reset</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.calcBtn} onPress={handleCalculate} activeOpacity={0.85}><Icon name="calculator" size={13} color="#1C1917" solid /><Text style={styles.calcBtnText}>Calculate Price</Text></TouchableOpacity>
+                    </View>
+
+                    {calcResult && (
+                        <View style={styles.resultBox}>
+                            <View style={styles.receiptHeader}>
+                                <Text style={styles.receiptTitle}>COST ESTIMATE</Text>
+                                <View style={styles.receiptPill}>
+                                    <View style={styles.receiptPulse} />
+                                    <Text style={styles.receiptPillText}>{selectedCarat.toUpperCase()} · {formatINR(calcResult.rate)}/g</Text>
+                                </View>
+                            </View>
+                            <View style={styles.receiptBody}>
+                                <View style={[styles.receiptRow, styles.receiptRowAlt]}>
+                                    <View style={styles.receiptRowLeft}><Icon name="cube" size={9} color="#92400e" style={{ marginRight: 5 }} /><Text style={styles.receiptKey}>Gold Weight</Text></View>
+                                    <Text style={styles.receiptVal}>{calcResult.goldWeight} g</Text>
+                                </View>
+                                <View style={styles.receiptRow}>
+                                    <View style={styles.receiptRowLeft}><Icon name="coins" size={9} color="#92400e" style={{ marginRight: 5 }} /><Text style={styles.receiptKey}>Gold Value</Text></View>
+                                    <Text style={styles.receiptVal}>{formatINR(calcResult.goldAmount)}</Text>
+                                </View>
+                                <View style={[styles.receiptRow, styles.receiptRowAlt]}>
+                                    <View style={styles.receiptRowLeft}><Icon name="tools" size={9} color="#92400e" style={{ marginRight: 5 }} /><Text style={styles.receiptKey}>Making ({makingPct}%)</Text></View>
+                                    <Text style={styles.receiptVal}>{formatINR(calcResult.makingCharges)}</Text>
+                                </View>
+                                <View style={styles.receiptRow}>
+                                    <View style={styles.receiptRowLeft}><Icon name="certificate" size={9} color="#92400e" style={{ marginRight: 5 }} /><Text style={styles.receiptKey}>Hallmarking</Text></View>
+                                    <Text style={styles.receiptVal}>₹40</Text>
+                                </View>
+                                <View style={[styles.receiptRow, styles.receiptRowAlt]}>
+                                    <View style={styles.receiptRowLeft}><Icon name="box" size={9} color="#92400e" style={{ marginRight: 5 }} /><Text style={styles.receiptKey}>Packing</Text></View>
+                                    <Text style={styles.receiptVal}>₹100</Text>
+                                </View>
+                            </View>
+                            <View style={styles.gstRow}>
+                                <View style={styles.receiptRowLeft}><Icon name="receipt" size={10} color="#854d0e" style={{ marginRight: 5 }} /><Text style={styles.gstKey}>GST (3%)</Text></View>
+                                <Text style={styles.gstVal}>{formatINR(calcResult.gst)}</Text>
+                            </View>
+                            <View style={styles.totalBar}>
+                                <View><Text style={styles.totalLabel}>TOTAL PAYABLE</Text><Text style={styles.totalSub}>All charges + GST included</Text></View>
+                                <Text style={styles.totalAmount}>{formatINR(calcResult.finalAmount)}</Text>
+                            </View>
+                        </View>
+                    )}
+                </View>
+            </ScrollView>
 
             <View style={styles.bottomStatus}>
                 <BlurBackground intensity={20} />
                 <View style={styles.statusContent}>
                     <View style={styles.statusIndicator}>
-                        <View style={styles.pulseContainer}>
-                            <View style={styles.pulseDot} />
-                            <View style={styles.pulseRing} />
-                        </View>
+                        <View style={styles.pulseContainer}><View style={styles.pulseDot} /><View style={styles.pulseRing} /></View>
                         <Text style={styles.statusText}>CHENNAI BULLION UPDATED</Text>
                     </View>
-                    <Text style={styles.clockText}>
-                        {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </Text>
+                    <Text style={styles.clockText}>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Text>
                 </View>
             </View>
         </View>
@@ -239,6 +448,10 @@ const BlurBackground = ({ intensity }) => (
 );
 
 const styles = StyleSheet.create({
+    sectionHeaderBanner: {
+        height: 40,
+        marginBottom: 5,
+    },
     container: {
         flex: 1,
         backgroundColor: '#F8F9FA',
@@ -454,6 +667,360 @@ const styles = StyleSheet.create({
         lineHeight: 16,
         paddingHorizontal: 20,
     },
+
+    // --- Gold Price Calculator (Redesigned) ---
+    calcSection: {
+        marginVertical: 10,
+        marginHorizontal: 10,
+        marginBottom: 30,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+    },
+    // Dark header banner
+    calcHeaderBanner: {
+        backgroundColor: '#1C1917',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+    },
+    calcBannerTitle: {
+        fontSize: 15,
+        fontWeight: '900',
+        color: '#FCD34D',
+        letterSpacing: 0.3,
+    },
+    calcBannerSub: {
+        fontSize: 10,
+        color: 'rgba(252,211,77,0.55)',
+        marginTop: 3,
+    },
+    calcBannerBadge: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(252,211,77,0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(252,211,77,0.2)',
+    },
+    // Carat chips with built-in rate
+    calcSectionLabel: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#94a3b8',
+        letterSpacing: 1,
+        marginBottom: 8,
+        paddingHorizontal: 16,
+        marginTop: 14,
+    },
+    caratRow: {
+        flexDirection: 'row',
+        gap: 8,
+        paddingHorizontal: 16,
+        marginBottom: 4,
+    },
+    caratBtn: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderRadius: 14,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    caratBtnActive: {
+        backgroundColor: '#1C1917',
+        borderColor: '#1C1917',
+    },
+    caratBtnText: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#334155',
+        letterSpacing: 0.5,
+    },
+    caratBtnTextActive: {
+        color: '#FCD34D',
+    },
+    caratRate: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#64748b',
+        marginTop: 3,
+    },
+    caratRateActive: {
+        color: 'rgba(252,211,77,0.8)',
+    },
+    caratRatePer: {
+        fontSize: 8,
+        fontWeight: '600',
+        color: '#94a3b8',
+    },
+    caratRatePerActive: {
+        color: 'rgba(252,211,77,0.5)',
+    },
+    caratActiveLine: {
+        position: 'absolute',
+        bottom: 0,
+        left: '20%',
+        right: '20%',
+        height: 3,
+        backgroundColor: '#FCD34D',
+        borderTopLeftRadius: 2,
+        borderTopRightRadius: 2,
+    },
+    // Inputs
+    inputsContainer: {
+        paddingHorizontal: 16,
+        gap: 10,
+        marginTop: 6,
+    },
+    inputGroup: {
+        gap: 6,
+    },
+    inputIconLabel: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+    inputIconCircle: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: '#B45309',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    calcInputBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 2,
+    },
+    calcInput: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0F172A',
+        paddingVertical: 10,
+    },
+    unitPill: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    unitPillText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#92400e',
+    },
+    // Fixed charges strip
+    fixedChargesStrip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 4,
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    fixedChargesText: {
+        fontSize: 10,
+        color: '#92400e',
+        fontWeight: '600',
+    },
+    // Buttons
+    calcBtnRow: {
+        flexDirection: 'row',
+        gap: 10,
+        paddingHorizontal: 16,
+        marginTop: 14,
+        marginBottom: 16,
+    },
+    resetBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 13,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    resetBtnText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#475569',
+    },
+    calcBtn: {
+        flex: 2.5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 13,
+        borderRadius: 12,
+        backgroundColor: '#FCD34D',
+        gap: 8,
+        elevation: 3,
+        shadowColor: '#B45309',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 5,
+    },
+    calcBtnText: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#1C1917',
+    },
+    // Result receipt
+    resultBox: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
+        overflow: 'hidden',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+    },
+    receiptHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    receiptTitle: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#475569',
+        letterSpacing: 1.5,
+    },
+    receiptPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    receiptPulse: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#22c55e',
+    },
+    receiptPillText: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#92400e',
+    },
+    receiptBody: {
+        paddingHorizontal: 14,
+    },
+    receiptRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 9,
+    },
+    receiptRowAlt: {
+        backgroundColor: '#FAFAFA',
+    },
+    receiptRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    receiptKey: {
+        fontSize: 12,
+        color: '#475569',
+        fontWeight: '500',
+    },
+    receiptVal: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    gstRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#FDE68A',
+        borderBottomWidth: 1,
+        borderBottomColor: '#FDE68A',
+    },
+    gstKey: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#854d0e',
+    },
+    gstVal: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#854d0e',
+    },
+    totalBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#1C1917',
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+    },
+    totalLabel: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: '#FCD34D',
+        letterSpacing: 1,
+    },
+    totalSub: {
+        fontSize: 9,
+        color: 'rgba(252,211,77,0.5)',
+        marginTop: 2,
+    },
+    totalAmount: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#FCD34D',
+    },
     bottomStatus: {
         position: 'absolute',
         bottom: 0,
@@ -505,7 +1072,41 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#636E72',
         fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
-    }
+    },
+    // Jewellery Section Styles
+    jewellerySection: {
+        marginTop: 25,
+        marginBottom: 10,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#f0f0f0',
+        elevation: 2,
+    },
+    jewelleryHeaderBanner: {
+        height: 40,
+    },
+    jewelleryHeaderGradient: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 15,
+    },
+    jewelleryHeaderTitle: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+    },
+    jewellerySubHeader: {
+        flexDirection: 'row',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        backgroundColor: '#fdfbf0',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
 });
 
 export default GoldTab;

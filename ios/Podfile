@@ -21,17 +21,38 @@ target 'JewelMobileApp' do
   pod 'FirebaseCoreInternal', :modular_headers => true
 
   use_react_native!(
-    :path => config[:reactNativePath],
-    # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
-  )
+  :path => config[:reactNativePath],
+  :hermes_enabled => false,
+  :app_path => "#{Pod::Config.instance.installation_root}/.."
+)
 
   post_install do |installer|
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+      end
+
+      if target.name == 'React-jsitooling'
+        target.build_configurations.each do |config|
+          config.build_settings['DEFINES_MODULE'] = 'NO'
+        end
+      end
+    end
+
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      # :ccache_enabled => true
+      :mac_catalyst_enabled => false
     )
+
+    # ✅ Hermes fix AFTER react_native_post_install
+    installer.pods_project.targets.each do |target|
+      if target.name == 'hermes-engine'
+        target.build_configurations.each do |config|
+          config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
+          config.build_settings['GCC_GENERATE_DEBUGGING_SYMBOLS'] = 'NO'
+        end
+      end
+    end
   end
 end

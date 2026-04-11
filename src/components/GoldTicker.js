@@ -1,6 +1,6 @@
-import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useGoldRate } from '../context/GoldRateContext';
 
 const GoldTicker = () => {
@@ -8,11 +8,12 @@ const GoldTicker = () => {
 
     if (goldRates.loading) return null;
 
-    // Filter relevant rows for the ticker: 24K INR, 22K INR, and 22K 1 Pound
+    // Filter relevant rows for the ticker: 24K, 22K, and 18K INR
     const tickerRows = goldRates.rows.filter(row =>
         row.id === '24k_inr' ||
         row.id === '22k_inr' ||
-        row.id === '22k_1pound'
+        row.id === '18k_inr' ||
+        row.id === 'silver_inr'
     );
 
     return (
@@ -24,29 +25,30 @@ const GoldTicker = () => {
         >
             <View style={styles.cardHeader}>
                 <View style={styles.liveTagContainer}>
-                    <View style={styles.liveDot} />
-                    <Text style={styles.liveText}>CHENNAI LIVE</Text>
+                    <Icon name="chart-line" size={10} color="#DC2626" style={{ marginRight: 6 }} />
+                    <Text style={styles.liveText}>DAILY SELLING PRICES</Text>
                 </View>
-                <Text style={styles.sourceText}>Market Rates</Text>
+                <Text style={styles.sourceText}>Today's Rates</Text>
             </View>
 
             <View style={styles.ratesRow}>
                 {tickerRows.map((row, idx) => {
-                    const isUp = row.price > row.prevPrice;
-                    const isDown = row.price < row.prevPrice;
-                    const isPound = row.id.includes('pound');
+                    const isUp = row.sellRate > row.prevSell;
+                    const isDown = row.sellRate < row.prevSell;
 
                     return (
                         <View key={idx} style={[styles.rateBox, idx < tickerRows.length - 1 && styles.borderRight]}>
                             <Text style={styles.karatLabel}>
-                                {row.id.includes('24k') ? '24K' : row.id.includes('1pound') ? '1 POUND' : '22K'}
+                                {row.id.includes('24k') ? '24K GOLD' : 
+                                 row.id.includes('22k') ? '22K GOLD' : 
+                                 row.id.includes('18k') ? '18K GOLD' : 'SILVER'}
                             </Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Text style={[styles.priceText, isUp && { color: '#15803d' }, isDown && { color: '#b91c1c' }]}>
-                                    {row.price.toLocaleString(undefined, { maximumFractionDigits: isPound ? 0 : 0 })}
+                                    ₹{row.sellRate?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                 </Text>
                             </View>
-                            <Text style={styles.unitSmall}>{isPound ? '8 Grams' : 'Per Gram'}</Text>
+                            <Text style={styles.unitSmall}>Per {row.unit === 'kg' ? 'Kilogram' : 'Gram'}</Text>
                         </View>
                     );
                 })}

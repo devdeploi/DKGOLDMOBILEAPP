@@ -32,10 +32,14 @@ interface UserData {
   email: string;
   role: Role;
   id: number;
+  _id?: string;
   plan: string | null;
   phone?: string;
   address?: string;
   token?: string;
+  goldRate18k?: number;
+  goldRate22k?: number;
+  shopLogo?: string;
 }
 
 function App() {
@@ -250,8 +254,8 @@ function App() {
   const isLoginOrRegister = currentScreen === 'LOGIN' || currentScreen === 'REGISTER' || currentScreen === 'INTRO';
 
   return (
-    <GoldRateProvider>
-      <SafeAreaProvider>
+    <SafeAreaProvider>
+      <GoldRateProvider merchantRates={user?.role === 'merchant' ? { goldRate18k: user.goldRate18k, goldRate22k: user.goldRate22k } : null}>
         {/* Main Application Container */}
         <View style={{ flex: 1, backgroundColor: COLORS?.light }}>
           <StatusBar
@@ -260,24 +264,10 @@ function App() {
             translucent
           />
           {renderScreen()}
-
-          {/* Global Ad Display Overlay (Both Roles) - REMOVED for non-blocking ads */}
-          {/* {user && ads.length > 0 && !isLoginOrRegister && (
-            <AdDisplay
-              ads={ads}
-              visible={true}
-              paused={areAdsPaused}
-              userRole={user.role}
-            />
-          )} */}
-
-          {/* Merchant Brand Ads (Based on Plan) */}
-
-
           <Toast />
         </View>
-      </SafeAreaProvider>
-    </GoldRateProvider>
+      </GoldRateProvider>
+    </SafeAreaProvider>
   );
 }
 

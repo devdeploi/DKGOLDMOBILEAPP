@@ -42,6 +42,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
     const [phone, setPhone] = useState(user.phone || '');
     const [address, setAddress] = useState(user.address || '');
     const [acc_no, setAccNo] = useState(user.acc_no || '');
+    const [panCard, setPanCard] = useState(user.panCard || '');
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [activeInput] = useState(new Animated.Value(0));
@@ -61,7 +62,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
         }
         setLoading(true);
         try {
-            await onUpdate({ name, email, phone, address, acc_no }); // Send email
+            await onUpdate({ name, email, phone, address, acc_no, panCard }); // Send email
             setIsEditing(false);
         } catch (e) {
             console.log("Update failed");
@@ -97,7 +98,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                     {/* Decorative Background Element */}
                     <View style={styles.cornerDecoration}>
                         <Image
-                            source={require('../../assets/AURUM.png')}
+                            source={require('../../assets/DK.png')}
                             style={{ width: 120, height: 60, opacity: 0.1, resizeMode: 'contain' }}
                         />
                     </View>
@@ -117,6 +118,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                                     setPhone(user.phone || '');
                                     setAddress(user.address || '');
                                     setAccNo(user.acc_no || '');
+                                    setPanCard(user.panCard || '');
                                     setIsEditing(true);
                                 }}
                             >
@@ -135,6 +137,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                         if (user.phone) completed++;
                         if (user.address) completed++;
                         if (user.acc_no) completed++;
+                        if (user.panCard) completed++;
 
                         const progress = completed / total;
                         const percent = Math.round(progress * 100);
@@ -236,17 +239,27 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                                         onChangeText={setAddress}
                                         multiline
                                         numberOfLines={3}
-                                        placeholderTextColor="#aaa"
-                                    />
+                                        />
                                 </View>
                                 <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Account Number</Text>
+                                    <Text style={styles.label}>Account Number (Auto-generated)</Text>
+                                    <TextInput
+                                        style={[styles.input, { backgroundColor: '#f0f0f0', color: '#888' }]}
+                                        value={acc_no}
+                                        editable={false}
+                                        placeholderTextColor="#aaa"
+                                    />
+                                    <Text style={{ fontSize: 10, color: '#999', marginTop: 4 }}>Account number is assigned upon your first subscription.</Text>
+                                </View>
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>PAN Card (Optional)</Text>
                                     <TextInput
                                         style={styles.input}
-                                        value={acc_no}
-                                        onChangeText={setAccNo}
+                                        value={panCard}
+                                        onChangeText={setPanCard}
+                                        placeholder="Enter PAN Number"
                                         placeholderTextColor="#aaa"
-                                        keyboardType="numeric"
+                                        autoCapitalize="characters"
                                     />
                                 </View>
 
@@ -317,6 +330,15 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.detailLabel}>Account Number</Text>
                                         <Text style={styles.detailValue}>{user.acc_no || 'Not provided'}</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.detailRow}>
+                                    <View style={styles.iconBox}>
+                                        <Icon name="id-card" size={14} color={THEME.primaryDark} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.detailLabel}>PAN Card</Text>
+                                        <Text style={styles.detailValue}>{user.panCard || 'Not provided'}</Text>
                                     </View>
                                 </View>
                             </View>
