@@ -4,7 +4,7 @@
 
 import LinearGradient from 'react-native-linear-gradient';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -65,6 +65,8 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
     const [profileData, setProfileData] = useState({ ...user });
     const [updatingProfile, setUpdatingProfile] = useState(false);
     const [uploadingDoc, setUploadingDoc] = useState(false);
+
+    const stabilizedUser = useMemo(() => ({ ...user, ...profileData }), [user, profileData]);
 
     const merchantTabs = [
         { id: 'overview', icon: 'chart-pie', label: 'Overview' },
@@ -264,7 +266,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 return (
                     <View style={{ flex: 1 }}>
                         <MerchantOverview
-                            user={{ ...user, ...profileData }}
+                            user={stabilizedUser}
                             stats={stats}
                             plans={plans}
                             refreshing={loadingPlans}
@@ -277,7 +279,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             case 'plans':
                 return (
                     <MerchantPlans
-                        user={{ ...user, ...profileData }}
+                        user={stabilizedUser}
                         loadingPlans={loadingPlans}
                         plans={plans}
                         onPlanCreated={fetchPlans}
@@ -285,9 +287,9 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                     />
                 );
             case 'subscribers':
-                return <MerchantUsers user={{ ...user, ...profileData }} />;
+                return <MerchantUsers user={stabilizedUser} />;
             case 'ads':
-                return <AdManager user={{ ...user, ...profileData }} />;
+                return <AdManager user={stabilizedUser} />;
             case 'profile':
                 return (
                     <MerchantProfile

@@ -345,8 +345,14 @@ const MerchantUsers = ({ user }) => {
     const [showManualModal, setShowManualModal] = useState(false);
     const [selectedSubscriber, setSelectedSubscriber] = useState(null);
     const [manualForm, setManualForm] = useState({ amount: '', notes: '', customGoldRate: '', type: 'CASH' });
+    const [selectedPaymentDate, setSelectedPaymentDate] = useState(new Date());
+    const [manualDateInput, setManualDateInput] = useState({
+        day: new Date().getDate().toString().padStart(2, '0'),
+        month: (new Date().getMonth() + 1).toString().padStart(2, '0'),
+        year: new Date().getFullYear().toString()
+    });
     const [submittingManual, setSubmittingManual] = useState(false);
-
+    
     // History Details State
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [paymentHistory, setPaymentHistory] = useState([]);
@@ -506,7 +512,12 @@ const MerchantUsers = ({ user }) => {
 
             // 2. Data Prep
             const planName = subscriber.plan?.planName || subscriber.chitPlan?.planName || 'Unknown Plan';
-            const paymentDate = new Date(payment.paymentDate || payment.date || new Date()).toLocaleDateString();
+            console.log(payment);
+
+            // Use the established payment date from the record, fallback to now only if missing
+            const paymentDateVal = payment.paymentDate || payment.date || new Date();
+            const paymentDate = new Date(paymentDateVal).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const generationDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
             const merchantName = user.name.toUpperCase();
             const customerName = subscriber.user.name.toUpperCase();
 
@@ -552,7 +563,7 @@ const MerchantUsers = ({ user }) => {
 
                     <div class="title-section">
                         <h1>PAYMENT RECEIPT</h1>
-                        <p>Date: ${new Date().toLocaleDateString()}</p>
+                        <p>Date: ${generationDate}</p>
                     </div>
 
                     <div class="grid">
@@ -1319,6 +1330,22 @@ const MerchantUsers = ({ user }) => {
         }
     };
 
+    const handleManualDateChange = (type, value) => {
+        const newParts = { ...manualDateInput, [type]: value };
+        setManualDateInput(newParts);
+        
+        const d = parseInt(newParts.day);
+        const m = parseInt(newParts.month) - 1;
+        const y = parseInt(newParts.year);
+
+        if (!isNaN(d) && !isNaN(m) && !isNaN(y) && y > 2000) {
+            const newDate = new Date(y, m, d);
+            if (newDate.getDate() === d && newDate.getMonth() === m && newDate.getFullYear() === y) {
+                setSelectedPaymentDate(newDate);
+            }
+        }
+    };
+
     const openManualPaymentModal = (subscriber) => {
         setSelectedSubscriber(subscriber);
         setManualForm({
@@ -1330,6 +1357,13 @@ const MerchantUsers = ({ user }) => {
                     : '',
             notes: '',
             customGoldRate: (lockedGoldRate || goldRate) ? Number(lockedGoldRate || goldRate).toFixed(2) : ''
+        });
+        const today = new Date();
+        setSelectedPaymentDate(today);
+        setManualDateInput({
+            day: today.getDate().toString().padStart(2, '0'),
+            month: (today.getMonth() + 1).toString().padStart(2, '0'),
+            year: today.getFullYear().toString()
         });
         if (lockedGoldRate === 0 && goldRate > 0) {
             setLockedGoldRate(goldRate);
@@ -1348,17 +1382,17 @@ const MerchantUsers = ({ user }) => {
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
             const subId = selectedSubscriber._id || selectedSubscriber.subscriberId;
-            await axios.post(`${APIURL}/payments/offline/record`, {
+            const result = await axios.post(`${APIURL}/payments/offline/record`, {
                 chitPlanId: selectedSubscriber.plan._id,
                 userId: selectedSubscriber.user._id,
                 subscriptionId: subId, // Add this
                 amount: manualForm.amount,
+                date: selectedPaymentDate.toISOString(),
                 goldRate: ((selectedSubscriber?.plan?.type === 'unlimited') || (selectedSubscriber?.plan?.planType === 'unlimited')) 
                     ? (manualForm.customGoldRate ? parseFloat(manualForm.customGoldRate) : (lockedGoldRate || goldRate))
                     : 0,
                 notes: manualForm.notes,
-                type: manualForm.type || 'CASH',
-                date: new Date().toISOString()
+                type: manualForm.type || 'CASH'
             }, config);
 
             setShowManualModal(false);
@@ -1369,15 +1403,7 @@ const MerchantUsers = ({ user }) => {
                 {
                     text: "Invoice",
                     onPress: () => {
-                        // Need to construct payment object similar to what we did in web
-                        const paymentData = {
-                            amount: manualForm.amount,
-                            notes: manualForm.notes,
-                            date: new Date().toISOString(),
-                            type: manualForm.type || 'CASH',
-                            paymentDate: new Date().toISOString()
-                        };
-                        generateInvoice(paymentData, selectedSubscriber);
+                        generateInvoice(result.data, selectedSubscriber);
                     }
                 },
                 { text: "OK", onPress: () => { } }
@@ -2309,7 +2335,7 @@ const MerchantUsers = ({ user }) => {
                                             selectedSubscriber?.plan?.durationMonths !== 0) && { backgroundColor: '#f0f0f0', color: '#666' }
                                     ]}
                                     value={manualForm.amount}
-                                    onChangeText={t => setManualForm({ ...manualForm, amount: t })}
+                                    onChangeText={t => setManualForm(prev => ({ ...prev, amount: t }))}
                                     keyboardType="numeric"
                                     editable={!(selectedSubscriber?.plan?.monthlyAmount > 0 &&
                                         selectedSubscriber?.plan?.type !== 'unlimited' &&
@@ -2327,13 +2353,13 @@ const MerchantUsers = ({ user }) => {
                                 <View style={{ flexDirection: 'row', marginBottom: 15 }}>
                                     <TouchableOpacity
                                         style={[styles.filterChip, manualForm.type === 'CASH' && styles.filterChipActive]}
-                                        onPress={() => setManualForm({ ...manualForm, type: 'CASH' })}
+                                        onPress={() => setManualForm(prev => ({ ...prev, type: 'CASH' }))}
                                     >
                                         <Text style={[styles.filterChipText, manualForm.type === 'CASH' && styles.filterChipTextActive]}>CASH</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={[styles.filterChip, manualForm.type === 'UPI' && styles.filterChipActive]}
-                                        onPress={() => setManualForm({ ...manualForm, type: 'UPI' })}
+                                        onPress={() => setManualForm(prev => ({ ...prev, type: 'UPI' }))}
                                     >
                                         <Text style={[styles.filterChipText, manualForm.type === 'UPI' && styles.filterChipTextActive]}>UPI</Text>
                                     </TouchableOpacity>
@@ -2345,7 +2371,7 @@ const MerchantUsers = ({ user }) => {
                                         <TextInput
                                             style={[styles.textInput, { backgroundColor: '#fff', borderColor: '#FCD34D', marginBottom: 10 }]}
                                             value={manualForm.customGoldRate}
-                                            onChangeText={t => setManualForm({ ...manualForm, customGoldRate: t })}
+                                            onChangeText={t => setManualForm(prev => ({ ...prev, customGoldRate: t }))}
                                             keyboardType="numeric"
                                             placeholder="Enter gold rate applied..."
                                         />
@@ -2358,11 +2384,60 @@ const MerchantUsers = ({ user }) => {
                                     </View>
                                 )}
 
+                                <Text style={styles.inputLabel}>Payment Date</Text>
+                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 10, color: '#92400E', marginBottom: 2 }}>DD</Text>
+                                        <TextInput
+                                            style={[styles.textInput, { textAlign: 'center', paddingVertical: 8 }]}
+                                            value={manualDateInput.day}
+                                            onChangeText={(v) => handleManualDateChange('day', v.replace(/[^0-9]/g, '').slice(0, 2))}
+                                            placeholder="DD"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 10, color: '#92400E', marginBottom: 2 }}>MM</Text>
+                                        <TextInput
+                                            style={[styles.textInput, { textAlign: 'center', paddingVertical: 8 }]}
+                                            value={manualDateInput.month}
+                                            onChangeText={(v) => handleManualDateChange('month', v.replace(/[^0-9]/g, '').slice(0, 2))}
+                                            placeholder="MM"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1.5 }}>
+                                        <Text style={{ fontSize: 10, color: '#92400E', marginBottom: 2 }}>YYYY</Text>
+                                        <TextInput
+                                            style={[styles.textInput, { textAlign: 'center', paddingVertical: 8 }]}
+                                            value={manualDateInput.year}
+                                            onChangeText={(v) => handleManualDateChange('year', v.replace(/[^0-9]/g, '').slice(0, 4))}
+                                            placeholder="YYYY"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                    <TouchableOpacity 
+                                        style={{ justifyContent: 'flex-end', paddingBottom: 10 }}
+                                        onPress={() => {
+                                            const today = new Date();
+                                            const todayParts = {
+                                                day: today.getDate().toString().padStart(2, '0'),
+                                                month: (today.getMonth() + 1).toString().padStart(2, '0'),
+                                                year: today.getFullYear().toString()
+                                            };
+                                            setManualDateInput(todayParts);
+                                            setSelectedPaymentDate(today);
+                                        }}
+                                    >
+                                        <Text style={{ color: COLORS?.primary, fontSize: 12, fontWeight: 'bold' }}>Today</Text>
+                                    </TouchableOpacity>
+                                </View>
+
                                 <Text style={styles.inputLabel}>Notes</Text>
                                 <TextInput
                                     style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
                                     value={manualForm.notes}
-                                    onChangeText={t => setManualForm({ ...manualForm, notes: t })}
+                                    onChangeText={t => setManualForm(prev => ({ ...prev, notes: t }))}
                                     multiline
                                     placeholder="Paid via Cash/UPI..."
                                 />
