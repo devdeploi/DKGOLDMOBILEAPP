@@ -172,6 +172,12 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
                         return;
                     }
 
+                    // If multiple profiles — pass through, App.tsx will handle routing
+                    if (data.multipleProfiles) {
+                        onLogin('user', data);
+                        return;
+                    }
+
                     await FCMService.registerToken(data._id, data.role, data.token);
                     FCMService.displayLocalNotification('Welcome Back!', `Welcome back, ${data.name || 'User'}!`);
                     onLogin(data.role, data);
@@ -260,10 +266,14 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
             });
             console.log('Verify Merchant OTP Success:', data);
 
-
+            // Multiple user profiles — pass through, App.tsx routes to ProfileSelectScreen
+            if (data.multipleProfiles) {
+                onLogin('user', data);
+                return;
+            }
 
             await FCMService.registerToken(data._id, data.role, data.token);
-            FCMService.displayLocalNotification('OTP Verified', 'Merchant login successful.');
+            FCMService.displayLocalNotification('OTP Verified', `${data.role === 'merchant' ? 'Merchant' : 'User'} login successful.`);
             onLogin(data.role, data);
         } catch (err) {
             console.log('Verify Merchant OTP Error:', err.response?.data || err.message);

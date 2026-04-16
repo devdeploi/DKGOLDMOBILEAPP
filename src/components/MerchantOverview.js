@@ -94,8 +94,14 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
     const [searchQuery, setSearchQuery] = useState('');
     const [collectionFreq, setCollectionFreq] = useState('daily');
     const [settlementFreq, setSettlementFreq] = useState('daily');
+    const [visibleCount, setVisibleCount] = useState(10);
 
     const showLoader = refreshing;
+
+    // Reset visible count when switching tabs
+    useEffect(() => {
+        setVisibleCount(10);
+    }, [collectionFreq]);
 
     // ... Helper Functions ...
     const formatCurrencyCompact = (value) => {
@@ -107,9 +113,14 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
     };
 
     const formatDate = (dateString, simple = false) => {
+        if (!dateString) return '-';
         const date = new Date(dateString);
-        if (simple) return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' });
-        return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const options = { 
+            timeZone: 'Asia/Kolkata',
+            day: simple ? '2-digit' : 'numeric', 
+            month: simple ? '2-digit' : 'short' 
+        };
+        return date.toLocaleDateString('en-IN', options);
     };
 
     const getInitials = (name) => {
@@ -210,51 +221,36 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
     }, [usersList]);
 
     // 3. Today's Transactions
-    const todaysTransactions = useMemo(() => {
-        const all = [];
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-
-        const endOfToday = new Date();
-        endOfToday.setHours(23, 59, 59, 999);
-
-        plans.forEach(plan => {
-            if (plan.subscribers) {
-                plan.subscribers.forEach(sub => {
-                    const paymentDate = sub.lastPaymentDate || sub.joinedAt;
-
-                    if (paymentDate && (sub.totalPaid > 0 || sub.installmentsPaid > 0)) {
-                        const transactionDate = new Date(paymentDate);
-
-                        if (transactionDate >= startOfToday && transactionDate <= endOfToday) {
-                            all.push({
-                                name: (sub.user?.name) || (sub.name || 'No Name'),
-                                image: (sub.user?.profileImage) ? `${BASE_URL}${sub.user.profileImage}` : null,
-                                amount: plan.monthlyAmount,
-                                date: paymentDate,
-                                planName: plan.planName
-                            });
-                        }
-                    }
-                });
-            }
-        });
-        return all.sort((a, b) => new Date(b.date) - new Date(a.date));
-    }, [plans]);
+    const activeTransactions = useMemo(() => {
+        return collectionFreq === 'daily' 
+            ? (stats.todaysCollections || []) 
+            : (stats.monthlyCollections || []);
+    }, [stats.todaysCollections, stats.monthlyCollections, collectionFreq]);
 
 
     const renderRecentItem = ({ item }) => (
         <View style={styles.recentItem}>
             <View style={[styles.avatarPlaceholder, { backgroundColor: '#F1F5F9' }]}>
-                <Text style={styles.avatarInitialsLight}>{getInitials(item.name)}</Text>
+                {item.user?.profileImage ? (
+                    <Image source={{ uri: `${BASE_URL}${item.user.profileImage}` }} style={{ width: '100%', height: '100%', borderRadius: 10 }} />
+                ) : (
+                    <Text style={styles.avatarInitialsLight}>{getInitials(item.user?.name || item.name)}</Text>
+                )}
             </View>
             <View style={{ flex: 1, marginHorizontal: 12 }}>
-                <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.recentPlan} numberOfLines={1}>{item.planName}</Text>
+                <Text style={styles.recentName} numberOfLines={1}>{item.user?.name || item.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.recentPlan} numberOfLines={1}>{item.chitPlan?.planName || item.planName}</Text>
+                    {item.user?.acc_no && (
+                        <View style={{ marginLeft: 6, backgroundColor: '#EDF2F7', paddingHorizontal: 4, borderRadius: 3 }}>
+                            <Text style={{ fontSize: 9, color: '#4A5568', fontWeight: 'bold' }}>{item.user.acc_no}</Text>
+                        </View>
+                    )}
+                </View>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.recentAmount}>+{formatCurrencyCompact(item.amount)}</Text>
-                <Text style={styles.recentDate}>{formatDate(item.date, true)}</Text>
+                <Text style={styles.recentAmount}>₹{item.amount?.toLocaleString()}</Text>
+                <Text style={styles.recentDate}>{formatDate(item.paymentDate || item.date, true)}</Text>
             </View>
         </View>
     );
@@ -551,18 +547,54 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
 
                 </View>
 
-                {/* Today's Collections */}
-                <View style={[styles.sectionCard, { marginBottom: 20, minHeight: 280 }]} >
-                    <Text style={styles.sectionTitle}>Today's Collections</Text>
+                {/* Collections List with Tabs */}
+                <View style={[styles.sectionCard, { marginBottom: 20, minHeight: 400 }]} >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                        <Text style={styles.sectionTitle}>Collections Detail</Text>
+                        <View style={styles.tabSwitcher}>
+                            <TouchableOpacity 
+                                style={[styles.miniTab, collectionFreq === 'daily' && styles.miniTabActive]}
+                                onPress={() => setCollectionFreq('daily')}
+                            >
+                                <Text style={[styles.miniTabText, collectionFreq === 'daily' && styles.miniTabTextActive]}>Today</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.miniTab, collectionFreq === 'monthly' && styles.miniTabActive]}
+                                onPress={() => setCollectionFreq('monthly')}
+                            >
+                                <Text style={[styles.miniTabText, collectionFreq === 'monthly' && styles.miniTabTextActive]}>Month</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
-                    {todaysTransactions.length > 0 ? (
-                        <View style={{ marginTop: 10 }}>
-                            {todaysTransactions.map((item, index) => (
-                                <View key={index}>
-                                    {renderRecentItem({ item })}
-                                    {index < todaysTransactions.length - 1 && <View style={styles.listDivider} />}
-                                </View>
-                            ))}
+                    {activeTransactions.length > 0 ? (
+                        <View>
+                            <View style={{ marginTop: 10 }}>
+                                {activeTransactions.slice(0, visibleCount).map((item, index) => (
+                                    <View key={index}>
+                                        {renderRecentItem({ item })}
+                                        {index < Math.min(activeTransactions.length, visibleCount) - 1 && <View style={styles.listDivider} />}
+                                    </View>
+                                ))}
+                            </View>
+
+                            {activeTransactions.length > visibleCount && (
+                                <TouchableOpacity 
+                                    style={styles.loadMoreButton} 
+                                    onPress={() => setVisibleCount(prev => prev + 10)}
+                                >
+                                    <Text style={styles.loadMoreText}>Load More ({activeTransactions.length - visibleCount} more)</Text>
+                                    <Icon name="chevron-down" size={10} color={COLORS?.primary} />
+                                </TouchableOpacity>
+                            )}
+                            
+                            {/* Total Row */}
+                            <View style={styles.totalRow}>
+                                <Text style={styles.totalLabel}>Grand Total ({activeTransactions.length} users)</Text>
+                                <Text style={styles.totalValue}>
+                                    ₹ {activeTransactions.reduce((acc, curr) => acc + (curr.amount || 0), 0).toLocaleString()}
+                                </Text>
+                            </View>
                         </View>
                     ) : (
                         <View style={{ marginTop: 15, flex: 1, position: 'relative' }}>
@@ -582,7 +614,7 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                             ))}
 
                             {/* Empty Message Overlay */}
-                            <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                            <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }]}>
                                 <View style={{
                                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                                     paddingVertical: 12,
@@ -595,14 +627,12 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                                     elevation: 5,
                                     alignItems: 'center'
                                 }}>
-                                    <Icon name="history" size={20} color={COLORS?.secondary} style={{ marginBottom: 6 }} />
-                                    <Text style={{ color: COLORS?.secondary, fontWeight: '600', fontSize: 13 }}>Data will load here if available</Text>
+                                    <Icon name="calendar-check" size={20} color={COLORS?.secondary} style={{ marginBottom: 6 }} />
+                                    <Text style={{ color: COLORS?.secondary, fontWeight: '600', fontSize: 13 }}>No collections for this period</Text>
                                 </View>
                             </View>
                         </View>
                     )}
-
-
                 </View >
 
 
@@ -1099,6 +1129,71 @@ const styles = StyleSheet.create({
     listDivider: {
         height: 1,
         backgroundColor: '#F1F5F9'
+    },
+    tabSwitcher: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 20,
+        padding: 2
+    },
+    miniTab: {
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 18
+    },
+    miniTabActive: {
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 1
+    },
+    miniTabText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#94A3B8'
+    },
+    miniTabTextActive: {
+        color: COLORS?.primary,
+        fontWeight: '700'
+    },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 20,
+        paddingTop: 15,
+        borderTopWidth: 2,
+        borderTopColor: '#F1F5F9',
+        borderStyle: 'dashed'
+    },
+    totalLabel: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS?.dark
+    },
+    totalValue: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: COLORS?.primary
+    },
+    loadMoreButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        marginTop: 10,
+        borderWidth: 1,
+        borderColor: '#F1F5F9'
+    },
+    loadMoreText: {
+        fontSize: 12,
+        color: COLORS?.primary,
+        fontWeight: '700',
+        marginRight: 6
     },
     // Footer Plan
     planFooter: {

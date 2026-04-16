@@ -35,7 +35,7 @@ const THEME = {
     danger: '#d32f2f'
 };
 
-const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
+const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwitchProfile }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(user.name);
     const [email, setEmail] = useState(user.email || ''); // Add email state
@@ -46,6 +46,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [activeInput] = useState(new Animated.Value(0));
+    const [alertMsg, setAlertMsg] = useState({ visible: false, type: '', text: '' });
 
     const handleRefresh = async () => {
         if (onRefresh) {
@@ -56,16 +57,26 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
     };
 
     const handleSave = async () => {
-        if (!name.trim() || phone.trim().length !== 10) {
-            // Add proper alert or toast
+        if (!name.trim()) {
+            setAlertMsg({ visible: true, type: 'error', text: 'Name cannot be empty.' });
+            return;
+        }
+        if (phone.trim().length !== 10) {
+            setAlertMsg({ visible: true, type: 'error', text: 'Phone number must be 10 digits.' });
+            return;
+        }
+        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            setAlertMsg({ visible: true, type: 'error', text: 'Please enter a valid email address.' });
             return;
         }
         setLoading(true);
+        setAlertMsg({ visible: false, type: '', text: '' });
         try {
-            await onUpdate({ name, email, phone, address, acc_no, panCard }); // Send email
+            await onUpdate({ name, email: email.trim(), phone, address, acc_no, panCard });
             setIsEditing(false);
         } catch (e) {
-            console.log("Update failed");
+            const errMsg = e?.response?.data?.message || 'Update failed. Please try again.';
+            setAlertMsg({ visible: true, type: 'error', text: errMsg });
         } finally {
             setLoading(false);
         }
@@ -210,26 +221,40 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                                     />
                                 </View>
                                 <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Email Address</Text>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, marginLeft: 4 }}>
+                                        <Text style={[styles.label, { marginBottom: 0 }]}>Email Address</Text>
+                                        <View style={{ backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                                            <Text style={{ fontSize: 10, color: '#999' }}>Optional</Text>
+                                        </View>
+                                    </View>
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, email && { borderColor: THEME.border }]}
                                         value={email}
-                                        onChangeText={setEmail}
+                                        onChangeText={(t) => { setEmail(t); setAlertMsg({ visible: false, type: '', text: '' }); }}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
+                                        placeholder="e.g. yourname@email.com"
                                         placeholderTextColor="#aaa"
                                     />
+                                    {alertMsg.visible && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, marginLeft: 4 }}>
+                                            <Icon name="exclamation-circle" size={12} color={THEME.danger} />
+                                            <Text style={{ fontSize: 12, color: THEME.danger, marginLeft: 6 }}>{alertMsg.text}</Text>
+                                        </View>
+                                    )}
                                 </View>
                                 <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Phone Number</Text>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, marginLeft: 4 }}>
+                                        <Text style={[styles.label, { marginBottom: 0 }]}>Phone Number</Text>
+                                    </View>
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, { backgroundColor: '#f0f0f0', color: '#888' }]}
                                         value={phone}
-                                        onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ''))}
-                                        keyboardType="phone-pad"
+                                        editable={false}
                                         placeholderTextColor="#aaa"
                                         maxLength={10}
                                     />
+                                    <Text style={{ fontSize: 10, color: '#999', marginTop: 4 }}>Your registered phone number cannot be changed.</Text>
                                 </View>
                                 <View style={styles.inputContainer}>
                                     <Text style={styles.label}>Address</Text>
@@ -320,7 +345,16 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.detailLabel}>Email Address</Text>
-                                        <Text style={styles.detailValue}>{user.email}</Text>
+                                        {user.email ? (
+                                            <Text style={styles.detailValue}>{user.email}</Text>
+                                        ) : (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={[styles.detailValue, { color: '#bbb', fontStyle: 'italic', fontWeight: '400' }]}>Not provided</Text>
+                                                <View style={{ marginLeft: 8, backgroundColor: '#fff8e8', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: THEME.border }}>
+                                                    <Text style={{ fontSize: 10, color: THEME.primaryDark, fontWeight: '600' }}>Tap EDIT to add</Text>
+                                                </View>
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
                                 <View style={styles.detailRow}>
@@ -346,6 +380,35 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh }) => {
                     </View>
 
                     {/* Logout Button Removed as requested */}
+
+                    {/* Switch Profile Card */}
+                    {onSwitchProfile && (
+                        <TouchableOpacity
+                            style={[styles.card, { padding: 0, overflow: 'hidden' }]}
+                            onPress={onSwitchProfile}
+                            activeOpacity={0.85}
+                        >
+                            <LinearGradient
+                                colors={['#f7f0d8', '#fff8e6']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ borderRadius: 20, padding: 20 }}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <View style={[styles.iconBox, { backgroundColor: '#fff4d0', width: 44, height: 44, borderRadius: 22 }]}>
+                                        <Icon name="random" size={16} color={THEME.primaryDark} />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 14 }}>
+                                        <Text style={{ fontSize: 15, fontWeight: '700', color: THEME.text }}>Switch Profile</Text>
+                                        <Text style={{ fontSize: 12, color: THEME.subText, marginTop: 2 }}>Access another profile linked to your number</Text>
+                                    </View>
+                                    <View style={[styles.iconBox, { backgroundColor: THEME.primaryLight }]}>
+                                        <Icon name="chevron-right" size={13} color={THEME.primaryDark} />
+                                    </View>
+                                </View>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={{ height: 40 }} />
                 </ScrollView>

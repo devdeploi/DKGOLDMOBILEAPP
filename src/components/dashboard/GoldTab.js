@@ -117,6 +117,45 @@ const GoldTab = () => {
     const [makingPct, setMakingPct] = useState('');
     const [calcResult, setCalcResult] = useState(null);
 
+    // --- Market Status Logic (MCX Standards) ---
+    const getMarketStatus = () => {
+        const now = currentTime;
+        const day = now.getDay();
+        const hour = now.getHours();
+        const min = now.getMinutes();
+        const timeVal = hour * 100 + min;
+
+        // Indian Market Holidays 2026 (Common)
+        const dateStr = `${now.getMonth() + 1}-${now.getDate()}`;
+        const holidays = [
+            '1-26', // Republic Day
+            '3-19', // Holi (Approx)
+            '4-2',  // Good Friday
+            '4-14', // Ambedkar Jayanti
+            '5-1',  // Maharashtra Day
+            '8-15', // Independence Day
+            '10-2', // Gandhi Jayanti
+            '11-8', // Diwali (Approx)
+            '12-25' // Christmas
+        ];
+
+        const isHoliday = holidays.includes(dateStr);
+        const isWeekend = day === 0 || day === 6;
+
+        // MCX Standard: 10:00 AM - 11:30 PM IST
+        const openTime = 1000;
+        const closeTime = 2330; 
+        const isOpenTime = timeVal >= openTime && timeVal <= closeTime;
+
+        if (isHoliday) return { isOpen: false, label: 'MARKET CLOSED (PUBLIC HOLIDAY)', color: '#ef4444' };
+        if (isWeekend) return { isOpen: false, label: 'MARKET CLOSED (WEEKEND)', color: '#ef4444' };
+        if (!isOpenTime) return { isOpen: false, label: `MARKET CLOSED (OPENS AT 10:00 AM)`, color: '#ef4444' };
+        
+        return { isOpen: true, label: 'MARKET IS OPEN (MCX)', color: '#22c55e' };
+    };
+
+    const marketStatus = getMarketStatus();
+
     // --- Calculator Logic ---
     const getCaratRate = () => {
         const rate22 = goldRates.rows.find(r => r.id === '22k_inr')?.sellRate || 0;
@@ -169,6 +208,7 @@ const GoldTab = () => {
     }
 
     // Separate rows into groups
+    const usdInrRate = goldRates.rows.find(r => r.id === 'usd_inr');
     const usdRows = goldRates.rows.filter(r => ['24k_usd', 'silver_usd'].includes(r.id));
     const inrRows = goldRates.rows.filter(r => ['24k_inr', 'silver_inr'].includes(r.id));
     const retailNoGstRows = goldRates.rows.filter(r => ['22k_inr', '18k_inr'].includes(r.id));
@@ -184,6 +224,22 @@ const GoldTab = () => {
                     { paddingBottom: isLandscape ? 80 : 140, paddingTop: 10 }
                 ]}
             >
+                {/* --- Top Exchange Rate Bar --- */}
+                {usdInrRate && (
+                    <View style={styles.topExchangeBar}>
+                        <LinearGradient colors={['#ebdc87', '#fffbf0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.topExGradient}>
+                            <View style={styles.exInfo}>
+                                <Icon name="chart-line" size={14} color="#915200" />
+                                <Text style={styles.exLabelTop}>LIVE USD / INR RATE</Text>
+                            </View>
+                                <View style={styles.exBadge}>
+                                    <Text style={styles.exValueTop}>{usdInrRate.sellRate.toFixed(2)}</Text>
+                                    <Text style={styles.exInrSymbol}>₹</Text>
+                                </View>
+                        </LinearGradient>
+                    </View>
+                )}
+
                 {/* --- Table 1: International Market (USD) --- */}
                 <View style={styles.tableWrapper}>
                     <View style={styles.sectionHeaderBanner}>
@@ -266,8 +322,8 @@ const GoldTab = () => {
                             <AnimatedPriceCell value={row.sellRate} prevValue={row.prevSell} rowId={row.id} flex={1.1} />
                             <View style={[styles.cell, { flex: 1.0, alignItems: 'flex-end' }]}>
                                 <View style={styles.rangeCol}>
-                                    <View style={styles.rangeItem}><Text style={styles.highText}>{Math.round(row.high)}</Text></View>
-                                    <View style={styles.rangeItem}><Text style={styles.lowText}>{Math.round(row.low)}</Text></View>
+                                    <View style={styles.rangeItem}><Text style={styles.highText}>H:{Math.round(row.high)}</Text></View>
+                                    <View style={styles.rangeItem}><Text style={styles.lowText}>L:{Math.round(row.low)}</Text></View>
                                 </View>
                             </View>
                         </View>
@@ -374,6 +430,11 @@ const GoldTab = () => {
                         </View>
                     </View>
 
+                    <View style={styles.timingRow}>
+                        <Icon name="clock" size={10} color="#64748b" />
+                        <Text style={styles.timingText}>TIMING: 10:00 AM - 11:30 PM (IST)</Text>
+                    </View>
+
                     <View style={styles.fixedChargesStrip}>
                         <Icon name="info-circle" size={10} color="#78350f" />
                         <Text style={styles.fixedChargesText}>Fixed: Hallmarking ₹40 · Packing ₹100 · GST 3%</Text>
@@ -430,12 +491,17 @@ const GoldTab = () => {
 
             <View style={styles.bottomStatus}>
                 <BlurBackground intensity={20} />
-                <View style={styles.statusContent}>
-                    <View style={styles.statusIndicator}>
-                        <View style={styles.pulseContainer}><View style={styles.pulseDot} /><View style={styles.pulseRing} /></View>
-                        <Text style={styles.statusText}>CHENNAI BULLION UPDATED</Text>
+                <View style={styles.statusDisplayBar}>
+                    <View style={styles.marketStatusPill}>
+                        <View style={[styles.statusDot, { backgroundColor: marketStatus.color }]} />
+                        <Text style={[styles.statusText, { color: marketStatus.isOpen ? '#22c55e' : '#666', fontWeight: 'bold' }]}>
+                            {marketStatus.label}
+                        </Text>
                     </View>
-                    <Text style={styles.clockText}>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Text>
+                    
+                    <Text style={styles.clockText}>
+                        {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                    </Text>
                 </View>
             </View>
         </View>
@@ -577,10 +643,10 @@ const styles = StyleSheet.create({
         borderBottomColor: '#F0F0F0',
     },
     headerColText: {
-        fontSize: 10,
-        color: '#9E9E9E',
-        fontWeight: 'bold',
-        letterSpacing: 1,
+        fontSize: normalize(13),
+        color: '#92400e',
+        fontWeight: '900',
+        letterSpacing: 1.2,
     },
     tableBody: {
         flex: 1,
@@ -610,9 +676,10 @@ const styles = StyleSheet.create({
         minHeight: 40,
     },
     descriptionText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#2D3436',
+        fontSize: normalize(16),
+        fontWeight: '900',
+        color: '#1a1a1a',
+        marginBottom: 2,
     },
     unitBadge: {
         backgroundColor: '#F0F2F5',
@@ -632,7 +699,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     priceText: {
-        fontSize: 12,
+        fontSize: normalize(18),
         fontWeight: '900',
         textAlign: 'center',
     },
@@ -831,6 +898,19 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#92400e',
     },
+    // Timing
+    timingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        marginTop: 10,
+    },
+    timingText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#64748b',
+    },
     // Fixed charges strip
     fixedChargesStrip: {
         flexDirection: 'row',
@@ -1026,7 +1106,49 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        height: Platform.select({ ios: 40, android: 70 }),
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#e2d183',
+        paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+    },
+    statusDisplayBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 15,
+        paddingTop: 10,
+    },
+    marketStatusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    statusDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
+    exchangeRatePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 15,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    exLabelText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#92400e',
+        letterSpacing: 0.5,
+    },
+    exValueText: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#1e293b',
     },
     statusContent: {
         flex: 1,
@@ -1106,6 +1228,62 @@ const styles = StyleSheet.create({
         backgroundColor: '#fdfbf0',
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+    },
+    topExchangeBar: {
+        marginBottom: 15,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e2d183',
+        elevation: 4,
+        shadowColor: '#915200',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    topExGradient: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+    },
+    exInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    exLabelTop: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: '#915200',
+        letterSpacing: 1,
+    },
+    exPriceContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    exBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#e2d183',
+    },
+    exValueTop: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#1e293b',
+    },
+    exInrSymbol: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#915200',
+        marginLeft: 2,
     },
 });
 

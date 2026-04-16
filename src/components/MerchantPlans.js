@@ -161,9 +161,49 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
     const [newPlan, setNewPlan] = useState({ name: '', amount: '', duration: 11, description: '', returnType: 'Cash', isUnlimited: false });
     const [creatingPlan, setCreatingPlan] = useState(false);
 
-    // View Details State
+    // View Details & Subscribers State
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
+    const [planSubscribers, setPlanSubscribers] = useState([]);
+    const [loadingSubscribers, setLoadingSubscribers] = useState(false);
+    const [subscribersPage, setSubscribersPage] = useState(1);
+    const [subscribersTotal, setSubscribersTotal] = useState(0);
+    const [subscribersTotalPages, setSubscribersTotalPages] = useState(0);
+    const [subscribersSearch, setSubscribersSearch] = useState('');
+
+    const fetchSubscribers = async (planId, page = 1, search = '') => {
+        try {
+            setLoadingSubscribers(true);
+            const token = user.token;
+            const res = await axios.get(`${APIURL}/chit-plans/${planId}/subscribers`, {
+                params: { page, limit: 10, search },
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setPlanSubscribers(res.data.subscribers || []);
+            setSubscribersTotal(res.data.total || 0);
+            setSubscribersTotalPages(res.data.pages || 0);
+            setSubscribersPage(res.data.page || 1);
+        } catch (error) {
+            console.error("Error fetching subscribers:", error);
+            Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to fetch subscribers' });
+        } finally {
+            setLoadingSubscribers(false);
+        }
+    };
+
+    const handleSubscriberSearch = (text) => {
+        setSubscribersSearch(text);
+        if (selectedPlan) {
+            fetchSubscribers(selectedPlan._id, 1, text);
+        }
+    };
+
+    const handleSubscriberPagination = (newPage) => {
+        if (selectedPlan && newPage >= 1 && newPage <= subscribersTotalPages) {
+            fetchSubscribers(selectedPlan._id, newPage, subscribersSearch);
+        }
+    };
 
     // Custom Alert State
     const [alertConfig, setAlertConfig] = useState({
@@ -186,7 +226,8 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
 
 
     const handleCreateOrUpdatePlan = async () => {
-        if (!newPlan.name || !newPlan.amount || !newPlan.duration) {
+        const isDurationNeeded = !newPlan.isUnlimited;
+        if (!newPlan.name || !newPlan.amount || (isDurationNeeded && !newPlan.duration)) {
             setAlertConfig({
                 visible: true,
                 title: 'Validation Error',
@@ -199,7 +240,10 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
 
         const totalAmount = parseFloat(newPlan.amount);
         const duration = parseInt(newPlan.duration, 10);
-        const monthlyAmount = parseFloat((totalAmount / duration).toFixed(2));
+        // For unlimited plans, the "amount" is effectively the monthly minimum
+        const monthlyAmount = newPlan.isUnlimited 
+            ? totalAmount 
+            : parseFloat((totalAmount / duration).toFixed(2));
 
         console.log('[MerchantPlans] handleCreateOrUpdatePlan →', { totalAmount, duration, monthlyAmount, isEditing });
 
@@ -286,7 +330,11 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
 
     const openDetails = (plan) => {
         setSelectedPlan(plan);
+        setSubscribersSearch('');
+        setSubscribersPage(1);
+        setPlanSubscribers([]);
         setShowDetailsModal(true);
+        fetchSubscribers(plan._id, 1, '');
     };
 
 
@@ -338,7 +386,10 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
 
 
 
-    const isFormValid = newPlan.name.length > 0 && newPlan.amount.length > 0 && parseFloat(newPlan.amount) > 0;
+    const isFormValid = newPlan.name.length > 0 && 
+                        newPlan.amount.length > 0 && 
+                        parseFloat(newPlan.amount) > 0 && 
+                        (newPlan.isUnlimited || (newPlan.duration && newPlan.duration > 0));
 
     const showSkeletons = loadingPlans && displayedPlans.length === 0;
 
@@ -633,11 +684,14 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
             </Modal>
 
             {/* View Details Modal */}
-            <Modal visible={showDetailsModal} transparent animationType="fade" onRequestClose={() => setShowDetailsModal(false)}>
+            <Modal visible={showDetailsModal} transparent animationType="slide" onRequestClose={() => setShowDetailsModal(false)}>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, { width: '95%', maxHeight: '90%', paddingBottom: 10 }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Plan Details</Text>
+                            <View>
+                                <Text style={styles.modalTitle}>Plan Analysis</Text>
+                                {selectedPlan && <Text style={{ fontSize: 12, color: COLORS?.secondary }}>{selectedPlan.planName}</Text>}
+                            </View>
                             <TouchableOpacity onPress={() => setShowDetailsModal(false)}>
                                 <Icon name="times" size={20} color={COLORS?.secondary} />
                             </TouchableOpacity>
@@ -645,42 +699,98 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
 
                         {selectedPlan && (
                             <View style={styles.fullWidth}>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Plan Name:</Text>
-                                    <Text style={styles.detailValue}>{selectedPlan.planName}</Text>
-                                </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Total Amount:</Text>
-                                    <Text style={styles.detailValue}>₹{selectedPlan.totalAmount}</Text>
-                                </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Duration:</Text>
-                                    <Text style={styles.detailValue}>{selectedPlan.durationMonths} Months</Text>
-                                </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Monthly Installment:</Text>
-                                    <Text style={styles.detailValue}>₹{selectedPlan.monthlyAmount}</Text>
-                                </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Subscribers:</Text>
-                                    <Text style={styles.detailValue}>{selectedPlan.subscribers?.length || 0}</Text>
-                                </View>
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Return Type:</Text>
-                                    <Text style={[styles.detailValue, { fontWeight: 'bold', color: selectedPlan.returnType === 'Gold' ? '#D69E2E' : '#38A169' }]}>
-                                        {selectedPlan.returnType || 'Cash'}
-                                    </Text>
+                                <View style={styles.statsRow}>
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statLabel}>Total Enrolled</Text>
+                                        <Text style={styles.statValue}>{selectedPlan.subscribers?.length || 0}</Text>
+                                    </View>
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statLabel}>Monthly Int.</Text>
+                                        <Text style={styles.statValue}>₹{selectedPlan.monthlyAmount}</Text>
+                                    </View>
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statLabel}>Total Value</Text>
+                                        <Text style={styles.statValue}>₹{selectedPlan.totalAmount}</Text>
+                                    </View>
                                 </View>
 
-                                <Text style={[styles.detailLabel, { marginTop: 15, marginBottom: 5 }]}>Description:</Text>
-                                <View style={styles.descriptionBox}>
-                                    <Text style={styles.descriptionText}>{selectedPlan.description || 'No description provided.'}</Text>
+                                <View style={styles.subscriberSection}>
+                                    <View style={styles.subscriberHeader}>
+                                        <Text style={styles.subSectionTitle}>Enrolled Users ({subscribersTotal})</Text>
+                                        <View style={styles.subSearchContainer}>
+                                            <Icon name="search" size={12} color="#999" />
+                                            <TextInput
+                                                style={styles.subSearchInput}
+                                                placeholder="Name or Acc No..."
+                                                value={subscribersSearch}
+                                                onChangeText={handleSubscriberSearch}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    {loadingSubscribers && planSubscribers.length === 0 ? (
+                                        <View style={styles.subLoader}>
+                                            <ActivityIndicator size="large" color={COLORS?.primary} />
+                                            <Text style={{ marginTop: 10, color: '#666' }}>Fetching subscribers...</Text>
+                                        </View>
+                                    ) : (
+                                        <FlatList
+                                            data={planSubscribers}
+                                            keyExtractor={(item) => item._id}
+                                            style={{ maxHeight: 350 }}
+                                            renderItem={({ item: sub }) => (
+                                                <View style={styles.subscriberItem}>
+                                                    <View style={styles.subInfoMain}>
+                                                        <View style={styles.subAvatar}>
+                                                            <Text style={styles.subAvatarText}>{sub.user?.name?.charAt(0).toUpperCase()}</Text>
+                                                        </View>
+                                                        <View>
+                                                            <Text style={styles.subName}>{sub.user?.name}</Text>
+                                                            <Text style={styles.subAccNo}>Acc: {sub.user?.acc_no || 'N/A'}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={{ alignItems: 'flex-end' }}>
+                                                        <Text style={styles.subPaid}>₹{sub.totalPaid}</Text>
+                                                        <View style={[styles.statusTag, { backgroundColor: sub.status === 'active' ? '#C6F6D5' : '#FEEBC8' }]}>
+                                                            <Text style={[styles.statusTagText, { color: sub.status === 'active' ? '#2F855A' : '#C05621' }]}>{sub.status}</Text>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            )}
+                                            ListEmptyComponent={() => (
+                                                <View style={styles.subEmpty}>
+                                                    <Icon name="users-slash" size={40} color="#eee" />
+                                                    <Text style={{ color: '#999', marginTop: 10 }}>No subscribers found</Text>
+                                                </View>
+                                            )}
+                                        />
+                                    )}
+
+                                    {subscribersTotalPages > 1 && (
+                                        <View style={styles.subPagination}>
+                                            <TouchableOpacity 
+                                                disabled={subscribersPage === 1}
+                                                onPress={() => handleSubscriberPagination(subscribersPage - 1)}
+                                                style={[styles.pageBtn, subscribersPage === 1 && { opacity: 0.3 }]}
+                                            >
+                                                <Icon name="chevron-left" size={14} color={COLORS?.primary} />
+                                            </TouchableOpacity>
+                                            <Text style={styles.subPageText}>Page {subscribersPage} of {subscribersTotalPages}</Text>
+                                            <TouchableOpacity 
+                                                disabled={subscribersPage === subscribersTotalPages}
+                                                onPress={() => handleSubscriberPagination(subscribersPage + 1)}
+                                                style={[styles.pageBtn, subscribersPage === subscribersTotalPages && { opacity: 0.3 }]}
+                                            >
+                                                <Icon name="chevron-right" size={14} color={COLORS?.primary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                 </View>
                             </View>
                         )}
 
-                        <TouchableOpacity style={[styles.saveButton, { marginTop: 20, backgroundColor: COLORS?.secondary }]} onPress={() => setShowDetailsModal(false)}>
-                            <Text style={styles.saveButtonText}>Close</Text>
+                        <TouchableOpacity style={styles.closeModalBtn} onPress={() => setShowDetailsModal(false)}>
+                            <Text style={styles.closeModalBtnText}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1019,6 +1129,168 @@ const styles = StyleSheet.create({
         right: 0,
         height: 60,
         zIndex: 20
+    },
+    // New Subscriber Modal Styles
+    statsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 20
+    },
+    statBox: {
+        flex: 1,
+        backgroundColor: '#fff',
+        padding: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#f0f0f0',
+        alignItems: 'center',
+        elevation: 1
+    },
+    statLabel: {
+        fontSize: 10,
+        color: '#666',
+        marginBottom: 4,
+        fontWeight: '600'
+    },
+    statValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: COLORS?.primary
+    },
+    subscriberSection: {
+        backgroundColor: '#f8fafc',
+        borderRadius: 16,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0'
+    },
+    subscriberHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12
+    },
+    subSectionTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#334155'
+    },
+    subSearchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        height: 32,
+        width: '50%'
+    },
+    subSearchInput: {
+        flex: 1,
+        fontSize: 12,
+        padding: 0,
+        marginLeft: 6,
+        color: '#333'
+    },
+    subLoader: {
+        padding: 40,
+        alignItems: 'center'
+    },
+    subscriberItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        padding: 10,
+        borderRadius: 10,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#edf2f7'
+    },
+    subInfoMain: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    subAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: COLORS?.glass,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        borderWidth: 1,
+        borderColor: COLORS?.primary
+    },
+    subAvatarText: {
+        color: COLORS?.primary,
+        fontWeight: 'bold',
+        fontSize: 14
+    },
+    subName: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#1a202c'
+    },
+    subAccNo: {
+        fontSize: 11,
+        color: '#718096'
+    },
+    subPaid: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: COLORS?.primary
+    },
+    statusTag: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginTop: 4
+    },
+    statusTagText: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        textTransform: 'uppercase'
+    },
+    subEmpty: {
+        padding: 40,
+        alignItems: 'center'
+    },
+    subPagination: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 12,
+        gap: 20
+    },
+    pageBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0'
+    },
+    subPageText: {
+        fontSize: 12,
+        color: '#64748b',
+        fontWeight: '600'
+    },
+    closeModalBtn: {
+        backgroundColor: COLORS?.primary,
+        padding: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        width: '100%',
+        marginTop: 15
+    },
+    closeModalBtnText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16
     }
 });
 

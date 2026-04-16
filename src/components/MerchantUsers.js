@@ -104,6 +104,12 @@ const MerchantUsers = ({ user }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [expandedSubId, setExpandedSubId] = useState(null);
 
+    const formatDisplayDate = (dateString) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+    };
+
     // Date Search State
     const [dateQuery, setDateQuery] = useState('');
     const [dailyPayments, setDailyPayments] = useState(null);
@@ -127,7 +133,11 @@ const MerchantUsers = ({ user }) => {
 
         if (event.type === 'set' && selectedDate) {
             const currentDate = selectedDate || new Date();
-            const formatted = currentDate.toISOString().split('T')[0];
+            // Use local date parts to avoid timezone shifts
+            const year = currentDate.getFullYear();
+            const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+            const day = currentDate.getDate().toString().padStart(2, '0');
+            const formatted = `${year}-${month}-${day}`;
             setDateQuery(formatted);
         }
     }, [setShowDatePicker, setDateQuery]);
@@ -1380,14 +1390,34 @@ const MerchantUsers = ({ user }) => {
 
         setSubmittingManual(true);
         try {
+            // Validate Date parts
+            const y = parseInt(manualDateInput.year);
+            const m = parseInt(manualDateInput.month);
+            const d = parseInt(manualDateInput.day);
+
+            if (isNaN(y) || isNaN(m) || isNaN(d) || manualDateInput.year.length < 4) {
+                showCustomAlert("Error", "Please enter a full 4-digit year", "error");
+                setSubmittingManual(false);
+                return;
+            }
+
+            const checkDate = new Date(y, m - 1, d);
+            if (checkDate.getDate() !== d || checkDate.getMonth() !== (m - 1) || checkDate.getFullYear() !== y) {
+                showCustomAlert("Error", "Invalid date (e.g. check days in month)", "error");
+                setSubmittingManual(false);
+                return;
+            }
+
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
             const subId = selectedSubscriber._id || selectedSubscriber.subscriberId;
+            const formattedDate = `${manualDateInput.year}-${manualDateInput.month.padStart(2, '0')}-${manualDateInput.day.padStart(2, '0')}`;
+            
             const result = await axios.post(`${APIURL}/payments/offline/record`, {
                 chitPlanId: selectedSubscriber.plan._id,
                 userId: selectedSubscriber.user._id,
-                subscriptionId: subId, // Add this
+                subscriptionId: subId, 
                 amount: manualForm.amount,
-                date: selectedPaymentDate.toISOString(),
+                date: formattedDate,
                 goldRate: ((selectedSubscriber?.plan?.type === 'unlimited') || (selectedSubscriber?.plan?.planType === 'unlimited')) 
                     ? (manualForm.customGoldRate ? parseFloat(manualForm.customGoldRate) : (lockedGoldRate || goldRate))
                     : 0,
@@ -1510,7 +1540,7 @@ const MerchantUsers = ({ user }) => {
                 </View>
                 <View style={styles.row}>
                     <Text style={styles.label}>Date:</Text>
-                    <Text style={styles.value}>{new Date(item.paymentDate).toLocaleDateString()}</Text>
+                    <Text style={styles.value}>{formatDisplayDate(item.paymentDate)}</Text>
                 </View>
                 {item.notes && (
                     <View style={styles.row}>
@@ -1775,7 +1805,7 @@ const MerchantUsers = ({ user }) => {
                     <View style={{ paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0' }}>
                         <View style={styles.row}>
                             <Text style={styles.label}>Joined:</Text>
-                            <Text style={styles.value}>{new Date(item.subscription.joinedAt).toLocaleDateString()}</Text>
+                            <Text style={styles.value}>{formatDisplayDate(item.subscription.joinedAt)}</Text>
                         </View>
                         <View style={styles.row}>
                             <Text style={styles.label}>Status:</Text>
@@ -1893,7 +1923,7 @@ const MerchantUsers = ({ user }) => {
                                     >
                                         <Text style={styles.payOfflineText}>
                                             {effectiveStatus === 'settled' ? 'Settled' :
-                                                effectiveStatus === 'delivered_gold' ? 'Delivered' : 'Paid'}
+                                                effectiveStatus === 'delivered_gold' ? 'Delivered' : 'Record'}
                                         </Text>
                                 </TouchableOpacity>
                             </View>
@@ -2246,7 +2276,10 @@ const MerchantUsers = ({ user }) => {
             {showDatePicker && Platform.OS === 'android' && (
                 <DateTimePicker
                     testID="dateTimePicker"
-                    value={dateQuery ? new Date(dateQuery) : new Date()}
+                    value={dateQuery ? (() => {
+                        const parts = dateQuery.split('-');
+                        return new Date(parts[0], parts[1] - 1, parts[2]);
+                    })() : new Date()}
                     mode="date"
                     is24Hour={true}
                     display="default"
@@ -2272,7 +2305,10 @@ const MerchantUsers = ({ user }) => {
                             </View>
                             <DateTimePicker
                                 testID="dateTimePicker"
-                                value={dateQuery ? new Date(dateQuery) : new Date()}
+                                value={dateQuery ? (() => {
+                                    const parts = dateQuery.split('-');
+                                    return new Date(parts[0], parts[1] - 1, parts[2]);
+                                })() : new Date()}
                                 mode="date"
                                 is24Hour={true}
                                 display="spinner"
@@ -2547,7 +2583,7 @@ const MerchantUsers = ({ user }) => {
                                 renderItem={({ item }) => (
                                     <View style={styles.historyItem}>
                                         <View style={styles.historyLeft}>
-                                            <Text style={styles.historyDate}>{new Date(item.paymentDate || item.createdAt).toLocaleDateString()}</Text>
+                                            <Text style={styles.historyDate}>{formatDisplayDate(item.paymentDate || item.createdAt)}</Text>
                                             <Text style={styles.historyType}>
                                                 {item.type === 'online' ? 'Online' : item.type === 'offline' ? 'Offline' : item.type}
                                             </Text>

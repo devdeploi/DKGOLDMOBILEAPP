@@ -23,17 +23,16 @@ import TermsAndConditions from '../components/TermsAndConditions';
 import UserPolicy from '../components/UserPolicy';
 
 const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
-    const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     // OTP & Step State
     const [step, setStep] = useState(1);
     const [otp, setOtp] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
 
     // Password Strength State
     const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '#E2E8F0' });
@@ -92,21 +91,18 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
     };
 
     const handleSendOtp = async () => {
-        if (!email || !password || !phone) {
-            setAlertConfig({ visible: true, title: 'Error', message: 'Please fill all fields', type: 'error' });
+        if (!phone || !password) {
+            setAlertConfig({ visible: true, title: 'Error', message: 'Please fill all required fields', type: 'error' });
             return;
         }
-
         if (phone.length !== 10) {
             setAlertConfig({ visible: true, title: 'Invalid Phone', message: 'Phone number must be exactly 10 digits.', type: 'warning' });
             return;
         }
-
         if (password !== confirmPassword) {
             setAlertConfig({ visible: true, title: 'Error', message: 'Passwords do not match', type: 'error' });
             return;
         }
-
         if (!isCommonAccepted) {
             setAlertConfig({ visible: true, title: 'Required', message: 'Please read and accept both Terms & Conditions and User Policy to proceed.', type: 'warning' });
             return;
@@ -114,21 +110,19 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
 
         setIsLoading(true);
         try {
-            const response = await axios.post(`${APIURL}/merchants/send-reg-otp`, { email, phone });
-            console.log('Send Reg OTP Success:', response.data);
+            await axios.post(`${APIURL}/merchants/send-reg-otp`, { phone });
             setAlertConfig({
                 visible: true,
-                title: 'Success',
-                message: `OTP sent to ${email}`,
+                title: 'OTP Sent',
+                message: `A 6-digit OTP has been sent to +91 ${phone}`,
                 type: 'success',
                 buttons: [{ text: 'OK', onPress: () => setStep(2) }]
             });
         } catch (error) {
-            console.log('Send Reg OTP Error:', error.response?.data || error.message);
             setAlertConfig({
                 visible: true,
                 title: 'Error',
-                message: error.response?.data?.message || 'Failed to send OTP',
+                message: error.response?.data?.message || 'Failed to send OTP. Please try again.',
                 type: 'error'
             });
         } finally {
@@ -138,50 +132,41 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
 
     const handleVerifyAndRegister = async () => {
         if (otp.length !== 6) {
-            setAlertConfig({ visible: true, title: 'Error', message: 'Please enter a valid 6-digit OTP', type: 'error' });
+            setAlertConfig({ visible: true, title: 'Error', message: 'Please enter the 6-digit OTP', type: 'error' });
             return;
         }
 
         setIsLoading(true);
         try {
             // 1. Verify OTP
-            const verifyRes = await axios.post(`${APIURL}/merchants/verify-reg-otp`, { email, otp });
-            console.log('Verify Reg OTP Success:', verifyRes.data);
+            await axios.post(`${APIURL}/merchants/verify-reg-otp`, { phone, otp });
 
-            // 2. Register User
-            // Sending 'New User' as placeholder name since it's required by backend model
-            // User must complete profile later
-            const userData = {
+            // 2. Create account
+            const { data } = await axios.post(`${APIURL}/users`, {
                 name: 'New User',
-                email,
                 phone,
                 password,
                 role: 'user'
-            };
-
-            const { data } = await axios.post(`${APIURL}/users`, userData);
-            console.log('User Registration Success:', data);
+            });
 
             setAlertConfig({
                 visible: true,
-                title: 'Success',
+                title: 'Welcome!',
                 message: 'Account created successfully! Please complete your profile.',
                 type: 'success',
                 buttons: [{
-                    text: 'Login Now',
+                    text: 'Continue',
                     onPress: () => {
                         FCMService.displayLocalNotification('Welcome to DK Gold', 'Your account has been created successfully!');
                         onRegister(data);
                     }
                 }]
             });
-
         } catch (error) {
-            console.log('Registration Error:', error.response?.data || error.message);
             setAlertConfig({
                 visible: true,
                 title: 'Error',
-                message: error.response?.data?.message || 'Registration failed',
+                message: error.response?.data?.message || 'Verification failed. Please try again.',
                 type: 'error'
             });
         } finally {
@@ -204,41 +189,27 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                         <View style={styles.headerContainer}>
                             <Text style={styles.title}>Create Account</Text>
                             <Text style={styles.subtitle}>
-                                {step === 1 ? 'Start your journey with DK Gold' : 'Verify your email address'}
+                                {step === 1 ? 'Start your journey with DK Gold' : `Enter the OTP sent to +91 ${phone}`}
                             </Text>
                         </View>
 
                         {step === 1 ? (
                             <>
-                                <View style={styles.inputGroup}>
-                                    <View style={styles.iconInputContainer}>
-                                        <Icon name="phone-alt" size={16} color={COLORS?.primary} style={styles.inputIcon} />
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Phone Number (10 digits)"
-                                            placeholderTextColor="#A0AEC0"
-                                            value={phone}
-                                            onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ''))}
-                                            keyboardType="phone-pad"
-                                            maxLength={10}
-                                        />
-                                    </View>
-                                </View>
 
-                                <View style={styles.inputGroup}>
-                                    <View style={styles.iconInputContainer}>
-                                        <Icon name="envelope" size={16} color={COLORS?.primary} style={styles.inputIcon} />
-                                        <TextInput
-                                            style={styles.input}
-                                            placeholder="Email Address"
-                                            placeholderTextColor="#A0AEC0"
-                                            value={email}
-                                            onChangeText={setEmail}
-                                            keyboardType="email-address"
-                                            autoCapitalize="none"
-                                        />
-                                    </View>
-                                </View>
+                        <View style={styles.inputGroup}>
+                            <View style={styles.iconInputContainer}>
+                                <Icon name="phone-alt" size={16} color={COLORS?.primary} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Phone Number (10 digits)"
+                                    placeholderTextColor="#A0AEC0"
+                                    value={phone}
+                                    onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ''))}
+                                    keyboardType="phone-pad"
+                                    maxLength={10}
+                                />
+                            </View>
+                        </View>
 
                                 <View style={styles.inputGroup}>
                                     <View style={styles.iconInputContainer}>
@@ -334,14 +305,6 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Main Acceptance Disclaimer */}
-                                {/* <View style={styles.disclaimerContainer}>
-                                    <Icon name="info-circle" size={14} color="#718096" style={{ marginTop: 2, marginRight: 8 }} />
-                                    <Text style={styles.disclaimerText}>
-                                        By tapping Next, you confirm that you have read and agreed to our Terms and Privacy Policy.
-                                    </Text>
-                                </View> */}
-
                                 <TouchableOpacity
                                     style={[styles.button, !isCommonAccepted && styles.disabledButton]}
                                     onPress={handleSendOtp}
@@ -352,7 +315,7 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                                         <ActivityIndicator color="#fff" />
                                     ) : (
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Text style={styles.buttonText}>Continue</Text>
+                                            <Text style={styles.buttonText}>Send OTP</Text>
                                             <Icon name="arrow-right" size={14} color="#fff" style={{ marginLeft: 8 }} />
                                         </View>
                                     )}
@@ -361,7 +324,9 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                         ) : (
                             <>
                                 <View style={styles.otpContainer}>
-                                    <Text style={styles.otpLabel}>Enter the code sent to {email}</Text>
+                                    <Icon name="mobile-alt" size={36} color={COLORS?.primary} style={{ marginBottom: 16 }} />
+                                    <Text style={styles.otpLabel}>Enter the 6-digit OTP sent to</Text>
+                                    <Text style={[styles.otpLabel, { fontWeight: 'bold', color: COLORS?.primary }]}>+91 {phone}</Text>
                                     <TextInput
                                         style={styles.otpInput}
                                         placeholder="000000"
@@ -387,7 +352,7 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                                     )}
                                 </TouchableOpacity>
 
-                                <TouchableOpacity onPress={() => setStep(1)} style={styles.linkButton}>
+                                <TouchableOpacity onPress={() => { setStep(1); setOtp(''); }} style={styles.linkButton}>
                                     <Icon name="arrow-left" size={12} color={COLORS?.primary} style={{ marginRight: 6 }} />
                                     <Text style={styles.linkTextPrimary}>Back to Details</Text>
                                 </TouchableOpacity>

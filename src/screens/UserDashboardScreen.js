@@ -27,7 +27,7 @@ import GoldTab from '../components/dashboard/GoldTab';
 import CustomAlert from '../components/CustomAlert';
 import { APIURL } from '../constants/api';
 
-const UserDashboardScreen = ({ user: initialUser, onLogout, onSelectMerchant, onUserUpdate, initialTab = 'dashboard', ads = [], onRefreshAds }) => {
+const UserDashboardScreen = ({ user: initialUser, onLogout, onSelectMerchant, onUserUpdate, initialTab = 'dashboard', ads = [], onRefreshAds, onSwitchProfile }) => {
     const [user, setUser] = useState(initialUser);
     const [activeTab, setActiveTab] = useState(initialTab);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -266,7 +266,7 @@ const UserDashboardScreen = ({ user: initialUser, onLogout, onSelectMerchant, on
             case 'analytics':
                 return <AnalyticsTab user={user} />;
             case 'profile':
-                return <ProfileTab user={user} onUpdate={handleUpdateProfile} onUpdateImage={updateProfileImage} onLogout={handleLogoutPress} onRefresh={fetchUser} />;
+                return <ProfileTab user={user} onUpdate={handleUpdateProfile} onUpdateImage={updateProfileImage} onLogout={handleLogoutPress} onRefresh={fetchUser} onSwitchProfile={onSwitchProfile} />;
             default:
                 return null;
         }

@@ -160,7 +160,9 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             setStats(prev => ({
                 ...prev,
                 dailyCollection: data.dailyCollection || 0,
-                monthlyCollection: data.monthlyCollection || 0
+                monthlyCollection: data.monthlyCollection || 0,
+                todaysCollections: data.todaysCollections || [],
+                monthlyCollections: data.monthlyCollections || []
             }));
         } catch (error) {
             console.error("Error fetching dashboard stats", error);
@@ -182,9 +184,9 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 shopImages: data.shopImages || []
             };
 
-            // if (onUserUpdate) {
-            //     onUserUpdate({ ...user, ...safeData });
-            // }
+            if (onUserUpdate) {
+                onUserUpdate({ ...user, ...safeData });
+            }
 
             setProfileData(prev => ({ ...prev, ...safeData }));
         } catch (error) {
@@ -192,19 +194,20 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
         }
     }, [user]);
 
-    // Fetch Stats & Plans
+    // Initial Fetch on Mount
+    useEffect(() => {
+        fetchPlans();
+        fetchDashboardStats();
+        fetchProfile();
+    }, []); // Only run on first mount
+
+    // Tab Change Fetch
     useEffect(() => {
         if (activeTab === 'overview' || activeTab === 'plans' || activeTab === 'subscribers') {
-            fetchPlans();
-            if (activeTab === 'overview') {
-                fetchDashboardStats();
-            }
+            // Optional: Re-fetch on tab change if data needs to be fresh
+            // fetchPlans();
         }
-
-        if (user) {
-            fetchProfile();
-        }
-    }, [user, activeTab, fetchPlans, fetchProfile]);
+    }, [activeTab]);
 
     const handleUpdateProfile = async (updatedData) => {
         try {
@@ -243,8 +246,8 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             setIsEditingProfile(false);
             setAlertConfig({ visible: true, title: 'Success', message: 'Profile updated successfully', type: 'success' });
 
-            // Optionally, refresh the main user state if needed
-            // if (onUserUpdate) onUserUpdate(safeData);
+            // Refresh the main user state to reflect changes in Live Rates
+            if (onUserUpdate) onUserUpdate(safeData);
 
         } catch (error) {
             console.error("Update profile error", error);
