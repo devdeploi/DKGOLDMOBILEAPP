@@ -481,30 +481,22 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                                 ) : (
                                     <Text style={styles.helperText}>Pay ₹{selectedPlanForSub?.monthlyAmount} using any UPI app.</Text>
                                 )}
-
                                 {(selectedPlanForSub?.returnType?.toLowerCase() === 'gold' || selectedPlanForSub?.type === 'unlimited') && goldRate > 0 && (
-                                    <View style={styles.goldCalculationContainer}>
-                                        <View style={styles.goldPriceRow}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <View style={[styles.liveIndicator, { backgroundColor: '#4CAF50' }]} />
-                                                <Text style={styles.goldPriceText}>Live Price (24K): ₹{(lockedGoldRate || goldRate).toFixed(2)}/gm</Text>
-                                            </View>
+                                    <View style={{ marginTop: 15, marginBottom: 15, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
+                                        <Text style={[styles.label, { color: '#92400E', marginBottom: 8 }]}>Applied Gold Rate (₹/gm)</Text>
+                                        <View style={[styles.input, { backgroundColor: '#F3F4F6', borderColor: '#FCD34D', marginBottom: 12, height: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                                            <Text style={{ color: '#666', fontSize: 15 }}>
+                                                ₹{(lockedGoldRate || goldRate).toFixed(2)}
+                                            </Text>
+                                            <Icon name="lock" size={12} color="#999" />
                                         </View>
-                                        {/* Full width timer progression bar */}
-                                        <View style={styles.fullWidthTimerContainer}>
-                                            <View style={[styles.timerProgress, { width: `${(goldRefreshTimer / 60) * 100}%` }]} />
+
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Text style={{ fontSize: 12, color: '#92400E', fontWeight: 'bold' }}>Allocated Gold Weight:</Text>
+                                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS?.dark }}>
+                                                {((selectedPlanForSub?.type === 'unlimited' ? Number(subscriptionAmount) : selectedPlanForSub?.monthlyAmount) / (lockedGoldRate || goldRate)).toFixed(3)}g
+                                            </Text>
                                         </View>
-                                        <View style={styles.calcRow}>
-                                            <View style={styles.calcBox}>
-                                                <Text style={styles.calcLabel}>Allocated Weight</Text>
-                                                <Text style={styles.calcValue}>
-                                                    {((selectedPlanForSub?.type === 'unlimited' ? Number(subscriptionAmount) : selectedPlanForSub?.monthlyAmount) / (lockedGoldRate || goldRate)).toFixed(3)}g
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        <Text style={styles.goldRefreshHint}>
-                                            * Live gold rates refresh automatically every 60 seconds.
-                                        </Text>
                                     </View>
                                 )}
                             </View>

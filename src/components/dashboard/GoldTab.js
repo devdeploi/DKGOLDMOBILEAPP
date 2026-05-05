@@ -225,7 +225,7 @@ const GoldTab = () => {
                 ]}
             >
                 {/* --- Top Exchange Rate Bar --- */}
-                {usdInrRate && (
+                {/* {usdInrRate && (
                     <View style={styles.topExchangeBar}>
                         <LinearGradient colors={['#ebdc87', '#fffbf0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.topExGradient}>
                             <View style={styles.exInfo}>
@@ -238,7 +238,7 @@ const GoldTab = () => {
                                 </View>
                         </LinearGradient>
                     </View>
-                )}
+                )} */}
 
                 {/* --- Table 1: International Market (USD) --- */}
                 <View style={styles.tableWrapper}>

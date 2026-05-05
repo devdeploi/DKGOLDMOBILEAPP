@@ -135,7 +135,36 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
         return colors[index % colors.length];
     };
 
-    // --- Data Preparation ---
+    // 0. Calculate Delivered Partial Amounts (to be added to settlement and subtracted from collection)
+    const deliveryStats = useMemo(() => {
+        let total = 0;
+        let daily = 0;
+        let monthly = 0;
+        const today = new Date().toISOString().split('T')[0];
+        const thisMonth = new Date().toISOString().slice(0, 7);
+
+        plans.forEach(plan => {
+            if (plan.subscribers) {
+                plan.subscribers.forEach(sub => {
+                    // Total across all time
+                    total += Number(sub.deliveredAmount) || 0;
+                    
+                    // Check history for today and this month
+                    if (sub.deliveryHistory && Array.isArray(sub.deliveryHistory)) {
+                        sub.deliveryHistory.forEach(delivery => {
+                            if (delivery.date) {
+                                const dDate = delivery.date.split('T')[0];
+                                const dMonth = delivery.date.slice(0, 7);
+                                if (dDate === today) daily += Number(delivery.amount) || 0;
+                                if (dMonth === thisMonth) monthly += Number(delivery.amount) || 0;
+                            }
+                        });
+                    }
+                });
+            }
+        });
+        return { total, daily, monthly };
+    }, [plans]);
 
     // 1. Prepare Plan Distribution Donut Data
     const activePlansWithSubs = plans.filter(p => p.subscribers && p.subscribers.length > 0);
@@ -329,8 +358,8 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                                         ) : (
                                             <Text style={styles.glassValue}>
                                                 ₹ {collectionFreq === 'daily'
-                                                    ? (stats.dailyCollection ? stats.dailyCollection.toLocaleString() : '0')
-                                                    : (stats.monthlyCollection ? stats.monthlyCollection.toLocaleString() : '0')
+                                                    ? (stats.dailyCollection ? (stats.dailyCollection - deliveryStats.daily).toLocaleString() : '0')
+                                                    : (stats.monthlyCollection ? (stats.monthlyCollection - deliveryStats.monthly).toLocaleString() : '0')
                                                 }
                                             </Text>
                                         )}
@@ -427,7 +456,7 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                         {showLoader ? (
                             <RandomNumberLoader value={null} style={styles.statValue} isCurrency={true} />
                         ) : (
-                            <Text style={styles.statValue}>{formatCurrencyCompact(stats.activeUserCollection)}</Text>
+                            <Text style={styles.statValue}>{formatCurrencyCompact(stats.activeUserCollection - deliveryStats.total)}</Text>
                         )}
                     </View>
                     <View style={styles.statDivider} />
@@ -436,7 +465,7 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                         {showLoader ? (
                             <RandomNumberLoader value={null} style={styles.statValue} isCurrency={true} />
                         ) : (
-                            <Text style={styles.statValue}>{formatCurrencyCompact(stats.settledAmount)}</Text>
+                            <Text style={styles.statValue}>{formatCurrencyCompact(stats.settledAmount + deliveryStats.total)}</Text>
                         )}
                     </View>
                 </View>

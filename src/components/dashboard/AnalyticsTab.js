@@ -148,8 +148,8 @@ const AnalyticsTab = ({ user }) => {
                     // Optionally ask user to share, but for users download is fine
                     setTimeout(() => {
                         Alert.alert("Success", "PDF saved. Do you want to share it?", [
-                           { text: "Share", onPress: () => shareFile(downloadPath) },
-                           { text: "OK" }
+                            { text: "Share", onPress: () => shareFile(downloadPath) },
+                            { text: "OK" }
                         ]);
                     }, 500);
                 } catch (copyErr) {
@@ -752,15 +752,15 @@ const AnalyticsTab = ({ user }) => {
         const isExpanded = expandedCardId === plan._id;
         const isGoldPlan = plan.returnType?.toLowerCase() === 'gold';
         const showGold = (isUnlimited || isGoldPlan) && goldRate > 0;
-        
+
         // Calculate Remaining Balances
         const deliveredWeight = plan.deliveredGoldWeight || 0;
         const totalSavedAmount = plan.totalSaved || 0;
         const deliveredAmount = plan.deliveredAmount || 0;
-        
+
         const remainingGold = Math.max(0, (plan.totalGoldWeight || 0) - deliveredWeight);
         const remainingSaved = Math.max(0, totalSavedAmount - deliveredAmount);
-        
+
         const goldGrams = remainingGold.toFixed(3);
 
         return (
@@ -793,11 +793,11 @@ const AnalyticsTab = ({ user }) => {
                     <View style={styles.compactStats}>
                         <View>
                             <Text style={styles.compactStatText}>
-                                ₹{remainingSaved ? remainingSaved.toLocaleString() : 0} Remaining
+                                ₹{remainingSaved ? remainingSaved.toLocaleString() : 0} Saved
                             </Text>
                             {showGold && (
                                 <Text style={[styles.compactStatText, { color: '#B45309', fontWeight: 'bold', fontSize: 10 }]}>
-                                    {goldGrams}g Gold Remaining
+                                    {goldGrams}g Gold Saved
                                 </Text>
                             )}
                         </View>
@@ -827,12 +827,12 @@ const AnalyticsTab = ({ user }) => {
                         <View style={styles.statsGrid}>
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>Total Saved</Text>
-                                <Text style={styles.statValue}>₹{plan.totalSaved ? plan.totalSaved.toLocaleString() : 0}</Text>
+                                <Text style={styles.statValue}>₹{remainingSaved ? remainingSaved.toLocaleString() : 0}</Text>
                             </View>
 
                             {showGold && (
                                 <View style={styles.statItem}>
-                                    <Text style={styles.statLabel}>Gold (24k)</Text>
+                                    <Text style={styles.statLabel}>Gold Saved</Text>
                                     <Text style={[styles.statValue, { color: '#B45309' }]}>{goldGrams}g</Text>
                                 </View>
                             )}
@@ -975,11 +975,11 @@ const AnalyticsTab = ({ user }) => {
                                     plan.history.map((payment, index) => (
                                         <View key={payment._id || index} style={styles.historyItem}>
                                             <View style={styles.historyLeft}>
-                                                <Icon 
-                                                    name={payment.isDelivered ? "gift" : "check-circle"} 
-                                                    size={10} 
-                                                    color={payment.isDelivered ? "#d4af37" : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : "#2E7D32")} 
-                                                    style={{ marginTop: 2 }} 
+                                                <Icon
+                                                    name={payment.isDelivered ? "gift" : "check-circle"}
+                                                    size={10}
+                                                    color={payment.isDelivered ? "#d4af37" : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : "#2E7D32")}
+                                                    style={{ marginTop: 2 }}
                                                 />
                                                 <View style={{ marginLeft: 8 }}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1286,39 +1286,28 @@ const AnalyticsTab = ({ user }) => {
                                     <Text style={styles.inputHint}>Enter any amount you wish to pay towards this plan.</Text>
 
                                     {((selectedPlanForOffline?.returnType?.toLowerCase() === 'gold') || isPlanUnlimited(selectedPlanForOffline)) && goldRate > 0 && (
-                                        <View style={styles.goldCalculationContainer}>
-                                            <View style={styles.goldPriceRow}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <View style={[styles.liveIndicator, { backgroundColor: '#4CAF50' }]} />
-                                                    <Text style={styles.goldPriceText}>Live Price (24K): ₹{(lockedGoldRate || goldRate).toFixed(2)}/gm</Text>
-                                                </View>
-                                            </View>
-                                            
-                                            {/* Full width timer progression bar */}
-                                            <View style={styles.fullWidthTimerContainer}>
-                                                <View style={[styles.timerProgress, { width: `${(goldRefreshTimer / 60) * 100}%` }]} />
+                                        <View style={{ marginTop: 15, marginBottom: 15, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
+                                            <Text style={[styles.inputLabel, { color: '#92400E', marginBottom: 8 }]}>Applied Gold Rate (₹/gm)</Text>
+                                            <View style={[styles.inputWrapper, { backgroundColor: '#F3F4F6', borderColor: '#FCD34D', marginBottom: 12, height: 45 }]}>
+                                                <Text style={[styles.flexInput, { color: '#666', fontSize: 15, textAlignVertical: 'center', paddingTop: Platform.OS === 'ios' ? 12 : 0 }]}>
+                                                    ₹{(lockedGoldRate || goldRate).toFixed(2)}
+                                                </Text>
+                                                <Icon name="lock" size={12} color="#999" />
                                             </View>
 
-                                            <View style={styles.calcRow}>
-                                                <View style={styles.calcBox}>
-                                                    <Text style={styles.calcLabel}>Gold Weight</Text>
-                                                    <Text style={styles.calcValue}>
-                                                        {((isPlanUnlimited(selectedPlanForOffline) ? Number(customAmount) : selectedPlanForOffline.monthlyAmount) / (lockedGoldRate || goldRate)).toFixed(3)}g
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.calcDivider} />
-                                                <View style={styles.calcBox}>
-                                                    <Text style={styles.calcLabel}>Total Gold Saved</Text>
-                                                    <Text style={[styles.calcValue, { color: '#B45309' }]}>
-                                                        {selectedPlanForOffline.totalGoldWeight 
-                                                            ? selectedPlanForOffline.totalGoldWeight.toFixed(3) 
-                                                            : (selectedPlanForOffline.totalSaved / (lockedGoldRate || goldRate)).toFixed(3)}g
-                                                    </Text>
-                                                </View>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#FEF3C7', marginBottom: 10 }}>
+                                                <Text style={{ fontSize: 12, color: '#92400E', fontWeight: 'bold' }}>Calculated Gold Weight:</Text>
+                                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS?.dark }}>
+                                                    {(customAmount && (lockedGoldRate || goldRate)) ? (parseFloat(customAmount) / (lockedGoldRate || goldRate)).toFixed(3) : '0.000'}g
+                                                </Text>
                                             </View>
-                                            <Text style={styles.goldRefreshHint}>
-                                                * Live gold rates refresh automatically every 60 seconds.
-                                            </Text>
+
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Text style={{ fontSize: 11, color: '#92400E' }}>Total Gold Saved After This:</Text>
+                                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#B45309' }}>
+                                                    {((selectedPlanForOffline.totalGoldWeight || 0) + ((customAmount && (lockedGoldRate || goldRate)) ? (parseFloat(customAmount) / (lockedGoldRate || goldRate)) : 0)).toFixed(3)}g
+                                                </Text>
+                                            </View>
                                         </View>
                                     )}
                                 </View>

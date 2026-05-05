@@ -24,6 +24,7 @@ import Icon from 'react-native-vector-icons/FontAwesome5';
 import MerchantOverview from '../components/MerchantOverview';
 import MerchantPlans from '../components/MerchantPlans';
 import MerchantUsers from '../components/MerchantUsers';
+import UnsubscribedUsersList from '../components/UnsubscribedUsersList';
 import MerchantProfile from '../components/MerchantProfile';
 import AdManager from '../components/AdManager';
 import GoldTab from '../components/dashboard/GoldTab';
@@ -73,6 +74,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
         { id: 'gold', icon: 'coins', label: 'Live Rates' },
         { id: 'plans', icon: 'clipboard-list', label: 'My Plans' },
         { id: 'subscribers', icon: 'users', label: 'Users' },
+        { id: 'new-users', icon: 'user-plus', label: 'New' },
         { id: 'ads', icon: 'bullhorn', label: 'Promote' },
         { id: 'profile', icon: 'user-cog', label: 'Profile', profileImage: profileData?.shopLogo || user?.shopLogo },
     ];
@@ -291,6 +293,8 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 );
             case 'subscribers':
                 return <MerchantUsers user={stabilizedUser} />;
+            case 'new-users':
+                return <UnsubscribedUsersList user={stabilizedUser} />;
             case 'ads':
                 return <AdManager user={stabilizedUser} />;
             case 'profile':

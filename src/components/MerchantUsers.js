@@ -116,6 +116,15 @@ const MerchantUsers = ({ user }) => {
     const [isSearchingDate, setIsSearchingDate] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showDateInput, setShowDateInput] = useState(false);
+
+    // Date Range Search State
+    const [rangeFromDate, setRangeFromDate] = useState('');
+    const [rangeToDate, setRangeToDate] = useState('');
+    const [showFromPicker, setShowFromPicker] = useState(false);
+    const [showToPicker, setShowToPicker] = useState(false);
+    const [totalRangeAmount, setTotalRangeAmount] = useState(0);
+    const [totalSettledAmount, setTotalSettledAmount] = useState(0);
+    const [isRangeSearch, setIsRangeSearch] = useState(false);
     
     // Global Gold Rate Context
     const { goldRate, refreshTimer: lockedTimer } = useGoldRate();
@@ -312,6 +321,7 @@ const MerchantUsers = ({ user }) => {
     const handleDateSearch = async () => {
         if (!dateQuery) return;
         setIsSearchingDate(true);
+        setIsRangeSearch(false); // Reset range search mode
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
             const { data } = await axios.get(`${APIURL}/payments/search/date?date=${dateQuery}`, config);
@@ -324,9 +334,62 @@ const MerchantUsers = ({ user }) => {
         }
     };
 
+    const handleRangeSearch = async () => {
+        if (!rangeFromDate || !rangeToDate) {
+            showCustomAlert("Required", "Please select both From and To dates", "warning");
+            return;
+        }
+        setIsSearchingDate(true);
+        setIsRangeSearch(true);
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            const { data } = await axios.get(`${APIURL}/payments/search/range?fromDate=${rangeFromDate}&toDate=${rangeToDate}`, config);
+            
+            // Combine payments and settlements for display
+            const combined = [
+                ...data.payments,
+                ...data.settlements
+            ].sort((a, b) => new Date(b.paymentDate || b.date) - new Date(a.paymentDate || a.date));
+
+            setDailyPayments(combined);
+            setTotalRangeAmount(data.totalPaymentsAmount);
+            setTotalSettledAmount(data.totalSettledAmount);
+        } catch (error) {
+            console.error("Range search failed", error);
+            showCustomAlert("Error", "Failed to fetch range results.", "error");
+        } finally {
+            setIsSearchingDate(false);
+        }
+    };
+
+    const handleRangeDateChange = (type) => (event, selectedDate) => {
+        if (Platform.OS === 'android') {
+            type === 'from' ? setShowFromPicker(false) : setShowToPicker(false);
+        }
+
+        if (event.type === 'set' && selectedDate) {
+            const currentDate = selectedDate || new Date();
+            const year = currentDate.getFullYear();
+            const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+            const day = currentDate.getDate().toString().padStart(2, '0');
+            const formatted = `${year}-${month}-${day}`;
+            
+            if (type === 'from') {
+                setRangeFromDate(formatted);
+            } else {
+                setRangeToDate(formatted);
+            }
+        }
+    };
+
     const clearDateSearch = () => {
         setDailyPayments(null);
         setDateQuery('');
+        setRangeFromDate('');
+        setRangeToDate('');
+        setTotalRangeAmount(0);
+        setTotalSettledAmount(0);
+        setIsRangeSearch(false);
     };
 
     // Note: Timer and rate changes are now globally maintained via GoldRateContext
@@ -1120,7 +1183,6 @@ const MerchantUsers = ({ user }) => {
     };
 
     const toggleDateInput = () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setShowDateInput(!showDateInput);
     };
 
@@ -1542,6 +1604,12 @@ const MerchantUsers = ({ user }) => {
                     <Text style={styles.label}>Date:</Text>
                     <Text style={styles.value}>{formatDisplayDate(item.paymentDate)}</Text>
                 </View>
+                {item.paymentDetails?.transactionId && (
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Txn ID:</Text>
+                        <Text style={styles.value} selectable={true}>{item.paymentDetails.transactionId}</Text>
+                    </View>
+                )}
                 {item.notes && (
                     <View style={styles.row}>
                         <Text style={styles.label}>Notes:</Text>
@@ -1939,7 +2007,7 @@ const MerchantUsers = ({ user }) => {
         );
     };
 
-    const renderListHeader = () => (
+    const renderListHeader = useCallback(() => (
         <>
             {/* Pending Payments Section */}
             {pendingPayments.length > 0 && (
@@ -2103,21 +2171,37 @@ const MerchantUsers = ({ user }) => {
                 {/* Date Search Input & Results */}
                 {showDateInput && (
                     <View style={{ marginBottom: 15 }}>
-                        <View style={styles.searchContainer}>
-                            <TouchableOpacity
-                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', height: '100%' }}
-                                onPress={() => setShowDatePicker(true)}
-                            >
-                                <Icon name="calendar" size={14} color="#9CA3AF" style={{ marginRight: 10 }} />
-                                <Text style={{ color: dateQuery ? COLORS?.dark : '#999', fontSize: 14 }}>
-                                    {dateQuery || "Select Date..."}
-                                </Text>
-                            </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: COLORS?.primary, flex: 1 }}>Search by Date or Range</Text>
+                            {dailyPayments && (
+                                <TouchableOpacity onPress={clearDateSearch}>
+                                    <Text style={{ color: COLORS?.error, fontSize: 12 }}>Clear Results</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
 
-                            {dateQuery ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {/* Single Date Search */}
+                        {!rangeFromDate && !rangeToDate && (
+                            <View style={[styles.searchContainer, { marginBottom: 10 }]}>
+                                <TouchableOpacity
+                                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', height: '100%' }}
+                                    onPress={() => {
+                                    if (Platform.OS === 'android') {
+                                        setTimeout(() => setShowDatePicker(true), 100);
+                                    } else {
+                                        setShowDatePicker(true);
+                                    }
+                                }}
+                                >
+                                    <Icon name="calendar" size={14} color="#9CA3AF" style={{ marginRight: 10 }} />
+                                    <Text style={{ color: dateQuery ? COLORS?.dark : '#999', fontSize: 14 }}>
+                                        {dateQuery || "Select Single Date..."}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {dateQuery ? (
                                     <TouchableOpacity
-                                        style={{ marginRight: 10, padding: 5 }}
+                                        style={{ padding: 5 }}
                                         onPress={handleDateSearch}
                                         disabled={isSearchingDate}
                                     >
@@ -2127,49 +2211,202 @@ const MerchantUsers = ({ user }) => {
                                             <Icon name="search" size={16} color={COLORS?.primary} />
                                         )}
                                     </TouchableOpacity>
-                                    <TouchableOpacity onPress={clearDateSearch} style={{ padding: 5 }}>
-                                        <Icon name="times-circle" size={16} color="#9CA3AF" />
+                                ) : null}
+                            </View>
+                        )}
+
+                        {/* Range Search UI */}
+                        {!dateQuery && (
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={[styles.searchContainer, { flex: 0.48, paddingHorizontal: 8 }]}>
+                                    <TouchableOpacity
+                                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                                        onPress={() => {
+                                            if (Platform.OS === 'android') {
+                                                setTimeout(() => setShowFromPicker(true), 100);
+                                            } else {
+                                                setShowFromPicker(true);
+                                            }
+                                        }}
+                                    >
+                                        <Icon name="calendar-alt" size={12} color="#9CA3AF" style={{ marginRight: 5 }} />
+                                        <Text style={{ fontSize: 12, color: rangeFromDate ? COLORS?.dark : '#999' }}>
+                                            {rangeFromDate || "From..."}
+                                        </Text>
                                     </TouchableOpacity>
                                 </View>
-                            ) : null}
 
-                            {/* Date Pickers moved to stable root location */}
-                        </View>
+                                <View style={[styles.searchContainer, { flex: 0.48, paddingHorizontal: 8 }]}>
+                                    <TouchableOpacity
+                                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                                        onPress={() => {
+                                            if (Platform.OS === 'android') {
+                                                setTimeout(() => setShowToPicker(true), 100);
+                                            } else {
+                                                setShowToPicker(true);
+                                            }
+                                        }}
+                                    >
+                                        <Icon name="calendar-alt" size={12} color="#9CA3AF" style={{ marginRight: 5 }} />
+                                        <Text style={{ fontSize: 12, color: rangeToDate ? COLORS?.dark : '#999' }}>
+                                            {rangeToDate || "To..."}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {rangeFromDate && rangeToDate && (
+                                    <TouchableOpacity
+                                        style={{
+                                            backgroundColor: COLORS?.primary,
+                                            width: 40,
+                                            height: 45,
+                                            borderRadius: 10,
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            marginLeft: 5
+                                        }}
+                                        onPress={handleRangeSearch}
+                                        disabled={isSearchingDate}
+                                    >
+                                        {isSearchingDate ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <Icon name="search" size={16} color="#fff" />
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+
+                        {/* Summary for Range Search */}
+                        {isRangeSearch && dailyPayments && (
+                            <View style={{ 
+                                flexDirection: 'row', 
+                                backgroundColor: COLORS?.primary + '10', 
+                                padding: 12, 
+                                borderRadius: 10, 
+                                marginTop: 15,
+                                borderLeftWidth: 4,
+                                borderLeftColor: COLORS?.primary
+                            }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 10, color: '#666', textTransform: 'uppercase' }}>Total Received</Text>
+                                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS?.primary }}>₹{totalRangeAmount.toLocaleString()}</Text>
+                                </View>
+                                <View style={{ width: 1, backgroundColor: '#ddd', marginHorizontal: 15 }} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 10, color: '#666', textTransform: 'uppercase' }}>Total Settled</Text>
+                                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#10B981' }}>₹{totalSettledAmount.toLocaleString()}</Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* Date Pickers Rendered here to be in the same tree as triggers */}
+                {showDatePicker && Platform.OS === 'android' && (
+                    <DateTimePicker
+                        value={dateQuery && dateQuery.includes('-') ? (() => {
+                            try {
+                                const parts = dateQuery.split('-');
+                                const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                                return isNaN(d.getTime()) ? new Date() : d;
+                            } catch (e) { return new Date(); }
+                        })() : new Date()}
+                        mode="date"
+                        onChange={handleDateChange}
+                        maximumDate={new Date()}
+                    />
+                )}
+                {showFromPicker && Platform.OS === 'android' && (
+                    <DateTimePicker
+                        value={rangeFromDate && !isNaN(new Date(rangeFromDate).getTime()) ? new Date(rangeFromDate) : new Date()}
+                        mode="date"
+                        onChange={handleRangeDateChange('from')}
+                        maximumDate={new Date()}
+                    />
+                )}
+                {showToPicker && Platform.OS === 'android' && (
+                    <DateTimePicker
+                        value={rangeToDate && !isNaN(new Date(rangeToDate).getTime()) ? new Date(rangeToDate) : new Date()}
+                        mode="date"
+                        onChange={handleRangeDateChange('to')}
+                        maximumDate={new Date()}
+                    />
+                )}
 
                         {/* Daily Results */}
                         {dailyPayments && (
                             <View style={{ marginTop: 10 }}>
                                 <Text style={styles.resultTitle}>
-                                    Transactions on {dateQuery}: <Text style={{ color: COLORS?.primary, fontWeight: 'bold' }}>{dailyPayments.length}</Text>
+                                    {isRangeSearch ? `Results from ${rangeFromDate} to ${rangeToDate}` : `Transactions on ${dateQuery}`}: <Text style={{ color: COLORS?.primary, fontWeight: 'bold' }}>{dailyPayments.length}</Text>
                                 </Text>
 
                                 {dailyPayments.length === 0 ? (
                                     <View style={styles.emptyContainer}>
-                                        <Text style={styles.emptyText}>No payments found for this date.</Text>
+                                        <Text style={styles.emptyText}>No transactions found for this period.</Text>
                                     </View>
                                 ) : (
                                     dailyPayments.map(pay => (
-                                        <View key={pay._id} style={styles.paymentResultCard}>
+                                        <View key={pay._id + (pay.isSettlement ? 'settle' : 'pay')} style={[styles.paymentResultCard, pay.isSettlement && { borderLeftColor: '#10B981', borderLeftWidth: 4 }]}>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                                <Text style={styles.resultName}>{(pay.user?.name?.length > 10 ? pay.user.name.substring(0, 10) + '...' : pay.user?.name) || 'Unknown'}</Text>
-                                                <Text style={styles.resultAmount}>₹{pay.amount}</Text>
-                                            </View>
-                                            <Text style={styles.resultPlan}>{pay.chitPlan?.planName}</Text>
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
-                                                <Text style={[styles.resultBadge, pay.type === 'offline' ? { color: '#666', backgroundColor: '#eee' } : { color: COLORS?.primary, backgroundColor: COLORS?.primary + '10' }]}>
-                                                    {pay.type === 'offline' ? 'Offline' : 'Online'}
-                                                </Text>
-                                                <TouchableOpacity onPress={() => generateInvoice(pay, { user: pay.user, chitPlan: pay.chitPlan, plan: pay.chitPlan })}>
-                                                    <Icon name="file-invoice" size={14} color={COLORS?.primary} />
+                                                <TouchableOpacity 
+                                                    onPress={() => {
+                                                        setSelectedUserForModal(pay.user);
+                                                        setUserDetailsModalVisible(true);
+                                                    }}
+                                                >
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <Text style={[styles.resultName, { textDecorationLine: 'underline', color: COLORS?.primary }]}>
+                                                            {(pay.user?.name?.length > 10 ? pay.user.name.substring(0, 10) + '...' : pay.user?.name) || 'Unknown'}
+                                                        </Text>
+                                                        {pay.user?.acc_no && (
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, backgroundColor: '#f0f0f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                                                <Icon name="university" size={8} color="#666" style={{ marginRight: 4 }} />
+                                                                <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{pay.user.acc_no}</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
                                                 </TouchableOpacity>
+                                                <Text style={[styles.resultAmount, pay.isSettlement && { color: '#10B981' }]}>
+                                                    {pay.isSettlement ? '-' : ''}₹{pay.amount}
+                                                </Text>
+                                            </View>
+                                            
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Text style={styles.resultPlan}>{pay.planName || pay.chitPlan?.planName}</Text>
+                                                {isRangeSearch && (
+                                                    <Text style={{ fontSize: 10, color: '#999' }}>{formatDisplayDate(pay.paymentDate || pay.date)}</Text>
+                                                )}
+                                            </View>
+
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 }}>
+                                                <View style={{ flexDirection: 'row' }}>
+                                                    <Text style={[styles.resultBadge, { 
+                                                        color: pay.isSettlement ? '#10B981' : COLORS?.primary, 
+                                                        backgroundColor: pay.isSettlement ? '#10B98110' : COLORS?.primary + '10', 
+                                                        textTransform: 'uppercase' 
+                                                    }]}>
+                                                        {pay.isSettlement ? 'SETTLEMENT' : (pay.type || pay.paymentDetails?.method || 'N/A')}
+                                                    </Text>
+                                                    {pay.isSettlement && pay.type && (
+                                                        <Text style={[styles.resultBadge, { marginLeft: 5, color: '#666', backgroundColor: '#eee' }]}>
+                                                            {pay.type}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                                
+                                                {!pay.isSettlement && (
+                                                    <TouchableOpacity onPress={() => generateInvoice(pay, { user: pay.user, chitPlan: pay.chitPlan, plan: pay.chitPlan })}>
+                                                        <Icon name="file-invoice" size={14} color={COLORS?.primary} />
+                                                    </TouchableOpacity>
+                                                )}
                                             </View>
                                         </View>
                                     ))
                                 )}
                             </View>
                         )}
-                    </View>
-                )}
 
                 {showSearch && (
                     <View style={styles.searchContainer}>
@@ -2210,7 +2447,7 @@ const MerchantUsers = ({ user }) => {
                 )}
             </View>
         </>
-    );
+    ), [pendingPayments, withdrawalRequests, showFilters, statusFilter, amountFilter, planFilter, uniquePlans, showDateInput, dateQuery, rangeFromDate, rangeToDate, isSearchingDate, showSearch, searchQuery, allFilteredSubscribers, showDatePicker, showFromPicker, showToPicker]);
 
     const renderListEmpty = () => {
         if (loading) {
@@ -2244,7 +2481,7 @@ const MerchantUsers = ({ user }) => {
                 data={displayedSubscribers}
                 renderItem={renderSubscriber}
                 keyExtractor={item => item._id || item.subscriberId}
-                ListHeaderComponent={renderListHeader()}
+                ListHeaderComponent={renderListHeader}
                 ListEmptyComponent={renderListEmpty()}
                 ListFooterComponent={renderFooter}
                 onEndReached={handleLoadMore}
@@ -2272,54 +2509,61 @@ const MerchantUsers = ({ user }) => {
                 onClose={hideAlert}
             />
 
-            {/* Date Pickers (Moved here for stability on Android) */}
-            {showDatePicker && Platform.OS === 'android' && (
-                <DateTimePicker
-                    testID="dateTimePicker"
-                    value={dateQuery ? (() => {
-                        const parts = dateQuery.split('-');
-                        return new Date(parts[0], parts[1] - 1, parts[2]);
-                    })() : new Date()}
-                    mode="date"
-                    is24Hour={true}
-                    display="default"
-                    onChange={handleDateChange}
-                    maximumDate={new Date()}
-                />
-            )}
-
+            {/* iOS Modals remain at root */}
             {Platform.OS === 'ios' && (
-                <Modal
-                    transparent={true}
-                    animationType="slide"
-                    visible={showDatePicker}
-                    onRequestClose={() => setShowDatePicker(false)}
-                >
-                    <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                        <View style={{ backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, alignItems: 'center' }}>
-                                <Text style={{ fontWeight: 'bold', fontSize: 16, color: COLORS?.textPrimary }}>Select Date</Text>
-                                <TouchableOpacity onPress={() => setShowDatePicker(false)} style={{ padding: 5 }}>
-                                    <Text style={{ color: COLORS?.primary, fontWeight: 'bold', fontSize: 16 }}>Done</Text>
-                                </TouchableOpacity>
+                <>
+                    <Modal transparent={true} visible={showDatePicker} animationType="slide">
+                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                            <View style={{ backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+                                    <Text style={{ fontWeight: 'bold' }}>Select Date</Text>
+                                    <TouchableOpacity hitSlop={{top: 10, bottom: 10, left: 10, right: 10}} onPress={() => setShowDatePicker(false)}><Text style={{ color: COLORS?.primary }}>Done</Text></TouchableOpacity>
+                                </View>
+                                <DateTimePicker
+                                    value={dateQuery && dateQuery.includes('-') ? new Date(dateQuery.split('-')[0], dateQuery.split('-')[1]-1, dateQuery.split('-')[2]) : new Date()}
+                                    mode="date"
+                                    display="spinner"
+                                    onChange={handleDateChange}
+                                    maximumDate={new Date()}
+                                />
                             </View>
-                            <DateTimePicker
-                                testID="dateTimePicker"
-                                value={dateQuery ? (() => {
-                                    const parts = dateQuery.split('-');
-                                    return new Date(parts[0], parts[1] - 1, parts[2]);
-                                })() : new Date()}
-                                mode="date"
-                                is24Hour={true}
-                                display="spinner"
-                                onChange={handleDateChange}
-                                maximumDate={new Date()}
-                                style={{ height: 120 }}
-                                textColor={COLORS?.textPrimary}
-                            />
                         </View>
-                    </View>
-                </Modal>
+                    </Modal>
+                    <Modal transparent={true} visible={showFromPicker} animationType="slide">
+                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                            <View style={{ backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+                                    <Text style={{ fontWeight: 'bold' }}>Select From Date</Text>
+                                    <TouchableOpacity hitSlop={{top: 10, bottom: 10, left: 10, right: 10}} onPress={() => setShowFromPicker(false)}><Text style={{ color: COLORS?.primary }}>Done</Text></TouchableOpacity>
+                                </View>
+                                <DateTimePicker
+                                    value={rangeFromDate ? new Date(rangeFromDate) : new Date()}
+                                    mode="date"
+                                    display="spinner"
+                                    onChange={handleRangeDateChange('from')}
+                                    maximumDate={new Date()}
+                                />
+                            </View>
+                        </View>
+                    </Modal>
+                    <Modal transparent={true} visible={showToPicker} animationType="slide">
+                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                            <View style={{ backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
+                                    <Text style={{ fontWeight: 'bold' }}>Select To Date</Text>
+                                    <TouchableOpacity hitSlop={{top: 10, bottom: 10, left: 10, right: 10}} onPress={() => setShowToPicker(false)}><Text style={{ color: COLORS?.primary }}>Done</Text></TouchableOpacity>
+                                </View>
+                                <DateTimePicker
+                                    value={rangeToDate ? new Date(rangeToDate) : new Date()}
+                                    mode="date"
+                                    display="spinner"
+                                    onChange={handleRangeDateChange('to')}
+                                    maximumDate={new Date()}
+                                />
+                            </View>
+                        </View>
+                    </Modal>
+                </>
             )}
 
             {/* Processing Modal */}

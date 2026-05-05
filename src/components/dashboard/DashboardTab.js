@@ -64,11 +64,11 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
             const activePlans = plans.filter(p => !p.status || p.status === 'active' || p.status === 'pending');
 
             activePlans.forEach(plan => {
-                totalSaved += plan.totalSaved || 0;
+                totalSaved += (plan.totalSaved || 0) - (plan.deliveredAmount || 0);
                 totalGoal += plan.totalAmount || 0;
                 monthlyCommitment += plan.monthlyAmount || 0;
                 
-                totalActualGoldWeight += plan.totalGoldWeight || 0;
+                totalActualGoldWeight += (plan.totalGoldWeight || 0) - (plan.deliveredGoldWeight || 0);
                 
                 const planNameLower = plan.planName?.toLowerCase() || '';
                 if (planNameLower.includes('unlimited') || planNameLower.includes('infinity') || plan.returnType === 'gold') {
@@ -89,7 +89,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
             // Use totalSaved instead of monthlyAmount, truncate name
             const distribution = activePlans.map((plan, index) => ({
                 name: plan.planName, // Full name, handled in scrollable legend
-                population: plan.totalSaved || 0,
+                population: (plan.totalSaved || 0) - (plan.deliveredAmount || 0),
                 color: [COLORS?.primary, COLORS?.secondary, COLORS?.success, COLORS?.warning, COLORS?.danger][index % 5],
                 legendFontColor: "#7F7F7F",
                 legendFontSize: 11
@@ -338,7 +338,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                 <View style={styles.cardFooter}>
                                     <View>
                                         <Text style={styles.labelSmall}>Saved</Text>
-                                        <Text style={styles.amountSmall}>₹{plan.totalSaved?.toLocaleString()}</Text>
+                                        <Text style={styles.amountSmall}>₹{((plan.totalSaved || 0) - (plan.deliveredAmount || 0)).toLocaleString()}</Text>
                                     </View>
                                     <View>
                                         <Text style={styles.labelSmall}>Joined</Text>
