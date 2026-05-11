@@ -13,6 +13,7 @@ import {
     KeyboardAvoidingView,
     Platform
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
@@ -34,12 +35,13 @@ const UnsubscribedUsersList = ({ user }) => {
     const [subscribeForm, setSubscribeForm] = useState({
         planId: '',
         amount: '',
-        note: '',
+        paymentDate: new Date(),
         customGoldRate: '',
         name: '',
         email: '',
         address: ''
     });
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
     const [showSubscribeModal, setShowSubscribeModal] = useState(false);
     const [showUserModal, setShowUserModal] = useState(false);
@@ -115,7 +117,7 @@ const UnsubscribedUsersList = ({ user }) => {
         setSubscribeForm({
             planId: plans.length > 0 ? plans[0]._id : '',
             amount: '',
-            note: '',
+            paymentDate: new Date(),
             customGoldRate: (goldRate || 0).toFixed(2),
             name: u.name,
             email: u.email || '',
@@ -141,7 +143,7 @@ const UnsubscribedUsersList = ({ user }) => {
                 planId: subscribeForm.planId,
                 amount: isUnlimited ? subscribeForm.amount : selectedPlan.monthlyAmount,
                 goldRate: effectiveGoldRate,
-                note: subscribeForm.note,
+                paymentDate: subscribeForm.paymentDate,
                 name: subscribeForm.name,
                 email: subscribeForm.email,
                 address: subscribeForm.address
@@ -291,26 +293,55 @@ const UnsubscribedUsersList = ({ user }) => {
 
                             <View style={styles.formGroup}>
                                 <Text style={styles.label}>SELECT PLAN</Text>
-                                <View style={styles.pickerContainer}>
-                                    <ScrollView>
-                                        {plans.map(p => (
-                                            <TouchableOpacity 
+                                <View style={styles.planCardGrid}>
+                                    {plans.map(p => {
+                                        const isSelected = subscribeForm.planId === p._id;
+                                        const isUnlimitedPlan = p.type === 'unlimited';
+                                        return (
+                                            <TouchableOpacity
                                                 key={p._id}
-                                                style={[
-                                                    styles.planOption,
-                                                    subscribeForm.planId === p._id && styles.selectedPlanOption
-                                                ]}
+                                                style={[styles.planCard, isSelected && styles.planCardSelected]}
                                                 onPress={() => setSubscribeForm({...subscribeForm, planId: p._id, customGoldRate: (goldRate || 0).toFixed(2)})}
+                                                activeOpacity={0.75}
                                             >
-                                                <Text style={[
-                                                    styles.planOptionText,
-                                                    subscribeForm.planId === p._id && styles.selectedPlanOptionText
-                                                ]}>
-                                                    {p.planName} ({p.type === 'unlimited' ? 'Unlimited' : `₹${p.monthlyAmount}/mo`})
-                                                </Text>
+                                                {/* Left accent bar */}
+                                                <View style={[styles.planCardAccent, isSelected && styles.planCardAccentSelected]} />
+
+                                                <View style={styles.planCardBody}>
+                                                    {/* Top row: icon + badge */}
+                                                    <View style={styles.planCardTop}>
+                                                        <View style={[styles.planCardIcon, isSelected && styles.planCardIconSelected]}>
+                                                            <Icon
+                                                                name={isUnlimitedPlan ? 'infinity' : 'coins'}
+                                                                size={13}
+                                                                color={isSelected ? '#915200' : '#aaa'}
+                                                            />
+                                                        </View>
+                                                        <View style={[styles.planAmountBadge, isSelected && styles.planAmountBadgeSelected]}>
+                                                            <Text style={[styles.planAmountBadgeText, isSelected && styles.planAmountBadgeTextSelected]}>
+                                                                {isUnlimitedPlan ? 'Flexible' : `₹${p.monthlyAmount}/mo`}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+
+                                                    {/* Plan name */}
+                                                    <Text style={[styles.planCardName, isSelected && styles.planCardNameSelected]} numberOfLines={1}>
+                                                        {p.planName}
+                                                    </Text>
+
+                                                    {/* Bottom row: type label + radio */}
+                                                    <View style={styles.planCardBottom}>
+                                                        <Text style={[styles.planCardType, isSelected && styles.planCardTypeSelected]}>
+                                                            {isUnlimitedPlan ? 'Unlimited Savings' : 'Fixed Plan'}
+                                                        </Text>
+                                                        <View style={[styles.planRadio, isSelected && styles.planRadioSelected]}>
+                                                            {isSelected && <View style={styles.planRadioDot} />}
+                                                        </View>
+                                                    </View>
+                                                </View>
                                             </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+                                        );
+                                    })}
                                 </View>
                             </View>
 
@@ -356,16 +387,31 @@ const UnsubscribedUsersList = ({ user }) => {
                             )}
 
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>NOTES (OPTIONAL)</Text>
-                                <TextInput
-                                    style={[styles.input, styles.textArea]}
-                                    placeholder="Add any internal notes..."
-                                    multiline
-                                    numberOfLines={3}
-                                    value={subscribeForm.note}
-                                    onChangeText={(text) => setSubscribeForm({...subscribeForm, note: text})}
-                                />
+                                <Text style={styles.label}>ASSIGNMENT DATE</Text>
+                                <TouchableOpacity 
+                                    style={styles.datePickerBtn}
+                                    onPress={() => setShowDatePicker(true)}
+                                >
+                                    <Icon name="calendar-alt" size={16} color="#915200" style={{ marginRight: 10 }} />
+                                    <Text style={styles.dateText}>
+                                        {subscribeForm.paymentDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
+
+                            {showDatePicker && (
+                                <DateTimePicker
+                                    value={subscribeForm.paymentDate}
+                                    mode="date"
+                                    display="default"
+                                    onChange={(event, selectedDate) => {
+                                        setShowDatePicker(false);
+                                        if (selectedDate) {
+                                            setSubscribeForm({ ...subscribeForm, paymentDate: selectedDate });
+                                        }
+                                    }}
+                                />
+                            )}
 
                             <View style={{ marginBottom: 15, alignItems: 'center' }}>
                                 <Text style={styles.autoGenText}>Account Number (ACC_NO) will be auto-generated</Text>
@@ -625,26 +671,135 @@ const styles = StyleSheet.create({
         height: 80,
         textAlignVertical: 'top',
     },
-    pickerContainer: {
+    datePickerBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: '#f8f9fa',
-        borderRadius: 10,
-        maxHeight: 150,
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#eee',
     },
-    planOption: {
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+    dateText: {
+        fontSize: 15,
+        color: '#333',
+        fontWeight: '500',
     },
-    selectedPlanOption: {
+    // ── Plan Card Grid ─────────────────────────────────────────
+    planCardGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    planCard: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#ebebeb',
+        overflow: 'hidden',
+        minWidth: '46%',
+        flex: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    planCardSelected: {
+        borderColor: '#915200',
+        backgroundColor: '#fffcf5',
+        shadowColor: '#915200',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    planCardAccent: {
+        width: 4,
+        backgroundColor: '#e8e8e8',
+    },
+    planCardAccentSelected: {
+        backgroundColor: '#915200',
+    },
+    planCardBody: {
+        flex: 1,
+        padding: 11,
+    },
+    planCardTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    planCardIcon: {
+        width: 26,
+        height: 26,
+        borderRadius: 8,
+        backgroundColor: '#f2f2f2',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    planCardIconSelected: {
+        backgroundColor: '#ebdc8730',
+    },
+    planAmountBadge: {
+        backgroundColor: '#f2f2f2',
+        borderRadius: 20,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+    },
+    planAmountBadgeSelected: {
         backgroundColor: '#ebdc87',
     },
-    planOptionText: {
-        fontSize: 14,
-        color: '#333',
+    planAmountBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#888',
+        letterSpacing: 0.2,
     },
-    selectedPlanOptionText: {
-        fontWeight: 'bold',
+    planAmountBadgeTextSelected: {
+        color: '#6b3c00',
+    },
+    planCardName: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#333',
+        marginBottom: 6,
+    },
+    planCardNameSelected: {
         color: '#915200',
+    },
+    planCardBottom: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    planCardType: {
+        fontSize: 10,
+        color: '#bbb',
+        fontWeight: '500',
+    },
+    planCardTypeSelected: {
+        color: '#c4872a',
+    },
+    planRadio: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#ddd',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    planRadioSelected: {
+        borderColor: '#915200',
+    },
+    planRadioDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#915200',
     },
     goldRateInfo: {
         backgroundColor: '#fffbf0',

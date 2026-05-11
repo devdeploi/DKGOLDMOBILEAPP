@@ -94,12 +94,14 @@ const MerchantUsers = ({ user }) => {
     const [showSearch, setShowSearch] = useState(false);
     const [statusFilter, setStatusFilter] = useState('all');
     const [planFilter, setPlanFilter] = useState('all');
-    const [amountFilter, setAmountFilter] = useState('all');
     const [showFilters, setShowFilters] = useState(false);
     const [loading, setLoading] = useState(true);
     const [subscribers, setSubscribers] = useState([]);
     const searchInputRef = React.useRef(null);
     const [lastToggleTime, setLastToggleTime] = useState(0);
+    const [sortBy, setSortBy] = useState('recent'); // 'recent', 'name', 'acc_no'
+    const [searchType, setSearchType] = useState('all'); // 'all', 'phone', 'acc_no'
+    const [showSearchTypeModal, setShowSearchTypeModal] = useState(false);
     const [pendingPayments, setPendingPayments] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [expandedSubId, setExpandedSubId] = useState(null);
@@ -1191,19 +1193,27 @@ const MerchantUsers = ({ user }) => {
         if (now - lastToggleTime < 300) return; // Prevent rapid clicking flickering
         setLastToggleTime(now);
 
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        const nextShowSearch = !showSearch;
-        setShowSearch(nextShowSearch);
-        
-        if (!nextShowSearch) {
-            setSearchQuery('');
-            Keyboard.dismiss();
+        if (!showSearch) {
+            setShowSearchTypeModal(true);
         } else {
-            // Focus after animation completes to prevent blinking/jumping on Android
-            setTimeout(() => {
-                searchInputRef.current?.focus();
-            }, 300);
+            closeSearch();
         }
+    };
+
+    const openSearch = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setShowSearch(true);
+        setTimeout(() => {
+            searchInputRef.current?.focus();
+        }, 300);
+    };
+
+    const closeSearch = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setShowSearch(false);
+        setSearchQuery('');
+        setSearchType('all');
+        Keyboard.dismiss();
     };
 
     const uniquePlans = React.useMemo(() => {
@@ -1217,12 +1227,18 @@ const MerchantUsers = ({ user }) => {
         // 1. Global Search
         if (searchQuery) {
             const lower = searchQuery.toLowerCase();
-            result = result.filter(sub =>
-                (sub.user?.name?.toLowerCase() || '').includes(lower) ||
-                (sub.user?.phone || '').includes(lower) ||
-                (sub.user?.acc_no || '').toLowerCase().includes(lower) ||
-                (sub.plan?.planName?.toLowerCase() || '').includes(lower)
-            );
+            result = result.filter(sub => {
+                if (searchType === 'phone') {
+                    return (sub.user?.phone || '').includes(lower);
+                } else if (searchType === 'acc_no') {
+                    return (sub.user?.acc_no || '').toLowerCase().includes(lower);
+                } else {
+                    return (sub.user?.name?.toLowerCase() || '').includes(lower) ||
+                           (sub.user?.phone || '').includes(lower) ||
+                           (sub.user?.acc_no || '').toLowerCase().includes(lower) ||
+                           (sub.plan?.planName?.toLowerCase() || '').includes(lower);
+                }
+            });
         }
 
         // 2. Status Filter
@@ -1235,13 +1251,22 @@ const MerchantUsers = ({ user }) => {
             result = result.filter(sub => sub.plan?.planName === planFilter);
         }
 
-        // 4. Amount Filter
-        if (amountFilter !== 'all') {
-            result = result.filter(sub => sub.subscription?.totalAmountPaid >= Number(amountFilter));
-        }
+        // 5. Sorting
+        result.sort((a, b) => {
+            if (sortBy === 'name') {
+                return (a.user?.name || '').localeCompare(b.user?.name || '');
+            } else if (sortBy === 'acc_no') {
+                const accA = parseInt(a.user?.acc_no || '0');
+                const accB = parseInt(b.user?.acc_no || '0');
+                return accA - accB;
+            } else {
+                // Default: recent (joinedAt descending)
+                return new Date(b.subscription?.joinedAt || 0) - new Date(a.subscription?.joinedAt || 0);
+            }
+        });
 
         return result;
-    }, [subscribers, searchQuery, statusFilter, planFilter, amountFilter]);
+    }, [subscribers, searchQuery, statusFilter, planFilter, sortBy, searchType]);
 
     useEffect(() => {
         setDisplayedSubscribers(allFilteredSubscribers.slice(0, BATCH_SIZE));
@@ -1822,8 +1847,8 @@ const MerchantUsers = ({ user }) => {
                                 <Text style={styles.userPhone}>{item.user.phone}</Text>
                                 {item.user.acc_no && (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10, backgroundColor: '#f0f0f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                        <Icon name="university" size={8} color="#666" style={{ marginRight: 4 }} />
-                                        <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{item.user.acc_no}</Text>
+                                        <Icon name="university" size={10} color="#666" style={{ marginRight: 4 }} />
+                                        <Text style={{ fontSize: 12, color: '#666', fontWeight: 'bold' }}>{item.user.acc_no}</Text>
                                     </View>
                                 )}
                             </View>
@@ -2101,34 +2126,6 @@ const MerchantUsers = ({ user }) => {
                         </View>
 
                         <View style={styles.filterRow}>
-                            {/* Amount Filter */}
-                            <View style={styles.filterGroup}>
-                                <Text style={styles.filterLabel}>Min Paid Amount</Text>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
-                                    {[
-                                        { label: 'Any', value: 'all' },
-                                        { label: '₹1k+', value: '1000' },
-                                        { label: '₹5k+', value: '5000' },
-                                        { label: '₹10k+', value: '10000' },
-                                        { label: '₹25k+', value: '25000' },
-                                        { label: '₹50k+', value: '50000' },
-                                        { label: '₹1L+', value: '100000' }
-                                    ].map((opt) => (
-                                        <TouchableOpacity
-                                            key={opt.value}
-                                            style={[styles.filterChip, amountFilter === opt.value && styles.filterChipActive]}
-                                            onPress={() => setAmountFilter(opt.value)}
-                                        >
-                                            <Text style={[styles.filterChipText, amountFilter === opt.value && styles.filterChipTextActive]}>
-                                                {opt.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        </View>
-
-                        <View style={styles.filterRow}>
                             {/* Plan Filter */}
                             <View style={styles.filterGroup}>
                                 <Text style={styles.filterLabel}>Plan Type</Text>
@@ -2154,12 +2151,37 @@ const MerchantUsers = ({ user }) => {
                             </View>
                         </View>
 
+                        <View style={styles.filterRow}>
+                            {/* Sort Filter */}
+                            <View style={styles.filterGroup}>
+                                <Text style={styles.filterLabel}>Sort By</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                                    {[
+                                        { label: 'RECENTLY ADDED', value: 'recent' },
+                                        { label: 'ALPHABET (A-Z)', value: 'name' },
+                                        { label: 'ACCOUNT NO', value: 'acc_no' }
+                                    ].map((opt) => (
+                                        <TouchableOpacity
+                                            key={opt.value}
+                                            style={[styles.filterChip, sortBy === opt.value && styles.filterChipActive]}
+                                            onPress={() => setSortBy(opt.value)}
+                                        >
+                                            <Text style={[styles.filterChipText, sortBy === opt.value && styles.filterChipTextActive]}>
+                                                {opt.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        </View>
+
                         <TouchableOpacity
                             style={styles.resetButton}
                             onPress={() => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                                 setStatusFilter('all');
                                 setPlanFilter('all');
-                                setAmountFilter('all');
+                                setSortBy('recent');
                                 setSearchQuery('');
                             }}
                         >
@@ -2408,46 +2430,9 @@ const MerchantUsers = ({ user }) => {
                             </View>
                         )}
 
-                {showSearch && (
-                    <View style={styles.searchContainer}>
-                        <Icon name="search" size={14} color="#9CA3AF" style={{ marginRight: 10 }} />
-                        <TextInput
-                            ref={searchInputRef}
-                            style={styles.searchInput}
-                            placeholder="Search by Name, Phone, or Plan..."
-                            placeholderTextColor="#9CA3AF"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            returnKeyType="done"
-                            onSubmitEditing={() => Keyboard.dismiss()}
-                        />
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            {searchQuery.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ marginRight: 10 }}>
-                                    <Icon name="times-circle" size={16} color="#9CA3AF" />
-                                </TouchableOpacity>
-                            )}
-                            <TouchableOpacity
-                                onPress={() => {
-                                    const now = Date.now();
-                                    if (now - lastToggleTime < 300) return;
-                                    setLastToggleTime(now);
-
-                                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                                    setShowSearch(false);
-                                    setSearchQuery('');
-                                    Keyboard.dismiss();
-                                }}
-                                style={{ padding: 5 }}
-                            >
-                                <Icon name="times" size={18} color={COLORS?.primary} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
             </View>
         </>
-    ), [pendingPayments, withdrawalRequests, showFilters, statusFilter, amountFilter, planFilter, uniquePlans, showDateInput, dateQuery, rangeFromDate, rangeToDate, isSearchingDate, showSearch, searchQuery, allFilteredSubscribers, showDatePicker, showFromPicker, showToPicker]);
+    ), [pendingPayments, withdrawalRequests, showFilters, statusFilter, planFilter, uniquePlans, showDateInput, dateQuery, rangeFromDate, rangeToDate, isSearchingDate, allFilteredSubscribers, showDatePicker, showFromPicker, showToPicker]);
 
     const renderListEmpty = () => {
         if (loading) {
@@ -2476,6 +2461,49 @@ const MerchantUsers = ({ user }) => {
             <View style={{ height: 0, opacity: 0 }}>
                 <GoldTicker />
             </View>
+
+            {showSearch && (
+                <View style={[styles.searchContainer, { marginHorizontal: 16, marginTop: 8 }]}>
+                    <Icon name="search" size={14} color="#9CA3AF" style={{ marginRight: 10 }} />
+                    <TextInput
+                        ref={searchInputRef}
+                        style={styles.searchInput}
+                        placeholder={
+                            searchType === 'phone' ? "Search by Phone Number..." :
+                            searchType === 'acc_no' ? "Search by Account Number..." :
+                            "Search by Name, Phone, or Plan..."
+                        }
+                        placeholderTextColor="#9CA3AF"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        returnKeyType="done"
+                        onSubmitEditing={() => Keyboard.dismiss()}
+                        autoFocus
+                    />
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearchQuery('')} style={{ marginRight: 10 }}>
+                                <Icon name="times-circle" size={16} color="#9CA3AF" />
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                            onPress={() => {
+                                const now = Date.now();
+                                if (now - lastToggleTime < 300) return;
+                                setLastToggleTime(now);
+
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                setShowSearch(false);
+                                setSearchQuery('');
+                                Keyboard.dismiss();
+                            }}
+                            style={{ padding: 5 }}
+                        >
+                            <Icon name="times" size={18} color={COLORS?.primary} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
 
             <FlatList
                 data={displayedSubscribers}
@@ -2573,6 +2601,57 @@ const MerchantUsers = ({ user }) => {
                         <ActivityIndicator size="large" color="#915200" />
                         <Text style={{ marginTop: 15, fontWeight: 'bold', fontSize: 16, color: '#915200' }}>Processing Request...</Text>
                         <Text style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Sending notifications...</Text>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Custom Search Type Modal */}
+            <Modal transparent={true} visible={showSearchTypeModal} animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { padding: 25, borderRadius: 24, borderTopWidth: 4, borderTopColor: COLORS?.primary }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <Text style={styles.modalTitle}>Search By</Text>
+                            <TouchableOpacity onPress={() => setShowSearchTypeModal(false)}>
+                                <Icon name="times" size={20} color="#999" />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <Text style={{ color: '#666', marginBottom: 25 }}>Choose how you'd like to filter users:</Text>
+                        
+                        <View style={{ gap: 12 }}>
+                            {[
+                                { id: 'phone', label: 'Phone Number', icon: 'phone-alt', description: 'Search using mobile number' },
+                                { id: 'acc_no', label: 'Account Number', icon: 'university', description: 'Search using DKGOLD ID' },
+                                { id: 'all', label: 'Global Search', icon: 'search', description: 'Search name, phone, or plan' }
+                            ].map(item => (
+                                <TouchableOpacity 
+                                    key={item.id}
+                                    style={{ 
+                                        flexDirection: 'row', 
+                                        alignItems: 'center', 
+                                        padding: 16, 
+                                        backgroundColor: '#f8f9fa', 
+                                        borderRadius: 16,
+                                        borderWidth: 1,
+                                        borderColor: '#eee'
+                                    }}
+                                    onPress={() => {
+                                        setSearchType(item.id);
+                                        setShowSearchTypeModal(false);
+                                        openSearch();
+                                    }}
+                                >
+                                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 15 }}>
+                                        <Icon name={item.icon} size={18} color={COLORS?.primary} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS?.dark }}>{item.label}</Text>
+                                        <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{item.description}</Text>
+                                    </View>
+                                    <Icon name="chevron-right" size={12} color="#ccc" />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -3334,12 +3413,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#eee',
     },
     userName: {
-        fontSize: 14,
+        fontSize: 17,
         fontWeight: 'bold',
         color: COLORS?.primary,
     },
     userPhone: {
-        fontSize: 12,
+        fontSize: 14,
         color: COLORS?.secondary,
     },
     amountBadge: {

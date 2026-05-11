@@ -141,18 +141,33 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
             return;
         }
 
-        const upiUrl = `upi://pay?pa=${merchant.upiId}&pn=${encodeURIComponent(merchant.name || 'Merchant')}&am=${amount}&cu=INR`;
+        const params = `pa=${encodeURIComponent(merchant.upiId)}&pn=${encodeURIComponent(merchant.name || 'Merchant')}&am=${Number(amount).toFixed(2)}&cu=INR&tn=${encodeURIComponent('DKGold Plan Payment')}`;
 
-        try {
-            const supported = await Linking.canOpenURL(upiUrl);
-            if (supported) {
-                await Linking.openURL(upiUrl);
-            } else {
-                Alert.alert("Error", "No UPI app found on this device.");
+        // Try schemes in order: GPay tez:// → generic upi://
+        // tez:// works on Android emulators with GPay, upi:// works on real devices
+        const schemesToTry = [
+            `tez://upi/pay?${params}`,   // Google Pay (works on emulator)
+            `upi://pay?${params}`,        // Generic — PhonePe, Paytm, BHIM, etc.
+        ];
+
+        let opened = false;
+        for (const url of schemesToTry) {
+            try {
+                await Linking.openURL(url);
+                opened = true;
+                break;
+            } catch {
+                // This scheme failed, try the next one
             }
-        } catch (error) {
-            console.error("An error occurred", error);
-            Alert.alert("Error", "Failed to open UPI app.");
+        }
+
+        if (!opened) {
+            // All schemes failed — show manual fallback with UPI ID to copy
+            Alert.alert(
+                "Pay via UPI",
+                `No UPI app could be opened automatically.\n\nOpen GPay, PhonePe or any UPI app and pay to:\n\n📱 UPI ID: ${merchant.upiId}\n💰 Amount: ₹${amount}\n\nThen upload the payment screenshot below.`,
+                [{ text: "Got it" }]
+            );
         }
     };
 

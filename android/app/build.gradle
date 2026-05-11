@@ -83,7 +83,7 @@ android {
         applicationId "com.jewelmobileapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 13
+        versionCode 16
         versionName "1.1.2"
     }
     signingConfigs {

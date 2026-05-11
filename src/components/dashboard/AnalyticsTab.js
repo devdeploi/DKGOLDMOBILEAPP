@@ -691,7 +691,7 @@ const AnalyticsTab = ({ user }) => {
         }
     };
 
-    const openUPIPayment = (plan) => {
+    const openUPIPayment = async (plan) => {
         const upiId = plan?.merchant?.upiId;
         if (!upiId) {
             showAlert('Error', 'UPI ID not available.', 'error');
@@ -701,28 +701,42 @@ const AnalyticsTab = ({ user }) => {
         const isUnlimited = isPlanUnlimited(plan);
         const merchantName = plan?.merchant?.name || 'Merchant';
 
-        // Base UPI URL
-        let upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&cu=INR`;
+        let params = `pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}&cu=INR`;
 
         // Only add amount for fixed plans. Unlimited plans let user enter amount in their UPI app.
         if (!isUnlimited) {
             const amount = plan.monthlyAmount;
             if (amount && !isNaN(amount) && Number(amount) > 0) {
-                upiUrl += `&am=${parseFloat(amount).toFixed(2)}`;
+                params += `&am=${parseFloat(amount).toFixed(2)}`;
             }
         }
 
-        Linking.canOpenURL(upiUrl)
-            .then((supported) => {
-                if (supported) {
-                    Linking.openURL(upiUrl);
-                } else {
-                    showAlert('Error', 'No UPI app found on this device.', 'error');
-                }
-            })
-            .catch((err) => {
-                console.error('UPI Open Error:', err);
-            });
+        params += `&tn=${encodeURIComponent('DKGold Plan Payment')}`;
+
+        // Try schemes in order: GPay tez:// → generic upi://
+        const schemesToTry = [
+            `tez://upi/pay?${params}`,   // Google Pay
+            `upi://pay?${params}`,        // Generic
+        ];
+
+        let opened = false;
+        for (const url of schemesToTry) {
+            try {
+                await Linking.openURL(url);
+                opened = true;
+                break;
+            } catch (err) {
+                // Try next scheme
+            }
+        }
+
+        if (!opened) {
+            showAlert(
+                'Pay via UPI',
+                `No UPI app could be opened automatically.\n\nOpen GPay, PhonePe or any UPI app and pay to:\n\n📱 UPI ID: ${upiId}\n\nThen upload the payment screenshot.`,
+                'info'
+            );
+        }
     };
 
 
