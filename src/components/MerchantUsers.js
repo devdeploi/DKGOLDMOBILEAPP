@@ -31,7 +31,7 @@ import Share from 'react-native-share';
 import dkLogo from '../assets/DK.png';
 import safproLogo from '../../public/assests/Safpro-logo.png';
 import RNFS from 'react-native-fs';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import GoldTicker from './GoldTicker';
 import { useGoldRate } from '../context/GoldRateContext';
 
@@ -112,16 +112,18 @@ const MerchantUsers = ({ user }) => {
         return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
     };
 
+    const TODAY = React.useMemo(() => new Date(), []);
+    
     // Date Search State
-    const [dateQuery, setDateQuery] = useState('');
+    const [dateQuery, setDateQuery] = useState(null);
     const [dailyPayments, setDailyPayments] = useState(null);
     const [isSearchingDate, setIsSearchingDate] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showDateInput, setShowDateInput] = useState(false);
 
     // Date Range Search State
-    const [rangeFromDate, setRangeFromDate] = useState('');
-    const [rangeToDate, setRangeToDate] = useState('');
+    const [rangeFromDate, setRangeFromDate] = useState(null);
+    const [rangeToDate, setRangeToDate] = useState(null);
     const [showFromPicker, setShowFromPicker] = useState(false);
     const [showToPicker, setShowToPicker] = useState(false);
     const [totalRangeAmount, setTotalRangeAmount] = useState(0);
@@ -137,21 +139,12 @@ const MerchantUsers = ({ user }) => {
     const [page, setPage] = useState(1);
     const [loadingMore, setLoadingMore] = useState(false);
 
-    const handleDateChange = useCallback((event, selectedDate) => {
-        if (Platform.OS === 'android') {
-            setShowDatePicker(false);
+    const handleDateConfirm = (selectedDate) => {
+        setShowDatePicker(false);
+        if (selectedDate) {
+            setDateQuery(selectedDate);
         }
-
-        if (event.type === 'set' && selectedDate) {
-            const currentDate = selectedDate || new Date();
-            // Use local date parts to avoid timezone shifts
-            const year = currentDate.getFullYear();
-            const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-            const day = currentDate.getDate().toString().padStart(2, '0');
-            const formatted = `${year}-${month}-${day}`;
-            setDateQuery(formatted);
-        }
-    }, [setShowDatePicker, setDateQuery]);
+    };
 
     const executeSettlement = async () => {
         if (!selectedWithdrawalRequest) return;
@@ -326,7 +319,8 @@ const MerchantUsers = ({ user }) => {
         setIsRangeSearch(false); // Reset range search mode
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const { data } = await axios.get(`${APIURL}/payments/search/date?date=${dateQuery}`, config);
+            const formattedDate = dateQuery.toISOString().split('T')[0];
+            const { data } = await axios.get(`${APIURL}/payments/search/date?date=${formattedDate}`, config);
             setDailyPayments(data);
         } catch (error) {
             console.error("Date search failed", error);
@@ -345,12 +339,14 @@ const MerchantUsers = ({ user }) => {
         setIsRangeSearch(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const { data } = await axios.get(`${APIURL}/payments/search/range?fromDate=${rangeFromDate}&toDate=${rangeToDate}`, config);
+            const formattedFrom = rangeFromDate.toISOString().split('T')[0];
+            const formattedTo = rangeToDate.toISOString().split('T')[0];
+            const { data } = await axios.get(`${APIURL}/payments/search/range?fromDate=${formattedFrom}&toDate=${formattedTo}`, config);
             
             // Combine payments and settlements for display
             const combined = [
-                ...data.payments,
-                ...data.settlements
+                ...(data.payments || []),
+                ...(data.settlements || []).map(s => ({ ...s, isSettlement: true }))
             ].sort((a, b) => new Date(b.paymentDate || b.date) - new Date(a.paymentDate || a.date));
 
             setDailyPayments(combined);
@@ -364,31 +360,23 @@ const MerchantUsers = ({ user }) => {
         }
     };
 
-    const handleRangeDateChange = (type) => (event, selectedDate) => {
-        if (Platform.OS === 'android') {
-            type === 'from' ? setShowFromPicker(false) : setShowToPicker(false);
-        }
+    const handleRangeDateConfirm = (type) => (selectedDate) => {
+        type === 'from' ? setShowFromPicker(false) : setShowToPicker(false);
 
-        if (event.type === 'set' && selectedDate) {
-            const currentDate = selectedDate || new Date();
-            const year = currentDate.getFullYear();
-            const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-            const day = currentDate.getDate().toString().padStart(2, '0');
-            const formatted = `${year}-${month}-${day}`;
-            
+        if (selectedDate) {
             if (type === 'from') {
-                setRangeFromDate(formatted);
+                setRangeFromDate(selectedDate);
             } else {
-                setRangeToDate(formatted);
+                setRangeToDate(selectedDate);
             }
         }
     };
 
     const clearDateSearch = () => {
         setDailyPayments(null);
-        setDateQuery('');
-        setRangeFromDate('');
-        setRangeToDate('');
+        setDateQuery(null);
+        setRangeFromDate(null);
+        setRangeToDate(null);
         setTotalRangeAmount(0);
         setTotalSettledAmount(0);
         setIsRangeSearch(false);
@@ -2205,32 +2193,50 @@ const MerchantUsers = ({ user }) => {
                         {/* Single Date Search */}
                         {!rangeFromDate && !rangeToDate && (
                             <View style={[styles.searchContainer, { marginBottom: 10 }]}>
-                                <TouchableOpacity
-                                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', height: '100%' }}
-                                    onPress={() => {
-                                    if (Platform.OS === 'android') {
-                                        setTimeout(() => setShowDatePicker(true), 100);
-                                    } else {
-                                        setShowDatePicker(true);
-                                    }
-                                }}
-                                >
-                                    <Icon name="calendar" size={14} color="#9CA3AF" style={{ marginRight: 10 }} />
-                                    <Text style={{ color: dateQuery ? COLORS?.dark : '#999', fontSize: 14 }}>
-                                        {dateQuery || "Select Single Date..."}
-                                    </Text>
-                                </TouchableOpacity>
+                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                    <TouchableOpacity
+                                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', height: '100%' }}
+                                        onPress={() => {
+                                            if (Platform.OS === 'android') {
+                                                setTimeout(() => setShowDatePicker(true), 100);
+                                            } else {
+                                                setShowDatePicker(true);
+                                            }
+                                        }}
+                                    >
+                                        <Icon name="calendar" size={14} color={dateQuery ? COLORS?.primary : "#9CA3AF"} style={{ marginRight: 10 }} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: dateQuery ? COLORS?.dark : '#999', fontSize: 13, fontWeight: dateQuery ? '600' : '400' }}>
+                                                {dateQuery ? dateQuery.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : "Select Single Date..."}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                    
+                                    {dateQuery && (
+                                        <TouchableOpacity 
+                                            onPress={() => setDateQuery(null)} 
+                                            style={{ padding: 8 }}
+                                        >
+                                            <Icon name="times-circle" size={14} color="#999" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
 
                                 {dateQuery ? (
                                     <TouchableOpacity
-                                        style={{ padding: 5 }}
+                                        style={{ 
+                                            padding: 8, 
+                                            backgroundColor: COLORS?.primary, 
+                                            borderRadius: 8,
+                                            marginLeft: 5
+                                        }}
                                         onPress={handleDateSearch}
                                         disabled={isSearchingDate}
                                     >
                                         {isSearchingDate ? (
-                                            <ActivityIndicator size="small" color={COLORS?.primary} />
+                                            <ActivityIndicator size="small" color="#fff" />
                                         ) : (
-                                            <Icon name="search" size={16} color={COLORS?.primary} />
+                                            <Icon name="search" size={14} color="#fff" />
                                         )}
                                     </TouchableOpacity>
                                 ) : null}
@@ -2251,10 +2257,17 @@ const MerchantUsers = ({ user }) => {
                                             }
                                         }}
                                     >
-                                        <Icon name="calendar-alt" size={12} color="#9CA3AF" style={{ marginRight: 5 }} />
-                                        <Text style={{ fontSize: 12, color: rangeFromDate ? COLORS?.dark : '#999' }}>
-                                            {rangeFromDate || "From..."}
-                                        </Text>
+                                        <Icon name="calendar-alt" size={12} color={rangeFromDate ? COLORS?.primary : "#9CA3AF"} style={{ marginRight: 5 }} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 11, color: rangeFromDate ? COLORS?.dark : '#999', fontWeight: rangeFromDate ? '600' : '400' }}>
+                                                {rangeFromDate ? rangeFromDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : "From..."}
+                                            </Text>
+                                        </View>
+                                        {rangeFromDate && (
+                                            <TouchableOpacity onPress={() => setRangeFromDate(null)}>
+                                                <Icon name="times" size={10} color="#999" />
+                                            </TouchableOpacity>
+                                        )}
                                     </TouchableOpacity>
                                 </View>
 
@@ -2269,10 +2282,17 @@ const MerchantUsers = ({ user }) => {
                                             }
                                         }}
                                     >
-                                        <Icon name="calendar-alt" size={12} color="#9CA3AF" style={{ marginRight: 5 }} />
-                                        <Text style={{ fontSize: 12, color: rangeToDate ? COLORS?.dark : '#999' }}>
-                                            {rangeToDate || "To..."}
-                                        </Text>
+                                        <Icon name="calendar-alt" size={12} color={rangeToDate ? COLORS?.primary : "#9CA3AF"} style={{ marginRight: 5 }} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 11, color: rangeToDate ? COLORS?.dark : '#999', fontWeight: rangeToDate ? '600' : '400' }}>
+                                                {rangeToDate ? rangeToDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : "To..."}
+                                            </Text>
+                                        </View>
+                                        {rangeToDate && (
+                                            <TouchableOpacity onPress={() => setRangeToDate(null)}>
+                                                <Icon name="times" size={10} color="#999" />
+                                            </TouchableOpacity>
+                                        )}
                                     </TouchableOpacity>
                                 </View>
 
@@ -2325,43 +2345,13 @@ const MerchantUsers = ({ user }) => {
                     </View>
                 )}
 
-                {/* Date Pickers Rendered here to be in the same tree as triggers */}
-                {showDatePicker && Platform.OS === 'android' && (
-                    <DateTimePicker
-                        value={dateQuery && dateQuery.includes('-') ? (() => {
-                            try {
-                                const parts = dateQuery.split('-');
-                                const d = new Date(parts[0], parts[1] - 1, parts[2]);
-                                return isNaN(d.getTime()) ? new Date() : d;
-                            } catch (e) { return new Date(); }
-                        })() : new Date()}
-                        mode="date"
-                        onChange={handleDateChange}
-                        maximumDate={new Date()}
-                    />
-                )}
-                {showFromPicker && Platform.OS === 'android' && (
-                    <DateTimePicker
-                        value={rangeFromDate && !isNaN(new Date(rangeFromDate).getTime()) ? new Date(rangeFromDate) : new Date()}
-                        mode="date"
-                        onChange={handleRangeDateChange('from')}
-                        maximumDate={new Date()}
-                    />
-                )}
-                {showToPicker && Platform.OS === 'android' && (
-                    <DateTimePicker
-                        value={rangeToDate && !isNaN(new Date(rangeToDate).getTime()) ? new Date(rangeToDate) : new Date()}
-                        mode="date"
-                        onChange={handleRangeDateChange('to')}
-                        maximumDate={new Date()}
-                    />
-                )}
+
 
                         {/* Daily Results */}
                         {dailyPayments && (
                             <View style={{ marginTop: 10 }}>
                                 <Text style={styles.resultTitle}>
-                                    {isRangeSearch ? `Results from ${rangeFromDate} to ${rangeToDate}` : `Transactions on ${dateQuery}`}: <Text style={{ color: COLORS?.primary, fontWeight: 'bold' }}>{dailyPayments.length}</Text>
+                                    {isRangeSearch ? `Results from ${rangeFromDate?.toLocaleDateString('en-IN')} to ${rangeToDate?.toLocaleDateString('en-IN')}` : `Transactions on ${dateQuery?.toLocaleDateString('en-IN')}`}: <Text style={{ color: COLORS?.primary, fontWeight: 'bold' }}>{dailyPayments.length}</Text>
                                 </Text>
 
                                 {dailyPayments.length === 0 ? (
@@ -2527,6 +2517,37 @@ const MerchantUsers = ({ user }) => {
                 pointerEvents="none"
             /> */}
 
+            <DateTimePickerModal
+                isVisible={showDatePicker}
+                mode="date"
+                date={dateQuery || TODAY}
+                onConfirm={handleDateConfirm}
+                onCancel={() => setShowDatePicker(false)}
+                maximumDate={TODAY}
+                backdropStyleIOS={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                pickerComponentStyleIOS={{ backgroundColor: 'white' }}
+            />
+            <DateTimePickerModal
+                isVisible={showFromPicker}
+                mode="date"
+                date={rangeFromDate || TODAY}
+                onConfirm={handleRangeDateConfirm('from')}
+                onCancel={() => setShowFromPicker(false)}
+                maximumDate={TODAY}
+                backdropStyleIOS={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                pickerComponentStyleIOS={{ backgroundColor: 'white' }}
+            />
+            <DateTimePickerModal
+                isVisible={showToPicker}
+                mode="date"
+                date={rangeToDate || TODAY}
+                onConfirm={handleRangeDateConfirm('to')}
+                onCancel={() => setShowToPicker(false)}
+                maximumDate={TODAY}
+                backdropStyleIOS={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                pickerComponentStyleIOS={{ backgroundColor: 'white' }}
+            />
+
             {/* Custom Alert */}
             <CustomAlert
                 visible={alertConfig.visible}
@@ -2537,62 +2558,6 @@ const MerchantUsers = ({ user }) => {
                 onClose={hideAlert}
             />
 
-            {/* iOS Modals remain at root */}
-            {Platform.OS === 'ios' && (
-                <>
-                    <Modal transparent={true} visible={showDatePicker} animationType="slide">
-                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                            <View style={{ backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-                                    <Text style={{ fontWeight: 'bold' }}>Select Date</Text>
-                                    <TouchableOpacity hitSlop={{top: 10, bottom: 10, left: 10, right: 10}} onPress={() => setShowDatePicker(false)}><Text style={{ color: COLORS?.primary }}>Done</Text></TouchableOpacity>
-                                </View>
-                                <DateTimePicker
-                                    value={dateQuery && dateQuery.includes('-') ? new Date(dateQuery.split('-')[0], dateQuery.split('-')[1]-1, dateQuery.split('-')[2]) : new Date()}
-                                    mode="date"
-                                    display="spinner"
-                                    onChange={handleDateChange}
-                                    maximumDate={new Date()}
-                                />
-                            </View>
-                        </View>
-                    </Modal>
-                    <Modal transparent={true} visible={showFromPicker} animationType="slide">
-                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                            <View style={{ backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-                                    <Text style={{ fontWeight: 'bold' }}>Select From Date</Text>
-                                    <TouchableOpacity hitSlop={{top: 10, bottom: 10, left: 10, right: 10}} onPress={() => setShowFromPicker(false)}><Text style={{ color: COLORS?.primary }}>Done</Text></TouchableOpacity>
-                                </View>
-                                <DateTimePicker
-                                    value={rangeFromDate ? new Date(rangeFromDate) : new Date()}
-                                    mode="date"
-                                    display="spinner"
-                                    onChange={handleRangeDateChange('from')}
-                                    maximumDate={new Date()}
-                                />
-                            </View>
-                        </View>
-                    </Modal>
-                    <Modal transparent={true} visible={showToPicker} animationType="slide">
-                        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                            <View style={{ backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-                                    <Text style={{ fontWeight: 'bold' }}>Select To Date</Text>
-                                    <TouchableOpacity hitSlop={{top: 10, bottom: 10, left: 10, right: 10}} onPress={() => setShowToPicker(false)}><Text style={{ color: COLORS?.primary }}>Done</Text></TouchableOpacity>
-                                </View>
-                                <DateTimePicker
-                                    value={rangeToDate ? new Date(rangeToDate) : new Date()}
-                                    mode="date"
-                                    display="spinner"
-                                    onChange={handleRangeDateChange('to')}
-                                    maximumDate={new Date()}
-                                />
-                            </View>
-                        </View>
-                    </Modal>
-                </>
-            )}
 
             {/* Processing Modal */}
             <Modal transparent={true} visible={!!actionLoading} animationType="fade">

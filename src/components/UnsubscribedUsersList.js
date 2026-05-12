@@ -13,7 +13,7 @@ import {
     KeyboardAvoidingView,
     Platform
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
@@ -399,19 +399,20 @@ const UnsubscribedUsersList = ({ user }) => {
                                 </TouchableOpacity>
                             </View>
 
-                            {showDatePicker && (
-                                <DateTimePicker
-                                    value={subscribeForm.paymentDate}
-                                    mode="date"
-                                    display="default"
-                                    onChange={(event, selectedDate) => {
-                                        setShowDatePicker(false);
-                                        if (selectedDate) {
-                                            setSubscribeForm({ ...subscribeForm, paymentDate: selectedDate });
-                                        }
-                                    }}
-                                />
-                            )}
+                            <DateTimePickerModal
+                                isVisible={showDatePicker}
+                                mode="date"
+                                date={subscribeForm.paymentDate}
+                                onConfirm={(selectedDate) => {
+                                    setShowDatePicker(false);
+                                    if (selectedDate) {
+                                        setSubscribeForm({ ...subscribeForm, paymentDate: selectedDate });
+                                    }
+                                }}
+                                onCancel={() => {
+                                    setShowDatePicker(false);
+                                }}
+                            />
 
                             <View style={{ marginBottom: 15, alignItems: 'center' }}>
                                 <Text style={styles.autoGenText}>Account Number (ACC_NO) will be auto-generated</Text>

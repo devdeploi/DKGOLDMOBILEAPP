@@ -20,7 +20,7 @@ import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
 import { APIURL, BASE_URL } from '../constants/api';
 import { launchImageLibrary } from 'react-native-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import CustomAlert from './CustomAlert';
 import LinearGradient from 'react-native-linear-gradient';
 
@@ -306,7 +306,7 @@ const AdManager = ({ user }) => {
         );
     };
 
-    const onEndDateChange = (event, selectedDate) => {
+    const handleEndDateConfirm = (selectedDate) => {
         setShowEndPicker(false);
         if (selectedDate) setEndDate(selectedDate);
     };
@@ -560,16 +560,14 @@ const AdManager = ({ user }) => {
                             </View>
                         </View>
 
-                        {/* Date Pickers */}
-                        {showEndPicker && (
-                            <DateTimePicker
-                                value={endDate}
-                                mode="date"
-                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                onChange={onEndDateChange}
-                                minimumDate={startDate}
-                            />
-                        )}
+                        <DateTimePickerModal
+                            isVisible={showEndPicker}
+                            mode="date"
+                            date={endDate}
+                            onConfirm={handleEndDateConfirm}
+                            onCancel={() => setShowEndPicker(false)}
+                            minimumDate={startDate}
+                        />
 
                         <TouchableOpacity
                             style={[styles.saveBtn, uploading && { opacity: 0.8 }]}

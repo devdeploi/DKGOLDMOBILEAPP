@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ActivityIndicator, Modal, TextInput, Image, Alert, Platform, ScrollView, Linking } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -1345,20 +1345,19 @@ const AnalyticsTab = ({ user }) => {
                                     </TouchableOpacity>
                                 </View>
 
-                                {showDatePicker && (
-                                    <DateTimePicker
-                                        value={offlineForm.date}
-                                        mode="date"
-                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                        onChange={(event, selectedDate) => {
-                                            setShowDatePicker(Platform.OS === 'ios');
-                                            if (selectedDate) {
-                                                setOfflineForm({ ...offlineForm, date: selectedDate });
-                                            }
-                                        }}
-                                        maximumDate={new Date()}
-                                    />
-                                )}
+                                <DateTimePickerModal
+                                    isVisible={showDatePicker}
+                                    mode="date"
+                                    date={offlineForm.date}
+                                    onConfirm={(selectedDate) => {
+                                        setShowDatePicker(false);
+                                        if (selectedDate) {
+                                            setOfflineForm({ ...offlineForm, date: selectedDate });
+                                        }
+                                    }}
+                                    onCancel={() => setShowDatePicker(false)}
+                                    maximumDate={new Date()}
+                                />
 
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.inputLabel}>Transaction ID / Notes</Text>

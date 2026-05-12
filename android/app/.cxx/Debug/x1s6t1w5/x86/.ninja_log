@@ -24,7 +24,7 @@
 9	2529	1777536348831644735	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/States.cpp.o	da52f980d35eaa77
 20034	25034	1777536371335650362	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/rnsvg.cpp.o	52863686479efd32
 8	4060	1777536350370689725	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/ComponentDescriptors.cpp.o	1b70515c8fec2cad
-8	4275	1777536350576953107	CMakeFiles/appmodules.dir/OnLoad.cpp.o	724c40d2f31e5e90
+6	1436	1778583175195821907	CMakeFiles/appmodules.dir/OnLoad.cpp.o	724c40d2f31e5e90
 21799	23585	1777536369896484317	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-svg/android/build/generated/source/codegen/jni/react/renderer/components/rnsvg/States.cpp.o	68a84033cfc3b829
 3572	7004	1777536353312890144	RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ShadowNodes.cpp.o	b8875d1a8822422c
 17825	19944	1777536366246937141	RNShareSpec_autolinked_build/CMakeFiles/react_codegen_RNShareSpec.dir/react/renderer/components/RNShareSpec/EventEmitters.cpp.o	4d92bf874d64a111
@@ -53,14 +53,14 @@
 25058	27451	1777536373760967954	rnworklets_autolinked_build/CMakeFiles/react_codegen_rnworklets.dir/react/renderer/components/rnworklets/EventEmitters.cpp.o	5aaddc70f28ecb35
 12706	15765	1777536362077331310	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ShadowNodes.cpp.o	9fb475326cb71178
 2940	8756	1777536355015545074	RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/Props.cpp.o	42ceffdc2705670c
-1	23	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
+0	14	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
 10681	13610	1777536359921617408	HtmlToPdfSpec_autolinked_build/CMakeFiles/react_codegen_HtmlToPdfSpec.dir/react/renderer/components/HtmlToPdfSpec/ShadowNodes.cpp.o	ec67568144d057d3
 12022	15173	1777536361484490684	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ComponentDescriptors.cpp.o	b05bea9f468c8eca
 13316	16713	1777536363024199209	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/ComponentDescriptors.cpp.o	16d8ec3a660ee0fc
 8	3766	1777536350070506354	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/Props.cpp.o	c8e88d5e8594f2ca
 12821	14617	1777536360930590608	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/States.cpp.o	50309e1fbe9b513b
 14617	19417	1777536365711203684	safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-safe-area-context/common/cpp/react/renderer/components/safeareacontext/RNCSafeAreaViewShadowNode.cpp.o	6ed1b354816cbd2a
-8	12706	1777536358864794388	CMakeFiles/appmodules.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	3245203a21f3ce9f
+6	4216	1778583177923461386	CMakeFiles/appmodules.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	3245203a21f3ce9f
 12035	14079	1777536360391731091	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/EventEmitters.cpp.o	beb39d48ae3f74a8
 14457	17212	1777536363517189226	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/rnreanimated-generated.cpp.o	8958ee18b2d4696d
 15174	18572	1777536364867964535	safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-safe-area-context/common/cpp/react/renderer/components/safeareacontext/RNCSafeAreaViewState.cpp.o	bdb81ee49fcd814d
@@ -85,6 +85,6 @@
 11637	14452	1777536360743101756	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/RNImagePickerSpec-generated.cpp.o	31d1ee030b07e662
 26189	28106	1777536374417777397	rnworklets_autolinked_build/CMakeFiles/react_codegen_rnworklets.dir/rnworklets-generated.cpp.o	7c47e397d2ab139b
 17212	20513	1777536366825124373	RNShareSpec_autolinked_build/CMakeFiles/react_codegen_RNShareSpec.dir/react/renderer/components/RNShareSpec/ComponentDescriptors.cpp.o	6177f4556406f06a
-28107	28273	1777536374568973931	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/build/intermediates/cxx/Debug/x1s6t1w5/obj/x86/libappmodules.so	163cde408f1b46d9
+4216	4366	1778583178101948949	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/build/intermediates/cxx/Debug/x1s6t1w5/obj/x86/libappmodules.so	163cde408f1b46d9
 0	30	0	clean	19032e23f5748419
-0	16	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
+1	13	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
