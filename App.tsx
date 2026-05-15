@@ -40,6 +40,8 @@ interface UserData {
   token?: string;
   goldRate18k?: number;
   goldRate22k?: number;
+  goldRate24k?: number;
+  silverRate?: number;
   shopLogo?: string;
 }
 
@@ -316,7 +318,9 @@ function App() {
           
           setGlobalMerchantRates({
              goldRate18k: m.goldRate18k,
-             goldRate22k: m.goldRate22k
+             goldRate22k: m.goldRate22k,
+             goldRate24k: m.goldRate24k,
+             silverRate: m.silverRate
           });
         }
       }).catch(err => console.log("Failed to fetch primary merchant rates", err));
@@ -326,10 +330,15 @@ function App() {
   // Stabilize merchantRates object to prevent provider re-renders
   const merchantRatesObj = useMemo(() => {
     if (user?.role === 'merchant') {
-       return { goldRate18k: user.goldRate18k, goldRate22k: user.goldRate22k };
+       return { 
+         goldRate18k: user.goldRate18k, 
+         goldRate22k: user.goldRate22k, 
+         goldRate24k: user.goldRate24k,
+         silverRate: user.silverRate 
+       };
     }
     return globalMerchantRates;
-  }, [user?.role, user?.goldRate18k, user?.goldRate22k, globalMerchantRates]);
+  }, [user?.role, user?.goldRate18k, user?.goldRate22k, user?.goldRate24k, user?.silverRate, globalMerchantRates]);
 
   return (
     <SafeAreaProvider>

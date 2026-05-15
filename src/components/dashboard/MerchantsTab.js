@@ -54,6 +54,9 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     // Locked rate for Modal calculations
     const [lockedGoldRate, setLockedGoldRate] = useState(0);
 
+    // acc_no preview for user with no acc_no
+    const [accNoPreview, setAccNoPreview] = useState(null); // { lastAccNo, nextAccNo }
+
     // Alert State
     const [alertConfig, setAlertConfig] = useState({
         visible: false,
@@ -69,12 +72,6 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
             fetchMySubscriptions();
         }
     }, [merchant]);
-
-    useEffect(() => {
-        if (goldRefreshTimer === 60) {
-            setLockedGoldRate(goldRate);
-        }
-    }, [goldRefreshTimer, goldRate]);
 
     const fetchPlans = async () => {
         setLoadingPlans(true);
@@ -101,7 +98,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         }
     };
 
-    const handleSubscribePress = (plan) => {
+    const handleSubscribePress = async (plan) => {
         // Check Profile Completion
         if (!user || !user.name || user.name === 'New User' || !user.phone || !user.address) {
             setAlertConfig({
@@ -122,9 +119,28 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         }
         setTransactionId('');
         setSubNote('');
-        if (lockedGoldRate === 0 && goldRate > 0) {
-            setLockedGoldRate(goldRate);
+
+        // Calculate merchant-specific rate
+        const manual24k = Number(merchant?.goldRate24k);
+        const currentRate = (manual24k > 0) ? manual24k : goldRate;
+        if (currentRate > 0) {
+            setLockedGoldRate(currentRate);
         }
+
+        // Fetch plan-scoped acc_no preview if user has no acc_no
+        if (!user.acc_no) {
+            try {
+                const { data } = await axios.get(`${APIURL}/chit-plans/${plan._id}/next-acc-no`, {
+                    headers: { Authorization: `Bearer ${user.token}` }
+                });
+                setAccNoPreview(data); // { lastAccNo, nextAccNo }
+            } catch (e) {
+                setAccNoPreview(null);
+            }
+        } else {
+            setAccNoPreview(null);
+        }
+
         setShowSubscribeModal(true);
     };
 
@@ -217,6 +233,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
 
             setSubmitting(false);
             setShowSubscribeModal(false);
+            setAccNoPreview(null);
             setAlertConfig({
                 visible: true,
                 title: 'Success',
@@ -472,6 +489,51 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                         </View>
 
                         <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+
+                            {/* acc_no Preview Banner — only shown when user has no acc_no */}
+                            {accNoPreview && (
+                                <View style={{
+                                    backgroundColor: '#FFFBEB',
+                                    borderWidth: 1,
+                                    borderColor: '#F59E0B',
+                                    borderRadius: 14,
+                                    padding: 14,
+                                    marginBottom: 18,
+                                    flexDirection: 'row',
+                                    alignItems: 'center'
+                                }}>
+                                    <View style={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: 19,
+                                        backgroundColor: '#FEF3C7',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        marginRight: 12
+                                    }}>
+                                        <Icon name="id-badge" size={16} color="#D97706" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 11, color: '#92400E', fontWeight: '700', marginBottom: 4, letterSpacing: 0.3 }}>ACCOUNT NUMBER PREVIEW</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                            <View>
+                                                <Text style={{ fontSize: 10, color: '#B45309' }}>Last in this plan</Text>
+                                                <Text style={{ fontSize: 15, fontWeight: '700', color: '#78350F' }}>
+                                                    {accNoPreview.lastAccNo ?? 'None yet'}
+                                                </Text>
+                                            </View>
+                                            <Icon name="arrow-right" size={10} color="#D97706" />
+                                            <View>
+                                                <Text style={{ fontSize: 10, color: '#B45309' }}>Your new acc_no</Text>
+                                                <Text style={{ fontSize: 18, fontWeight: '900', color: '#92400E' }}>
+                                                    {accNoPreview.nextAccNo}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+
                             <View style={styles.upiCard}>
                                 <Text style={styles.upiLabel}>Merchant UPI Details (Tap to Pay)</Text>
                                 <TouchableOpacity style={styles.upiRow} onPress={handleUpiPayment}>

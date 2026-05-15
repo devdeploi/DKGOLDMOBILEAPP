@@ -39,9 +39,13 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
                 let updatedSell = row.sellRate;
                 const m22 = Number(merchantRates.goldRate22k);
                 const m18 = Number(merchantRates.goldRate18k);
+                const m24 = Number(merchantRates.goldRate24k);
+                const mSil = Number(merchantRates.silverRate);
 
                 if (row.id === '22k_inr' && m22 > 0) updatedSell = m22;
                 else if (row.id === '18k_inr' && m18 > 0) updatedSell = m18;
+                else if (row.id === '24k_inr' && m24 > 0) updatedSell = m24;
+                else if (row.id === 'silver_inr' && mSil > 0) updatedSell = mSil;
                 else if (row.id === '22k_gst' && m22 > 0) updatedSell = m22 * 1.03;
                 else if (row.id === '18k_gst' && m18 > 0) updatedSell = m18 * 1.03;
 
@@ -184,11 +188,25 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
                 const newRows = prev.rows.map(row => {
                     let buy = 0, sell = 0;
 
-                    if (row.id === '24k_usd') buy = sell = usdOunce;
-                    else if (row.id === 'silver_usd') buy = sell = silverOunceUSD;
+                    if (row.id === '24k_usd') {
+                        const manual24k = Number(manualRatesRef.current?.goldRate24k);
+                        buy = sell = (manual24k > 0) ? (manual24k / exRate / (MARKUP * GST) * troyWeight) : usdOunce;
+                    }
+                    else if (row.id === 'silver_usd') {
+                        const manualSilver = Number(manualRatesRef.current?.silverRate);
+                        buy = sell = (manualSilver > 0) ? (manualSilver / exRate / 1000 * troyWeight) : silverOunceUSD;
+                    }
                     else if (row.id === 'usd_inr') buy = sell = exRate;
-                    else if (row.id === '24k_inr') buy = sell = base24Final;
-                    else if (row.id === 'silver_inr') buy = sell = silverKgINR;
+                    else if (row.id === '24k_inr') {
+                        buy = base24Final;
+                        const manual24k = Number(manualRatesRef.current?.goldRate24k);
+                        sell = (manual24k > 0) ? manual24k : buy;
+                    }
+                    else if (row.id === 'silver_inr') {
+                        buy = silverKgINR;
+                        const manualSilver = Number(manualRatesRef.current?.silverRate);
+                        sell = (manualSilver > 0) ? manualSilver : buy;
+                    }
                     else if (row.id === '22k_inr') {
                         buy = (usdOunce / troyWeight) * exRate * MARKUP * (22 / 24);
                         const manual22k = Number(manualRatesRef.current?.goldRate22k);
@@ -241,11 +259,13 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
 
                 const m22 = Number(manualRatesRef.current?.goldRate22k);
                 const m18 = Number(manualRatesRef.current?.goldRate18k);
+                const m24 = Number(manualRatesRef.current?.goldRate24k);
+                const mSil = Number(manualRatesRef.current?.silverRate);
 
-                const isManual = (row.id.includes('22k') && m22 > 0) || (row.id.includes('18k') && m18 > 0);
+                const isManual = (row.id.includes('22k') && m22 > 0) || (row.id.includes('18k') && m18 > 0) || (row.id.includes('24k') && m24 > 0) || (row.id.includes('silver') && mSil > 0);
 
-                const newBuy = row.buyRate + move;
-                const newSell = isManual ? row.sellRate : (row.sellRate + move);
+                const newBuy = Math.max(0.01, row.buyRate + move);
+                const newSell = isManual ? row.sellRate : Math.max(0.01, row.sellRate + move);
 
                 return {
                     ...row,

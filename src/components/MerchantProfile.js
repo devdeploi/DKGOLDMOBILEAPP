@@ -260,8 +260,20 @@ const MerchantProfile = ({
                     </View>
 
                     <Text style={[styles.sectionTitle, { color: primaryColor, marginTop: 10 }]}>Gold Rates (Selling / gm)</Text>
-                    <View style={{ flexDirection: 'row', gap: 15, marginBottom: 15 }}>
-                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <View style={{ flexDirection: 'row', gap: 15, marginBottom: 15, flexWrap: 'wrap' }}>
+                        <View style={[styles.inputGroup, { width: '47%' }]}>
+                            <Text style={[styles.inputLabel, { color: primaryColor }]}>24K Rate</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
+                                value={profileData.goldRate24k?.toString()}
+                                onChangeText={(text) => setProfileData({ ...profileData, goldRate24k: text.replace(/[^0-9]/g, '') })}
+                                editable={isEditingProfile}
+                                placeholder="Auto"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={[styles.inputGroup, { width: '47%' }]}>
                             <Text style={[styles.inputLabel, { color: primaryColor }]}>22K Rate</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
@@ -273,12 +285,24 @@ const MerchantProfile = ({
                                 keyboardType="numeric"
                             />
                         </View>
-                        <View style={[styles.inputGroup, { flex: 1 }]}>
+                        <View style={[styles.inputGroup, { width: '47%' }]}>
                             <Text style={[styles.inputLabel, { color: primaryColor }]}>18K Rate</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
                                 value={profileData.goldRate18k?.toString()}
                                 onChangeText={(text) => setProfileData({ ...profileData, goldRate18k: text.replace(/[^0-9]/g, '') })}
+                                editable={isEditingProfile}
+                                placeholder="Auto"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={[styles.inputGroup, { width: '47%' }]}>
+                            <Text style={[styles.inputLabel, { color: primaryColor }]}>Silver Rate per kg</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
+                                value={profileData.silverRate?.toString()}
+                                onChangeText={(text) => setProfileData({ ...profileData, silverRate: text.replace(/[^0-9]/g, '') })}
                                 editable={isEditingProfile}
                                 placeholder="Auto"
                                 placeholderTextColor="#999"

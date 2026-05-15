@@ -11,6 +11,67 @@ const IntroScreen = ({ onFinish }) => {
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [updateConfig, setUpdateConfig] = useState(null);
     const [checkingUpdate, setCheckingUpdate] = useState(true);
+    const [updateType, setUpdateType] = useState('mandatory'); // 'mandatory' or 'optional'
+
+    // Animation values for modal
+    const modalScale = useRef(new Animated.Value(0)).current;
+    const modalOpacity = useRef(new Animated.Value(0)).current;
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const textOpacity = useRef(new Animated.Value(0)).current;
+    const textTranslateY = useRef(new Animated.Value(20)).current;
+
+    useEffect(() => {
+        if (showUpdateModal) {
+            // Reset animations
+            textOpacity.setValue(0);
+            textTranslateY.setValue(20);
+
+            // Entrance animation sequence
+            Animated.sequence([
+                Animated.parallel([
+                    Animated.spring(modalScale, {
+                        toValue: 1,
+                        friction: 8,
+                        tension: 40,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(modalOpacity, {
+                        toValue: 1,
+                        duration: 300,
+                        useNativeDriver: true,
+                    })
+                ]),
+                Animated.parallel([
+                    Animated.timing(textOpacity, {
+                        toValue: 1,
+                        duration: 500,
+                        useNativeDriver: true,
+                    }),
+                    Animated.spring(textTranslateY, {
+                        toValue: 0,
+                        friction: 8,
+                        useNativeDriver: true,
+                    })
+                ])
+            ]).start();
+
+            // Continuous pulse animation for logo
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, {
+                        toValue: 1.05,
+                        duration: 1000,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(pulseAnim, {
+                        toValue: 1,
+                        duration: 1000,
+                        useNativeDriver: true,
+                    })
+                ])
+            ).start();
+        }
+    }, [showUpdateModal]);
 
     useEffect(() => {
         const isVersionLower = (v1, v2) => {
@@ -30,12 +91,24 @@ const IntroScreen = ({ onFinish }) => {
                 const { data } = await axios.get(`${APIURL}/app/config`);
                 const currentVersion = packageJson.version;
 
+                // Case 1: Version is lower than minVersion (e.g. user has 1.1.2, min is 1.1.3)
                 if (data.minVersion && isVersionLower(currentVersion, data.minVersion)) {
                     setUpdateConfig(data);
+                    setUpdateType('mandatory');
                     setShowUpdateModal(true);
                     setCheckingUpdate(false);
                     return;
                 }
+                
+                // Case 2: Version is one version back from latest (e.g. user has 1.1.3, latest is 1.1.4)
+                if (data.latestVersion && isVersionLower(currentVersion, data.latestVersion)) {
+                    setUpdateConfig(data);
+                    setUpdateType('optional');
+                    setShowUpdateModal(true);
+                    setCheckingUpdate(false);
+                    return;
+                }
+
             } catch (error) {
                 console.log('Update check failed:', error);
             }
@@ -73,6 +146,24 @@ const IntroScreen = ({ onFinish }) => {
         }
     };
 
+    const handleContinue = () => {
+        Animated.parallel([
+            Animated.timing(modalScale, {
+                toValue: 0.8,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+            Animated.timing(modalOpacity, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+            })
+        ]).start(() => {
+            setShowUpdateModal(false);
+            startAnimation();
+        });
+    };
+
     const handleCloseApp = () => {
         if (Platform.OS === 'android') {
             BackHandler.exitApp();
@@ -101,23 +192,67 @@ const IntroScreen = ({ onFinish }) => {
                 </View>
             </Animated.View>
 
-            <Modal visible={showUpdateModal} transparent animationType="fade">
+            <Modal visible={showUpdateModal} transparent animationType="none">
                 <View style={styles.modalOverlay}>
-                    <View style={styles.updateCard}>
-                        <Image source={require('../assets/DK.png')} style={styles.updateLogo} />
-                        <Text style={styles.updateTitle}>Update Required</Text>
-                        <Text style={styles.updateMessage}>
-                            {updateConfig?.message || 'A new version of DK GOLD is available. Please update to continue using the app.'}
-                        </Text>
+                    <Animated.View style={[
+                        styles.updateCardContainer,
+                        {
+                            opacity: modalOpacity,
+                            transform: [{ scale: modalScale }]
+                        }
+                    ]}>
+                        <LinearGradient
+                            colors={['#ffffff', '#fcf8f0']}
+                            style={styles.updateCard}
+                        >
+                            <Animated.View style={[
+                                styles.logoBadge,
+                                { transform: [{ scale: pulseAnim }] }
+                            ]}>
+                                <Image source={require('../assets/DK.png')} style={styles.updateLogo} />
+                            </Animated.View>
+                            
+                            <Animated.View style={{ 
+                                opacity: textOpacity, 
+                                transform: [{ translateY: textTranslateY }],
+                                alignItems: 'center',
+                                width: '100%'
+                            }}>
+                                <Text style={styles.updateTitle}>
+                                    {updateType === 'mandatory' ? 'Update Required' : 'New Update Available'}
+                                </Text>
+                                
+                                <View style={styles.divider} />
+                                
+                                <Text style={styles.updateMessage}>
+                                    {updateType === 'mandatory' 
+                                        ? (updateConfig?.message || 'A new version of DK GOLD is available. Please update to continue using the app.')
+                                        : 'A newer version of DK GOLD is available with enhanced features and performance improvements.'}
+                                </Text>
 
-                        <TouchableOpacity style={styles.updateBtn} onPress={handleUpdate}>
-                            <Text style={styles.updateBtnText}>Update Now</Text>
-                        </TouchableOpacity>
+                                <TouchableOpacity activeOpacity={0.8} onPress={handleUpdate} style={{ width: '100%', alignItems: 'center' }}>
+                                    <LinearGradient
+                                        colors={['#915200', '#7a4400']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.updateBtn}
+                                    >
+                                        <Text style={styles.updateBtnText}>Update Now</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.closeBtn} onPress={handleCloseApp}>
-                            <Text style={styles.closeBtnText}>Exit App</Text>
-                        </TouchableOpacity>
-                    </View>
+                                {updateType === 'mandatory' ? (
+                                    <TouchableOpacity style={styles.closeBtn} onPress={handleCloseApp}>
+                                        <Text style={styles.closeBtnText}>Exit App</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity style={styles.closeBtn} onPress={handleContinue}>
+                                        <Text style={styles.closeBtnText}>Continue to App</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </Animated.View>
+                        </LinearGradient>
+                    </Animated.View>
                 </View>
             </Modal>
 
@@ -178,57 +313,100 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 20
     },
+    updateCardContainer: {
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     updateCard: {
         backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 24,
+        borderRadius: 28,
+        padding: 30,
         alignItems: 'center',
-        width: '100%',
-        maxWidth: 400
+        width: '90%',
+        maxWidth: 400,
+        elevation: 20,
+        shadowColor: COLORS?.primary,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(145, 82, 0, 0.1)'
+    },
+    logoBadge: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        borderWidth: 2,
+        borderColor: '#f2e07bff'
     },
     updateLogo: {
-        width: 120,
-        height: 80,
-        marginBottom: 20,
-        borderRadius: 40,
-        objectFit:'contain'
+        width: 70,
+        height: 70,
+        resizeMode: 'contain'
     },
     updateTitle: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: 'bold',
-        color: '#915200',
-        marginBottom: 10
+        color: COLORS?.primary,
+        marginBottom: 10,
+        textAlign: 'center'
+    },
+    divider: {
+        width: 50,
+        height: 3,
+        backgroundColor: '#f2e07bff',
+        borderRadius: 2,
+        marginBottom: 20
     },
     updateMessage: {
         fontSize: 16,
-        color: '#666',
+        color: '#555',
         textAlign: 'center',
-        marginBottom: 30,
-        lineHeight: 22
+        marginBottom: 35,
+        lineHeight: 24,
+        paddingHorizontal: 10
     },
     updateBtn: {
-        backgroundColor: '#915200',
-        paddingVertical: 14,
-        paddingHorizontal: 30,
-        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 40,
+        borderRadius: 16,
         width: '100%',
+        minWidth: 250,
         alignItems: 'center',
-        marginBottom: 12
+        elevation: 8,
+        shadowColor: COLORS?.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
     },
     updateBtnText: {
         color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold'
+        fontSize: 18,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+        textTransform: 'uppercase'
     },
     closeBtn: {
-        paddingVertical: 10,
+        marginTop: 20,
+        paddingVertical: 12,
         width: '100%',
         alignItems: 'center'
     },
     closeBtnText: {
-        color: '#999',
-        fontSize: 14,
-        fontWeight: '600'
+        color: COLORS?.secondary,
+        fontSize: 15,
+        fontWeight: '600',
+        textDecorationLine: 'underline'
     },
     checkingContainer: {
         position: 'absolute',

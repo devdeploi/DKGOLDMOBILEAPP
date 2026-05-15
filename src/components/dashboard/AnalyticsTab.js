@@ -484,12 +484,6 @@ const AnalyticsTab = ({ user }) => {
         }
     }, [fetchMyPlans, user]);
 
-    useEffect(() => {
-        if (goldRefreshTimer === 60) {
-            setLockedGoldRate(goldRate);
-        }
-    }, [goldRefreshTimer, goldRate]);
-
     const onRefresh = () => {
         setRefreshing(true);
         fetchMyPlans();
@@ -521,9 +515,16 @@ const AnalyticsTab = ({ user }) => {
         // For fixed plans, use the monthly amount. For unlimited, allow empty or monthly as default.
         const isUnlimited = isPlanUnlimited(plan);
         setCustomAmount(plan.monthlyAmount ? plan.monthlyAmount.toString() : '');
-        // Initial setup if not already locked by continuous timer
-        if (lockedGoldRate === 0 && goldRate > 0) {
-            setLockedGoldRate(goldRate);
+
+        // Calculate merchant-specific rate
+        const manual24k = Number(plan.merchant?.goldRate24k);
+        const currentRate = manual24k > 0 ? manual24k : goldRate;
+        console.log("Gold Rate: ", plan.merchant);
+
+
+        // Initial setup
+        if (currentRate > 0) {
+            setLockedGoldRate(currentRate);
         }
         setOfflineModalVisible(true);
     };

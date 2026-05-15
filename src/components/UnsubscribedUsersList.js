@@ -50,10 +50,14 @@ const UnsubscribedUsersList = ({ user }) => {
 
     const selectedPlan = plans.find(p => p._id === subscribeForm.planId);
     const isUnlimited = selectedPlan?.type === 'unlimited';
-    const effectiveGoldRate = Number(subscribeForm.customGoldRate) || goldRate;
+    const effectiveGoldRate = Number(subscribeForm.customGoldRate) || (isUnlimited ? (user.goldRate24k || goldRate) : goldRate);
     const calculatedWeight = (isUnlimited && subscribeForm.amount && effectiveGoldRate > 0) 
         ? (Number(subscribeForm.amount) / effectiveGoldRate).toFixed(3) 
         : '0.000';
+
+    // acc_no preview state
+    const [accNoPreview, setAccNoPreview] = useState(null); // { lastAccNo, nextAccNo }
+    const [fetchingAccNo, setFetchingAccNo] = useState(false);
 
     const [alertConfig, setAlertConfig] = useState({
         visible: false,
@@ -98,6 +102,27 @@ const UnsubscribedUsersList = ({ user }) => {
         fetchPlans();
     }, [fetchUsers, fetchPlans]);
 
+    // Fetch acc_no preview whenever a plan is selected and user has no acc_no
+    useEffect(() => {
+        const fetchAccNoPreview = async () => {
+            if (!subscribeForm.planId || !selectedUser || selectedUser.acc_no) {
+                setAccNoPreview(null);
+                return;
+            }
+            try {
+                setFetchingAccNo(true);
+                const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                const { data } = await axios.get(`${APIURL}/chit-plans/${subscribeForm.planId}/next-acc-no`, config);
+                setAccNoPreview(data);
+            } catch (e) {
+                setAccNoPreview(null);
+            } finally {
+                setFetchingAccNo(false);
+            }
+        };
+        fetchAccNoPreview();
+    }, [subscribeForm.planId, selectedUser]);
+
     const onRefresh = () => {
         setRefreshing(true);
         setPage(1);
@@ -114,11 +139,12 @@ const UnsubscribedUsersList = ({ user }) => {
 
     const handleOpenSubscribe = (u) => {
         setSelectedUser(u);
+        setAccNoPreview(null); // Reset preview; will load via useEffect when planId is set
         setSubscribeForm({
             planId: plans.length > 0 ? plans[0]._id : '',
             amount: '',
             paymentDate: new Date(),
-            customGoldRate: (goldRate || 0).toFixed(2),
+            customGoldRate: (plans[0]?.type === 'unlimited' ? (user.goldRate24k || goldRate || 0) : (goldRate || 0)).toFixed(2),
             name: u.name,
             email: u.email || '',
             address: u.address || ''
@@ -169,7 +195,7 @@ const UnsubscribedUsersList = ({ user }) => {
         } finally {
             setSubmitting(false);
         }
-    };
+    };    
 
     const renderUserItem = ({ item }) => (
         <View style={styles.userCard}>
@@ -301,7 +327,11 @@ const UnsubscribedUsersList = ({ user }) => {
                                             <TouchableOpacity
                                                 key={p._id}
                                                 style={[styles.planCard, isSelected && styles.planCardSelected]}
-                                                onPress={() => setSubscribeForm({...subscribeForm, planId: p._id, customGoldRate: (goldRate || 0).toFixed(2)})}
+                                                onPress={() => setSubscribeForm({
+                                                    ...subscribeForm, 
+                                                    planId: p._id, 
+                                                    customGoldRate: (p.type === 'unlimited' ? (user.goldRate24k || goldRate || 0) : (goldRate || 0)).toFixed(2)
+                                                })}
                                                 activeOpacity={0.75}
                                             >
                                                 {/* Left accent bar */}
@@ -415,7 +445,59 @@ const UnsubscribedUsersList = ({ user }) => {
                             />
 
                             <View style={{ marginBottom: 15, alignItems: 'center' }}>
-                                <Text style={styles.autoGenText}>Account Number (ACC_NO) will be auto-generated</Text>
+                                {/* Live acc_no preview (only for users who have no acc_no) */}
+                                {!selectedUser?.acc_no ? (
+                                    <View style={{
+                                        width: '100%',
+                                        backgroundColor: '#FFFBEB',
+                                        borderWidth: 1,
+                                        borderColor: '#F59E0B',
+                                        borderRadius: 14,
+                                        padding: 14,
+                                        flexDirection: 'row',
+                                        alignItems: 'center'
+                                    }}>
+                                        <View style={{
+                                            width: 36,
+                                            height: 36,
+                                            borderRadius: 18,
+                                            backgroundColor: '#FEF3C7',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            marginRight: 12
+                                        }}>
+                                            <Icon name="id-badge" size={15} color="#D97706" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 11, color: '#92400E', fontWeight: '700', marginBottom: 4, letterSpacing: 0.3 }}>ACCOUNT NUMBER PREVIEW</Text>
+                                            {fetchingAccNo ? (
+                                                <ActivityIndicator size="small" color="#D97706" />
+                                            ) : accNoPreview ? (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                                                    <View>
+                                                        <Text style={{ fontSize: 10, color: '#B45309' }}>Last in this plan</Text>
+                                                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#78350F' }}>
+                                                            {accNoPreview.lastAccNo ?? 'None yet'}
+                                                        </Text>
+                                                    </View>
+                                                    <Icon name="arrow-right" size={10} color="#D97706" />
+                                                    <View>
+                                                        <Text style={{ fontSize: 10, color: '#B45309' }}>Will be assigned</Text>
+                                                        <Text style={{ fontSize: 20, fontWeight: '900', color: '#92400E' }}>
+                                                            {accNoPreview.nextAccNo}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            ) : (
+                                                <Text style={{ fontSize: 12, color: '#B45309' }}>Select a plan to preview acc_no</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <Text style={styles.autoGenText}>
+                                        Acc No: <Text style={{ fontWeight: 'bold', color: '#915200' }}>{selectedUser?.acc_no}</Text>
+                                    </Text>
+                                )}
                             </View>
 
                             <TouchableOpacity 

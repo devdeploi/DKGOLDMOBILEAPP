@@ -453,11 +453,113 @@ const MerchantUsers = ({ user }) => {
     const [previewProofUrl, setPreviewProofUrl] = useState(null);
     const [downloadingProof, setDownloadingProof] = useState(false);
 
-    // User Details State
     const [selectedUserForModal, setSelectedUserForModal] = useState(null);
+    const [selectedPlanForModal, setSelectedPlanForModal] = useState(null);
     const [userDetailsModalVisible, setUserDetailsModalVisible] = useState(false);
+    const [isEditingUser, setIsEditingUser] = useState(false);
+    const [editForm, setEditForm] = useState({
+        name: '',
+        email: '',
+        panCard: '',
+        address: '',
+        acc_no: ''
+    });
+    const [updatingUser, setUpdatingUser] = useState(false);
+
+    // acc_no inline validation
+    const [accNoValidation, setAccNoValidation] = useState(null);
+    // null = not checked, { checking: true }, { available: true }, { available: false, ...details }
+    const [accNoValidating, setAccNoValidating] = useState(false);
+    const accNoDebounceTimer = React.useRef(null);
 
     // --- PDF Generation Logic ---
+
+    const handleEditUser = () => {
+        setEditForm({
+            name: selectedUserForModal.name || '',
+            email: selectedUserForModal.email || '',
+            panCard: selectedUserForModal.panCard || '',
+            address: selectedUserForModal.address || '',
+            acc_no: selectedUserForModal.acc_no || ''
+        });
+        setAccNoValidation(null);
+        setIsEditingUser(true);
+    };
+
+    const validateAccNoField = (newAccNo) => {
+        clearTimeout(accNoDebounceTimer.current);
+        // Same as current → no need to validate
+        if (newAccNo === (selectedUserForModal?.acc_no || '')) {
+            setAccNoValidation(null);
+            setAccNoValidating(false);
+            return;
+        }
+        if (!newAccNo.trim()) {
+            setAccNoValidation(null);
+            setAccNoValidating(false);
+            return;
+        }
+        setAccNoValidating(true);
+        accNoDebounceTimer.current = setTimeout(async () => {
+            try {
+                const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                const planId = selectedPlanForModal?._id;
+                const { data } = await axios.get(
+                    `${APIURL}/users/validate-acc-no?acc_no=${encodeURIComponent(newAccNo)}&excludeUserId=${selectedUserForModal._id}${planId ? `&planId=${planId}` : ''}`,
+                    config
+                );
+                setAccNoValidation(data);
+            } catch (e) {
+                setAccNoValidation(null);
+            } finally {
+                setAccNoValidating(false);
+            }
+        }, 600);
+    };
+
+    const handleUpdateUser = async () => {
+        if (!editForm.name) {
+            showCustomAlert("Error", "Name is required", "error");
+            return;
+        }
+        // Block save if acc_no has a known active conflict
+        if (accNoValidation && !accNoValidation.available && accNoValidation.hasActivePlan) {
+            showCustomAlert(
+                "Acc No Conflict",
+                `Acc No ${editForm.acc_no} is already assigned to ${accNoValidation.conflictUserName} who has an active ${accNoValidation.activePlanName} plan. Please use a different number.`,
+                "error"
+            );
+            return;
+        }
+
+        setUpdatingUser(true);
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            const payload = {
+                name: editForm.name,
+                email: editForm.email,
+                panCard: editForm.panCard,
+                address: editForm.address,
+                acc_no: editForm.acc_no || undefined
+            };
+            await axios.put(`${APIURL}/users/${selectedUserForModal._id}`, payload, config);
+
+            // Update local state for the modal
+            setSelectedUserForModal(prev => ({ ...prev, ...editForm }));
+
+            // Refresh main data list to reflect changes
+            fetchData();
+
+            setIsEditingUser(false);
+            setAccNoValidation(null);
+            showCustomAlert("Success", "User details updated successfully", "success");
+        } catch (error) {
+            console.error("Failed to update user", error);
+            showCustomAlert("Error", error.response?.data?.message || "Failed to update user details", "error");
+        } finally {
+            setUpdatingUser(false);
+        }
+    };
 
     const fetchImageAsBase64 = async (url) => {
         try {
@@ -575,8 +677,6 @@ const MerchantUsers = ({ user }) => {
 
             // 2. Data Prep
             const planName = subscriber.plan?.planName || subscriber.chitPlan?.planName || 'Unknown Plan';
-            console.log(payment);
-
             // Use the established payment date from the record, fallback to now only if missing
             const paymentDateVal = payment.paymentDate || payment.date || new Date();
             const paymentDate = new Date(paymentDateVal).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -1441,7 +1541,9 @@ const MerchantUsers = ({ user }) => {
                     ? subscriber.plan.monthlyAmount.toString() 
                     : '',
             notes: '',
-            customGoldRate: (lockedGoldRate || goldRate) ? Number(lockedGoldRate || goldRate).toFixed(2) : ''
+            customGoldRate: ((subscriber?.plan?.type === 'unlimited' || subscriber?.plan?.planType === 'unlimited') && user.goldRate24k)
+                ? user.goldRate24k.toFixed(2)
+                : (lockedGoldRate || goldRate) ? Number(lockedGoldRate || goldRate).toFixed(2) : ''
         });
         const today = new Date();
         setSelectedPaymentDate(today);
@@ -1494,7 +1596,7 @@ const MerchantUsers = ({ user }) => {
                 amount: manualForm.amount,
                 date: formattedDate,
                 goldRate: ((selectedSubscriber?.plan?.type === 'unlimited') || (selectedSubscriber?.plan?.planType === 'unlimited')) 
-                    ? (manualForm.customGoldRate ? parseFloat(manualForm.customGoldRate) : (lockedGoldRate || goldRate))
+                    ? (manualForm.customGoldRate ? parseFloat(manualForm.customGoldRate) : (user.goldRate24k || lockedGoldRate || goldRate))
                     : 0,
                 notes: manualForm.notes,
                 type: manualForm.type || 'CASH'
@@ -1588,6 +1690,7 @@ const MerchantUsers = ({ user }) => {
                         style={{ marginLeft: 10 }}
                         onPress={() => {
                             setSelectedUserForModal(item.user);
+                            setSelectedPlanForModal(item.plan || item.chitPlan);
                             setUserDetailsModalVisible(true);
                         }}
                     >
@@ -1671,7 +1774,8 @@ const MerchantUsers = ({ user }) => {
         const planName = item.plan?.planName || 'Unknown Plan';
         const isUnlimited = (planName.toLowerCase().includes('unlimited') || planName.toLowerCase().includes('infinity'));
         const paidAmount = item.subscription.totalAmountPaid || 0;
-        const goldGrams = (isUnlimited && goldRate > 0) ? (paidAmount / goldRate).toFixed(3) : 0;
+        const effectiveRate = user.goldRate24k || goldRate;
+        const goldGrams = (isUnlimited && effectiveRate > 0) ? (paidAmount / effectiveRate).toFixed(3) : 0;
 
         return (
             <View style={styles.withdrawalCard}>
@@ -1691,6 +1795,7 @@ const MerchantUsers = ({ user }) => {
                             <TouchableOpacity
                                 onPress={() => {
                                     setSelectedUserForModal(item.user);
+                                    setSelectedPlanForModal(item.plan || item.chitPlan);
                                     setUserDetailsModalVisible(true);
                                 }}
                             >
@@ -1713,7 +1818,7 @@ const MerchantUsers = ({ user }) => {
                     <View style={styles.withdrawalAmountBadge}>
                         <Text style={styles.withdrawalAmountLabel}>Total Paid</Text>
                         <Text style={styles.withdrawalAmountValue}>₹{paidAmount}</Text>
-                        {isUnlimited && goldRate > 0 && (
+                        {isUnlimited && (user.goldRate24k || goldRate) > 0 && (
                             <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '700', marginTop: 2 }}>
                                 {goldGrams}g (24K)
                             </Text>
@@ -1776,8 +1881,6 @@ const MerchantUsers = ({ user }) => {
     };
 
     const renderSubscriber = ({ item }) => {
-        console.log("item", item);
-
         const planName = (item.plan?.planName || '').toLowerCase();
         const isUnlimited = planName.includes('unlimited') || planName.includes('infinity') || item.plan?.type === 'unlimited';
 
@@ -1827,6 +1930,7 @@ const MerchantUsers = ({ user }) => {
                             style={{ marginLeft: 10 }}
                             onPress={() => {
                                 setSelectedUserForModal(item.user);
+                                setSelectedPlanForModal(item.plan || item.chitPlan);
                                 setUserDetailsModalVisible(true);
                             }}
                         >
@@ -2365,6 +2469,7 @@ const MerchantUsers = ({ user }) => {
                                                 <TouchableOpacity 
                                                     onPress={() => {
                                                         setSelectedUserForModal(pay.user);
+                                                        setSelectedPlanForModal(pay.plan || pay.chitPlan);
                                                         setUserDetailsModalVisible(true);
                                                     }}
                                                 >
@@ -3182,85 +3287,271 @@ const MerchantUsers = ({ user }) => {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>User Details</Text>
-                            <TouchableOpacity onPress={() => setUserDetailsModalVisible(false)}>
-                                <Icon name="times" size={20} color="#999" />
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                {selectedUserForModal && !isEditingUser && (
+                                    <TouchableOpacity 
+                                        onPress={handleEditUser}
+                                        style={{ marginRight: 15, padding: 5 }}
+                                    >
+                                        <Icon name="edit" size={18} color={COLORS?.primary} />
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity onPress={() => {
+                                    setUserDetailsModalVisible(false);
+                                    setIsEditingUser(false);
+                                }}>
+                                    <Icon name="times" size={20} color="#999" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {selectedUserForModal && (
                             <ScrollView showsVerticalScrollIndicator={false}>
-                                <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                                    {selectedUserForModal.profileImage ? (
-                                        <Image
-                                            source={{ uri: `${BASE_URL}${selectedUserForModal.profileImage}` }}
-                                            style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#eee', marginBottom: 10 }}
+                                {isEditingUser ? (
+                                    <View style={{ padding: 10 }}>
+                                        <Text style={styles.inputLabel}>Full Name</Text>
+                                        <TextInput
+                                            style={styles.modalInput}
+                                            value={editForm.name}
+                                            onChangeText={(txt) => setEditForm({ ...editForm, name: txt })}
+                                            placeholder="Enter full name"
                                         />
-                                    ) : (
-                                        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS?.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                                            <Text style={{ fontSize: 32, fontWeight: 'bold', color: COLORS?.primary }}>{selectedUserForModal.name?.charAt(0).toUpperCase()}</Text>
-                                        </View>
-                                    )}
-                                    <Text style={{ fontSize: 22, fontWeight: 'bold', color: COLORS?.dark }}>{selectedUserForModal.name}</Text>
-                                </View>
 
-                                <View style={{ backgroundColor: '#f8f9fa', borderRadius: 12, padding: 16 }}>
-                                    <View style={{ flexDirection: 'row', marginBottom: 16, alignItems: 'center' }}>
-                                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                            <Icon name="phone-alt" size={16} color={COLORS?.primary} />
+                                        <Text style={styles.inputLabel}>Email Address</Text>
+                                        <TextInput
+                                            style={styles.modalInput}
+                                            value={editForm.email}
+                                            onChangeText={(txt) => setEditForm({ ...editForm, email: txt })}
+                                            placeholder="Enter email address"
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
+                                        />
+
+                                        <Text style={styles.inputLabel}>PAN Number</Text>
+                                        <TextInput
+                                            style={styles.modalInput}
+                                            value={editForm.panCard}
+                                            onChangeText={(txt) => setEditForm({ ...editForm, panCard: txt })}
+                                            placeholder="Enter PAN number"
+                                            autoCapitalize="characters"
+                                        />
+
+                                        <Text style={styles.inputLabel}>Address</Text>
+                                        <TextInput
+                                            style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
+                                            value={editForm.address}
+                                            onChangeText={(txt) => setEditForm({ ...editForm, address: txt })}
+                                            placeholder="Enter address"
+                                            multiline={true}
+                                        />
+
+                                        {/* Account Number field */}
+                                        <Text style={styles.inputLabel}>Account Number (Acc No)</Text>
+                                        <View style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderWidth: 1,
+                                            borderColor: accNoValidation && !accNoValidation.available && accNoValidation.hasActivePlan
+                                                ? '#DC2626'
+                                                : accNoValidation?.available === true
+                                                    ? '#16A34A'
+                                                    : '#e0e0e0',
+                                            borderRadius: 8,
+                                            backgroundColor: '#f8f9fa',
+                                            paddingHorizontal: 12,
+                                            marginBottom: 4
+                                        }}>
+                                            <TextInput
+                                                style={[styles.modalInput, { flex: 1, borderWidth: 0, backgroundColor: 'transparent', marginBottom: 0, paddingHorizontal: 0 }]}
+                                                value={editForm.acc_no}
+                                                onChangeText={(txt) => {
+                                                    setEditForm({ ...editForm, acc_no: txt });
+                                                    validateAccNoField(txt);
+                                                }}
+                                                placeholder="Enter account number"
+                                                keyboardType="numeric"
+                                            />
+                                            {accNoValidating && (
+                                                <ActivityIndicator size="small" color="#999" style={{ marginLeft: 8 }} />
+                                            )}
+                                            {!accNoValidating && accNoValidation?.available === true && (
+                                                <Icon name="check-circle" size={16} color="#16A34A" style={{ marginLeft: 8 }} />
+                                            )}
+                                            {!accNoValidating && accNoValidation?.available === false && accNoValidation.hasActivePlan && (
+                                                <Icon name="times-circle" size={16} color="#DC2626" style={{ marginLeft: 8 }} />
+                                            )}
+                                            {!accNoValidating && accNoValidation?.available === false && !accNoValidation.hasActivePlan && (
+                                                <Icon name="exclamation-circle" size={16} color="#D97706" style={{ marginLeft: 8 }} />
+                                            )}
                                         </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 2 }}>Phone Number</Text>
-                                            <TouchableOpacity onPress={() => Linking.openURL(`tel:${selectedUserForModal.phone}`)}>
-                                                <Text style={{ fontSize: 16, color: COLORS?.dark, fontWeight: '600' }}>{selectedUserForModal.phone}</Text>
+
+                                        {/* Validation feedback banner */}
+                                        {accNoValidation && !accNoValidation.available && (
+                                            <View style={{
+                                                backgroundColor: accNoValidation.hasActivePlan ? '#FEF2F2' : '#FFFBEB',
+                                                borderWidth: 1,
+                                                borderColor: accNoValidation.hasActivePlan ? '#FCA5A5' : '#FDE68A',
+                                                borderRadius: 8,
+                                                padding: 10,
+                                                marginBottom: 8
+                                            }}>
+                                                <Text style={{ fontSize: 12, fontWeight: '700', color: accNoValidation.hasActivePlan ? '#991B1B' : '#92400E', marginBottom: 4 }}>
+                                                    {accNoValidation.hasActivePlan
+                                                        ? `⚠️ Acc No ${editForm.acc_no} already assigned to ${accNoValidation.conflictUserName}`
+                                                        : `ℹ️ Acc No ${editForm.acc_no} used by ${accNoValidation.conflictUserName} (no active plan)`}
+                                                </Text>
+                                                {accNoValidation.hasActivePlan && accNoValidation.activePlanName && (
+                                                    <Text style={{ fontSize: 11, color: '#B91C1C', marginBottom: 6 }}>
+                                                        Active plan: {accNoValidation.activePlanName}
+                                                    </Text>
+                                                )}
+                                                {accNoValidation.suggestedAccNo && (
+                                                    <TouchableOpacity
+                                                        onPress={() => {
+                                                            setEditForm(prev => ({ ...prev, acc_no: accNoValidation.suggestedAccNo }));
+                                                            setAccNoValidation({ available: true });
+                                                        }}
+                                                        style={{
+                                                            backgroundColor: accNoValidation.hasActivePlan ? '#DC2626' : '#D97706',
+                                                            paddingHorizontal: 10,
+                                                            paddingVertical: 5,
+                                                            borderRadius: 6,
+                                                            alignSelf: 'flex-start'
+                                                        }}
+                                                    >
+                                                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
+                                                            Use suggested: {accNoValidation.suggestedAccNo}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        <View style={{ flexDirection: 'row', marginTop: 20 }}>
+                                            <TouchableOpacity
+                                                style={[styles.modalButton, { backgroundColor: '#eee', flex: 1, marginRight: 10 }]}
+                                                onPress={() => setIsEditingUser(false)}
+                                            >
+                                                <Text style={{ color: '#666', fontWeight: 'bold' }}>Cancel</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.modalButton, { backgroundColor: COLORS?.primary, flex: 1 }]}
+                                                onPress={handleUpdateUser}
+                                                disabled={updatingUser}
+                                            >
+                                                {updatingUser ? (
+                                                    <ActivityIndicator size="small" color="#fff" />
+                                                ) : (
+                                                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save Changes</Text>
+                                                )}
                                             </TouchableOpacity>
                                         </View>
                                     </View>
+                                ) : (
+                                    <>
+                                        <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                                            {selectedUserForModal.profileImage ? (
+                                                <Image
+                                                    source={{ uri: `${BASE_URL}${selectedUserForModal.profileImage}` }}
+                                                    style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#eee', marginBottom: 10 }}
+                                                />
+                                            ) : (
+                                                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS?.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                                                    <Text style={{ fontSize: 32, fontWeight: 'bold', color: COLORS?.primary }}>{selectedUserForModal.name?.charAt(0).toUpperCase()}</Text>
+                                                </View>
+                                            )}
+                                            <Text style={{ fontSize: 22, fontWeight: 'bold', color: COLORS?.dark }}>{selectedUserForModal.name}</Text>
+                                            {selectedPlanForModal && (
+                                                <View style={{ backgroundColor: COLORS?.primary + '10', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginTop: 6 }}>
+                                                    <Text style={{ fontSize: 13, color: COLORS?.primary, fontWeight: '700' }}>{selectedPlanForModal.planName}</Text>
+                                                </View>
+                                            )}
+                                        </View>
 
-                                    <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 16 }} />
+                                        <View style={{ backgroundColor: '#f8f9fa', borderRadius: 12, padding: 16 }}>
+                                            <View style={{ flexDirection: 'row', marginBottom: 16, alignItems: 'center' }}>
+                                                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                                    <Icon name="phone-alt" size={16} color={COLORS?.primary} />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 2 }}>Phone Number</Text>
+                                                    <TouchableOpacity onPress={() => Linking.openURL(`tel:${selectedUserForModal.phone}`)}>
+                                                        <Text style={{ fontSize: 16, color: COLORS?.dark, fontWeight: '600' }}>{selectedUserForModal.phone}</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
 
-                                    {selectedUserForModal.email && (
-                                        <>
+                                            <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 16 }} />
+
                                             <View style={{ flexDirection: 'row', marginBottom: 16, alignItems: 'center' }}>
                                                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                                                     <Icon name="envelope" size={16} color={COLORS?.primary} />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 2 }}>Email Address</Text>
-                                                    <TouchableOpacity onPress={() => Linking.openURL(`mailto:${selectedUserForModal.email}`)}>
-                                                        <Text style={{ fontSize: 15, color: COLORS?.dark, fontWeight: '500' }}>{selectedUserForModal.email}</Text>
+                                                    <TouchableOpacity onPress={() => selectedUserForModal.email ? Linking.openURL(`mailto:${selectedUserForModal.email}`) : null}>
+                                                        <Text style={{ fontSize: 15, color: COLORS?.dark, fontWeight: '500' }}>{selectedUserForModal.email || 'Not Provided'}</Text>
                                                     </TouchableOpacity>
                                                 </View>
                                             </View>
                                             <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 16 }} />
-                                        </>
-                                    )}
 
-                                    {selectedUserForModal.address && (
-                                        <>
-                                            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                            {selectedUserForModal.address && (
+                                                <>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                                            <Icon name="map-marker-alt" size={16} color={COLORS?.primary} />
+                                                        </View>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 4 }}>Address</Text>
+                                                            <Text style={{ fontSize: 14, color: COLORS?.dark, lineHeight: 20 }}>{typeof selectedUserForModal.address === 'string' ? selectedUserForModal.address : JSON.stringify(selectedUserForModal.address)}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 16 }} />
+                                                </>
+                                            )}
+                                            
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                                                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                                    <Icon name="map-marker-alt" size={16} color={COLORS?.primary} />
+                                                    <Icon name="id-card" size={16} color={COLORS?.primary} />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
-                                                    <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 4 }}>Address</Text>
-                                                    <Text style={{ fontSize: 14, color: COLORS?.dark, lineHeight: 20 }}>{typeof selectedUserForModal.address === 'string' ? selectedUserForModal.address : JSON.stringify(selectedUserForModal.address)}</Text>
+                                                    <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 2 }}>PAN Card</Text>
+                                                    <Text style={{ fontSize: 16, color: COLORS?.dark, fontWeight: '600' }}>{selectedUserForModal.panCard || 'Not Provided'}</Text>
                                                 </View>
                                             </View>
-                                            <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 16 }} />
-                                        </>
-                                    )}
-                                    {selectedUserForModal.acc_no && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                                <Icon name="university" size={16} color={COLORS?.primary} />
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 2 }}>Account Number</Text>
-                                                <Text style={{ fontSize: 16, color: COLORS?.dark, fontWeight: '600' }}>{selectedUserForModal.acc_no}</Text>
-                                            </View>
+
+                                            <View style={{ height: 1, backgroundColor: '#eee', marginBottom: 16 }} />
+
+                                            {selectedUserForModal.acc_no && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                                        <Icon name="university" size={16} color={COLORS?.primary} />
+                                                    </View>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 2 }}>Account Number</Text>
+                                                        <Text style={{ fontSize: 16, color: COLORS?.dark, fontWeight: '600' }}>{selectedUserForModal.acc_no}</Text>
+                                                    </View>
+                                                </View>
+                                            )}
+
+                                            {selectedPlanForModal && (
+                                                <>
+                                                    <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 16 }} />
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS?.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                                            <Icon name="file-invoice-dollar" size={16} color={COLORS?.primary} />
+                                                        </View>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={{ fontSize: 12, color: COLORS?.secondary, marginBottom: 2 }}>Current Plan Context</Text>
+                                                            <Text style={{ fontSize: 16, color: COLORS?.dark, fontWeight: '600' }}>{selectedPlanForModal.planName}</Text>
+                                                        </View>
+                                                    </View>
+                                                </>
+                                            )}
                                         </View>
-                                    )}
-                                </View>
+                                    </>
+                                )}
                             </ScrollView>
                         )}
                     </View>
@@ -3696,6 +3987,22 @@ const styles = StyleSheet.create({
         padding: 12,
         fontSize: 14,
         color: COLORS?.dark,
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderColor: '#eee',
+        borderRadius: 10,
+        padding: 12,
+        fontSize: 15,
+        color: COLORS?.dark,
+        backgroundColor: '#f9f9f9',
+        marginBottom: 10,
+    },
+    modalButton: {
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     submitButton: {
         backgroundColor: COLORS?.primary,

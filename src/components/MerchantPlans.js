@@ -205,6 +205,47 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
         }
     };
 
+    const handleDeleteSubscriber = (sub) => {
+        setAlertConfig({
+            visible: true,
+            title: 'Delete Subscriber',
+            message: `Remove ${sub.user?.name} from "${selectedPlan?.planName}" and delete all their payment records? This cannot be undone.`,
+            type: 'warning',
+            buttons: [
+                { text: 'Cancel', style: 'cancel', onPress: hideAlert },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        hideAlert();
+                        try {
+                            const res = await axios.delete(
+                                `${APIURL}/chit-plans/${selectedPlan._id}/subscribers/${sub._id}`,
+                                { headers: { Authorization: `Bearer ${user.token}` } }
+                            );
+                            Toast.show({
+                                type: 'success',
+                                text1: 'Subscriber Removed',
+                                text2: `${res.data.paymentsDeleted} payment record(s) deleted.`
+                            });
+                            // Refresh subscriber list
+                            fetchSubscribers(selectedPlan._id, subscribersPage, subscribersSearch);
+                            // Refresh plans list to update subscriber count
+                            if (onRefresh) onRefresh();
+                        } catch (error) {
+                            console.error('Delete subscriber error:', error);
+                            Toast.show({
+                                type: 'error',
+                                text1: 'Error',
+                                text2: error.response?.data?.message || 'Failed to delete subscriber'
+                            });
+                        }
+                    }
+                }
+            ]
+        });
+    };
+
     // Custom Alert State
     const [alertConfig, setAlertConfig] = useState({
         visible: false,
@@ -749,11 +790,27 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                                                             <Text style={styles.subAccNo}>Acc: {sub.user?.acc_no || 'N/A'}</Text>
                                                         </View>
                                                     </View>
-                                                    <View style={{ alignItems: 'flex-end' }}>
-                                                        <Text style={styles.subPaid}>₹{sub.totalPaid}</Text>
-                                                        <View style={[styles.statusTag, { backgroundColor: sub.status === 'active' ? '#C6F6D5' : '#FEEBC8' }]}>
-                                                            <Text style={[styles.statusTagText, { color: sub.status === 'active' ? '#2F855A' : '#C05621' }]}>{sub.status}</Text>
+                                                    <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 10 }}>
+                                                        <View style={{ alignItems: 'flex-end' }}>
+                                                            <Text style={styles.subPaid}>₹{sub.totalPaid}</Text>
+                                                            <View style={[styles.statusTag, { backgroundColor: sub.status === 'active' ? '#C6F6D5' : '#FEEBC8' }]}>
+                                                                <Text style={[styles.statusTagText, { color: sub.status === 'active' ? '#2F855A' : '#C05621' }]}>{sub.status}</Text>
+                                                            </View>
                                                         </View>
+                                                        {/* Delete subscriber button */}
+                                                        <TouchableOpacity
+                                                            onPress={() => handleDeleteSubscriber(sub)}
+                                                            style={{
+                                                                width: 32,
+                                                                height: 32,
+                                                                borderRadius: 8,
+                                                                backgroundColor: '#FEE2E2',
+                                                                justifyContent: 'center',
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            <Icon name="trash" size={13} color="#DC2626" />
+                                                        </TouchableOpacity>
                                                     </View>
                                                 </View>
                                             )}

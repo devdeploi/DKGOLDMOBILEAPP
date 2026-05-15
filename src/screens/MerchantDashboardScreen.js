@@ -230,7 +230,9 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 gstin: updatedData.gstin,
                 pancard: updatedData.pancard,
                 goldRate18k: updatedData.goldRate18k,
-                goldRate22k: updatedData.goldRate22k
+                goldRate22k: updatedData.goldRate22k,
+                goldRate24k: updatedData.goldRate24k,
+                silverRate: updatedData.silverRate
             };
 
             const { data } = await axios.put(`${APIURL}/merchants/${id}`, payload, {

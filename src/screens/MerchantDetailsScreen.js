@@ -57,6 +57,7 @@ const MerchantDetailsScreen = ({ merchant, onBack, user }) => {
     const [selectedPlan, setSelectedPlan] = useState(null);
 
     const [subscribedPlanIds, setSubscribedPlanIds] = useState([]);
+    const [accNoPreview, setAccNoPreview] = useState(null); // { lastAccNo, nextAccNo }
 
     // Custom Alert State
     const [alertConfig, setAlertConfig] = useState({
@@ -149,12 +150,28 @@ const MerchantDetailsScreen = ({ merchant, onBack, user }) => {
             return;
         }
 
+        // If user has no acc_no, fetch the plan-scoped preview first
+        let preview = null;
+        if (!user.acc_no) {
+            try {
+                const { data } = await axios.get(`${APIURL}/chit-plans/${plan._id}/next-acc-no`, {
+                    headers: { Authorization: `Bearer ${user.token}` }
+                });
+                preview = data; // { lastAccNo, nextAccNo }
+                setAccNoPreview(preview);
+            } catch (e) {
+                console.log('Failed to fetch acc_no preview', e);
+            }
+        }
+
+        const accNoInfo = preview
+            ? `\n\n🔢 Account No Preview:\n  • Last acc_no in this plan: ${preview.lastAccNo ?? 'None yet'}\n  • Your new acc_no will be: ${preview.nextAccNo}`
+            : '';
+
         setAlertConfig({
             visible: true,
             title: 'Confirm Request',
-            message: plan.type === 'unlimited'
-                ? `Request to join ${plan.planName}? You will need to pay ₹${plan.monthlyAmount} at the store.`
-                : `Request to join ${plan.planName}? You will need to pay ₹${plan.monthlyAmount} at the store.`,
+            message: `Request to join ${plan.planName}? You will need to pay ₹${plan.monthlyAmount} at the store.${accNoInfo}`,
             type: 'info',
             buttons: [
                 { text: 'Cancel', style: 'cancel', onPress: () => { } },
@@ -177,10 +194,9 @@ const MerchantDetailsScreen = ({ merchant, onBack, user }) => {
                             }, config);
 
                             setSubscribing(null);
+                            setAccNoPreview(null);
                             setAlertConfig({ visible: true, title: 'Request Sent', message: 'Your request has been sent to the merchant. Please visit the store to complete payment.', type: 'success' });
                             FCMService.displayLocalNotification('Request Sent', `Request to join ${plan.planName} sent successfully.`);
-                            // fetchPlans(); // Optional
-                            // fetchMySubscriptions(); // Optional
                         } catch (error) {
                             console.error("Subscription Request Error:", error);
                             setSubscribing(null);
