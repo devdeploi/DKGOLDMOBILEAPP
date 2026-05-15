@@ -53,7 +53,7 @@
 25058	27451	1777536373760967954	rnworklets_autolinked_build/CMakeFiles/react_codegen_rnworklets.dir/react/renderer/components/rnworklets/EventEmitters.cpp.o	5aaddc70f28ecb35
 12706	15765	1777536362077331310	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ShadowNodes.cpp.o	9fb475326cb71178
 2940	8756	1777536355015545074	RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/Props.cpp.o	42ceffdc2705670c
-0	14	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
+0	24	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
 10681	13610	1777536359921617408	HtmlToPdfSpec_autolinked_build/CMakeFiles/react_codegen_HtmlToPdfSpec.dir/react/renderer/components/HtmlToPdfSpec/ShadowNodes.cpp.o	ec67568144d057d3
 12022	15173	1777536361484490684	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ComponentDescriptors.cpp.o	b05bea9f468c8eca
 13316	16713	1777536363024199209	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/ComponentDescriptors.cpp.o	16d8ec3a660ee0fc
@@ -87,4 +87,4 @@
 17212	20513	1777536366825124373	RNShareSpec_autolinked_build/CMakeFiles/react_codegen_RNShareSpec.dir/react/renderer/components/RNShareSpec/ComponentDescriptors.cpp.o	6177f4556406f06a
 4216	4366	1778583178101948949	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/build/intermediates/cxx/Debug/x1s6t1w5/obj/x86/libappmodules.so	163cde408f1b46d9
 0	30	0	clean	19032e23f5748419
-1	13	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
+0	15	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs	3f2b30e4eeee785a
