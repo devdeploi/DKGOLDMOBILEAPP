@@ -144,15 +144,18 @@ const GoldTab = () => {
 
         // MCX Standard: 10:00 AM - 11:30 PM IST
         const openTime = 1000;
-        const closeTime = 2330; 
+        const closeTime = 2330;
         const isOpenTime = timeVal >= openTime && timeVal <= closeTime;
 
         if (isHoliday) return { isOpen: false, label: 'MARKET CLOSED (PUBLIC HOLIDAY)', color: '#ef4444' };
         if (isWeekend) return { isOpen: false, label: 'MARKET CLOSED (WEEKEND)', color: '#ef4444' };
         if (!isOpenTime) return { isOpen: false, label: `MARKET CLOSED (OPENS AT 10:00 AM)`, color: '#ef4444' };
-        
-        return { isOpen: true, label: 'MARKET IS OPEN (MCX)', color: '#22c55e' };
+
+        return { isOpen: true, label: 'MARKET IS OPEN', color: '#22c55e' };
     };
+
+    console.log("Rates : ",goldRates);
+    
 
     const marketStatus = getMarketStatus();
 
@@ -195,6 +198,7 @@ const GoldTab = () => {
     }, []);
 
     if (goldRates.loading) {
+        console.log(goldRates.loading);
         return (
             <View style={styles.loader}>
                 <LinearGradient
@@ -498,7 +502,7 @@ const GoldTab = () => {
                             {marketStatus.label}
                         </Text>
                     </View>
-                    
+
                     <Text style={styles.clockText}>
                         {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                     </Text>

@@ -294,11 +294,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                             />
                         </View>
 
-                        <ScrollView
-                            style={styles.legendContainer}
-                            nestedScrollEnabled={true}
-                            showsVerticalScrollIndicator={true}
-                        >
+                        <View style={styles.legendContainer}>
                             {planDistribution.map((item, index) => (
                                 <View key={index} style={styles.legendItem}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -310,7 +306,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                     <Text style={styles.legendValue}>₹{item.population.toLocaleString()}</Text>
                                 </View>
                             ))}
-                        </ScrollView>
+                        </View>
                     </View>
                 )}
 
@@ -419,7 +415,6 @@ const styles = StyleSheet.create({
     },
     // Legend Styles
     legendContainer: {
-        maxHeight: 120, // Limit height
         marginTop: 10,
         paddingHorizontal: 10
     },

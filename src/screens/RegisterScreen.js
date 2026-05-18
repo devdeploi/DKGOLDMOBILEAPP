@@ -156,7 +156,8 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                 type: 'success',
                 buttons: [{
                     text: 'Continue',
-                    onPress: () => {
+                    onPress: async () => {
+                        await FCMService.registerToken(data._id, data.role, data.token);
                         FCMService.displayLocalNotification('Welcome to DK Gold', 'Your account has been created successfully!');
                         onRegister(data);
                     }

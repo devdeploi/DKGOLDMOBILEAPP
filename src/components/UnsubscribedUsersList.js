@@ -21,6 +21,26 @@ import { APIURL } from '../constants/api';
 import CustomAlert from './CustomAlert';
 import { useGoldRate } from '../context/GoldRateContext';
 
+const getTimeAgo = (date) => {
+    if (!date) return '';
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) {
+        const days = Math.floor(interval);
+        if (days === 1) return "Yesterday";
+        return days + " days ago";
+    }
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + " mins ago";
+    return "Just now";
+};
+
 const UnsubscribedUsersList = ({ user }) => {
     const { goldRate } = useGoldRate();
     const [users, setUsers] = useState([]);
@@ -195,7 +215,47 @@ const UnsubscribedUsersList = ({ user }) => {
         } finally {
             setSubmitting(false);
         }
-    };    
+    };
+
+    const handleDeleteUser = (u) => {
+        setAlertConfig({
+            visible: true,
+            title: 'Delete User?',
+            message: `Are you sure you want to delete ${u.name}? This action cannot be undone.`,
+            type: 'warning',
+            buttons: [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Delete', 
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                            await axios.delete(`${APIURL}/users/${u._id}`, config);
+                            setAlertConfig({
+                                visible: true,
+                                title: 'Deleted',
+                                message: 'User has been removed successfully.',
+                                type: 'success'
+                            });
+                            onRefresh();
+                        } catch (error) {
+                            console.error("Error deleting user", error);
+                            setAlertConfig({
+                                visible: true,
+                                title: 'Error',
+                                message: error.response?.data?.message || 'Failed to delete user',
+                                type: 'error'
+                            });
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        });
+    };
 
     const renderUserItem = ({ item }) => (
         <View style={styles.userCard}>
@@ -207,21 +267,41 @@ const UnsubscribedUsersList = ({ user }) => {
                     <TouchableOpacity onPress={() => handleOpenUserModal(item)}>
                         <Text style={styles.userName} numberOfLines={1}>{item.name}</Text>
                     </TouchableOpacity>
-                    <Text style={styles.userPhone}>{item.phone}</Text>
-                    {item.address && <Text style={styles.userAddress} numberOfLines={1}>{item.address}</Text>}
+                    <View style={styles.userMetaRow}>
+                        <Icon name="phone-alt" size={10} color="#999" />
+                        <Text style={styles.userPhone}>{item.phone}</Text>
+                    </View>
+                    <View style={styles.userMetaRow}>
+                        <Icon name="clock" size={10} color="#aaa" />
+                        <Text style={styles.joinedText}>Joined {getTimeAgo(item.createdAt)}</Text>
+                    </View>
                 </View>
-                <TouchableOpacity 
-                    style={styles.assignBtn}
-                    onPress={() => handleOpenSubscribe(item)}
-                >
-                    <LinearGradient
-                        colors={['#ebdc87', '#e2d183']}
-                        style={styles.assignGradient}
+                <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                        style={styles.deleteBtn}
+                        onPress={() => handleDeleteUser(item)}
                     >
-                        <Text style={styles.assignBtnText}>Assign Plan</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
+                        <Icon name="trash-alt" size={12} color="#e74c3c" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={styles.assignBtn}
+                        onPress={() => handleOpenSubscribe(item)}
+                    >
+                        <LinearGradient
+                            colors={['#ebdc87', '#e2d183']}
+                            style={styles.assignGradient}
+                        >
+                            <Icon name="user-plus" size={14} color="#915200" />
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
             </View>
+            {item.address && (
+                <View style={styles.cardFooter}>
+                    <Icon name="map-marker-alt" size={10} color="#ccc" />
+                    <Text style={styles.userAddress} numberOfLines={1}>{item.address}</Text>
+                </View>
+            )}
         </View>
     );
 
@@ -591,6 +671,7 @@ const UnsubscribedUsersList = ({ user }) => {
                 title={alertConfig.title}
                 message={alertConfig.message}
                 type={alertConfig.type}
+                buttons={alertConfig.buttons}
                 onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
             />
         </View>
@@ -668,27 +749,67 @@ const styles = StyleSheet.create({
         color: '#2c3e50',
     },
     userPhone: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#666',
-        marginTop: 2,
+        marginLeft: 6,
+    },
+    userMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 3,
+    },
+    joinedText: {
+        fontSize: 11,
+        color: '#aaa',
+        marginLeft: 6,
+        fontWeight: '500',
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f5f5f5',
     },
     userAddress: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#999',
-        marginTop: 2,
+        marginLeft: 6,
+        flex: 1,
+    },
+    actionButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginLeft: 10,
+    },
+    deleteBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#fff0f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ffcdd2',
     },
     assignBtn: {
-        borderRadius: 20,
+        borderRadius: 10,
         overflow: 'hidden',
+        elevation: 2,
     },
     assignGradient: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        width: 36,
+        height: 36,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     assignBtnText: {
         fontSize: 12,
-        fontWeight: 'bold',
+        fontWeight: '800',
         color: '#915200',
+        textTransform: 'uppercase',
     },
     centerLoader: {
         flex: 1,

@@ -17,7 +17,7 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
             { id: '22k_gst', label: 'GOLD 22K (+GST)', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'gm' },
             { id: '18k_gst', label: 'GOLD 18K (+GST)', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'gm' },
         ],
-        exRate: 83.5,
+        exRate: 95.5,
         loading: true
     });
 
@@ -54,6 +54,9 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
             return { ...prev, rows: newRows };
         });
     };
+
+    console.log("Gold rates : ", goldRates);
+
 
     // Initial Fetch and Master Cycle
     useEffect(() => {
@@ -101,80 +104,84 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
 
     const fetchRates = async () => {
         try {
-            const myHeaders = new Headers();
-            myHeaders.append("x-access-token", "goldapi-agk42fsmm0glila-io");
-            myHeaders.append("Content-Type", "application/json");
-
-            const requestOptions = { method: 'GET', headers: myHeaders, redirect: 'follow' };
-
-            let dataXAU_INR, dataXAU_USD, dataXAG_INR, dataXAG_USD, exRate = 83.5;
+            let dataXAU_INR = { price: 0 }, dataXAU_USD = { price: 0 }, dataXAG_INR = { price: 0 }, dataXAG_USD = { price: 0 }, exRate = 95.5;
             let fetchSuccess = false;
 
-            // 1. Fetch Exchange Rate with Fallback
+            // 1. Fetch Exchange Rate with Multi-Source Accuracy
             try {
-                const resEX = await fetch("https://open.er-api.com/v6/latest/USD");
-                if (resEX.ok) {
-                    const exData = await resEX.json();
-                    exRate = exData?.rates?.INR || 83.5;
-                } else {
-                    throw new Error("Primary EX fail");
+                // Priority 1: Yahoo Finance
+                const resYahoo = await fetch("https://query2.finance.yahoo.com/v8/finance/chart/USDINR=X?interval=1m&range=1d");
+                if (resYahoo.ok) {
+                    const yahooData = await resYahoo.json();
+                    const latestPrice = yahooData?.chart?.result?.[0]?.meta?.regularMarketPrice;
+                    if (latestPrice) {
+                        exRate = latestPrice;
+                        fetchSuccess = true;
+                        console.log("EX Rate (Yahoo) fetched:", exRate);
+                    }
+                }
+
+                // Priority 2: Alternative Free Feed
+                if (!fetchSuccess) {
+                    const resAlt = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
+                    if (resAlt.ok) {
+                        const altData = await resAlt.json();
+                        exRate = altData?.rates?.INR || exRate;
+                        fetchSuccess = true;
+                    }
                 }
             } catch (e) {
-                try {
-                    const resEX2 = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
-                    const exData2 = await resEX2.json();
-                    exRate = exData2?.rates?.INR || 83.5;
-                } catch (e2) {
-                    console.warn("All EX APIs failed, using default 83.5");
-                }
+                console.warn("EX fetch failed, using default", e);
             }
 
-            // 2. Fetch Gold Prices
+            // 2. Fetch Gold Prices (Keyless Sources)
             try {
-                const [resXAU_INR, resXAU_USD, resXAG_INR, resXAG_USD] = await Promise.all([
-                    fetch("https://www.goldapi.io/api/XAU/INR", requestOptions),
-                    fetch("https://www.goldapi.io/api/XAU/USD", requestOptions),
-                    fetch("https://www.goldapi.io/api/XAG/INR", requestOptions),
-                    fetch("https://www.goldapi.io/api/XAG/USD", requestOptions),
+                // Priority 1: Gold-API.com (Free & Keyless)
+                const [resXAU, resXAG] = await Promise.all([
+                    fetch("https://api.gold-api.com/price/XAU"),
+                    fetch("https://api.gold-api.com/price/XAG")
                 ]);
 
-                if (resXAU_INR.ok && resXAU_USD.ok) {
-                    dataXAU_INR = await resXAU_INR.json();
-                    dataXAU_USD = await resXAU_USD.json();
-                    dataXAG_INR = await resXAG_INR.json();
-                    dataXAG_USD = await resXAG_USD.json();
-                    if (dataXAU_INR.price && dataXAU_USD.price) fetchSuccess = true;
+                if (resXAU.ok && resXAG.ok) {
+                    const gData = await resXAU.json();
+                    const sData = await resXAG.json();
+                    if (gData.price) {
+                        dataXAU_USD = { price: gData.price };
+                        dataXAG_USD = { price: sData.price };
+                        fetchSuccess = true;
+                        console.log("Gold/Silver Prices (Free API) fetched");
+                    }
+                }
+
+                // Priority 2: Binance PAXG (Proxy for Gold Price - Free & Keyless)
+                if (!fetchSuccess) {
+                    const resBinance = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT");
+                    if (resBinance.ok) {
+                        const bData = await resBinance.json();
+                        if (bData.price) {
+                            dataXAU_USD = { price: parseFloat(bData.price) };
+                            fetchSuccess = true;
+                        }
+                    }
                 }
             } catch (e) {
-                console.warn("GoldAPI fail, fallback", e);
+                console.warn("Free Gold APIs failed", e);
             }
 
             if (!fetchSuccess) {
-                const fbRes = await fetch("https://api.gold-api.com/price/XAU");
-                const fbData = await fbRes.json();
-                dataXAU_USD = { price: fbData.price };
-                dataXAU_INR = { price: fbData.price * exRate };
-
-                const fbResSilver = await fetch("https://api.gold-api.com/price/XAG");
-                const fbDataSilver = await fbResSilver.json();
-                dataXAG_USD = { price: fbDataSilver.price };
-                dataXAG_INR = { price: fbDataSilver.price * exRate };
+                console.warn("All live prices failed. Using last known or zero.");
             }
 
-            // --- Updated Formula Implementation ---
-            // Formula: (USD_Spot / 31.10) * ExchangeRate + 15% (Markup) + 3% (GST)
-            // Note: Updated markup to 15% to match the 15k/g target with the current feed.
-            const MARKUP = 1.06; // 6% Premium/Import Duty
-            const GST = 1.03; // 3% GST
-            const troyWeight = 31.10; // Grams per troy ounce // Per user request
+            // --- Updated Formula Implementation for Physical Gold (India) ---
+            const MARKUP = 1.125; 
+            const GST = 1.03;    
+            const troyWeight = 31.10; 
 
-            const baseGramINR = (dataXAU_USD.price / troyWeight) * exRate;
-            const base24WithMarkup = baseGramINR * MARKUP;
-            const base24Final = base24WithMarkup * GST;
-
-            const usdOunce = dataXAU_USD.price;
-            const silverOunceUSD = dataXAG_USD.price;
-            const silverKgINR = (silverOunceUSD / troyWeight) * 1000 * exRate;
+            const usdOunce = dataXAU_USD.price || 0;
+            const silverOunceUSD = dataXAG_USD.price || 0;
+            const baseGramINR = (usdOunce / troyWeight) * exRate;
+            const base24Final = baseGramINR * MARKUP * GST;
+            const silverKgINR = (silverOunceUSD / troyWeight) * 1000 * exRate * MARKUP * GST;
 
             lastBaseRates.current = {
                 usd: usdOunce,
