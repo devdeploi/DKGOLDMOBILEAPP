@@ -179,8 +179,6 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             const { data } = await axios.get(`${APIURL}/merchants/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            console.log("Full DB Profile:", data);
-
             const safeData = {
                 ...data,
                 shopImages: data.shopImages || []

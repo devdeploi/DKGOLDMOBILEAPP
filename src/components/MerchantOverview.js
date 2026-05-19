@@ -257,32 +257,50 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
     }, [stats.todaysCollections, stats.monthlyCollections, collectionFreq]);
 
 
-    const renderRecentItem = ({ item }) => (
-        <View style={styles.recentItem}>
-            <View style={[styles.avatarPlaceholder, { backgroundColor: '#F1F5F9' }]}>
-                {item.user?.profileImage ? (
-                    <Image source={{ uri: `${BASE_URL}${item.user.profileImage}` }} style={{ width: '100%', height: '100%', borderRadius: 10 }} />
-                ) : (
-                    <Text style={styles.avatarInitialsLight}>{getInitials(item.user?.name || item.name)}</Text>
-                )}
-            </View>
-            <View style={{ flex: 1, marginHorizontal: 12 }}>
-                <Text style={styles.recentName} numberOfLines={1}>{item.user?.name || item.name}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={styles.recentPlan} numberOfLines={1}>{item.chitPlan?.planName || item.planName}</Text>
-                    {item.user?.acc_no && (
-                        <View style={{ marginLeft: 6, backgroundColor: '#EDF2F7', paddingHorizontal: 4, borderRadius: 3 }}>
-                            <Text style={{ fontSize: 9, color: '#4A5568', fontWeight: 'bold' }}>{item.user.acc_no}</Text>
-                        </View>
+    const getPlanScopedAccNo = (paymentItem) => {
+        if (!paymentItem) return null;
+        const targetPlanId = paymentItem.chitPlan?._id || paymentItem.chitPlan;
+        const targetUserId = paymentItem.user?._id || paymentItem.user?.id || paymentItem.user;
+        if (!targetPlanId || !targetUserId) return paymentItem.user?.acc_no || null;
+        const plan = plans.find(p => p._id?.toString() === targetPlanId.toString());
+        if (plan && plan.subscribers) {
+            const sub = plan.subscribers.find(s => (s.user?._id || s.user)?.toString() === targetUserId.toString());
+            if (sub && sub.acc_no) {
+                return sub.acc_no;
+            }
+        }
+        return paymentItem.user?.acc_no || null;
+    };
+
+    const renderRecentItem = ({ item }) => {
+        const displayAccNo = getPlanScopedAccNo(item);
+        return (
+            <View style={styles.recentItem}>
+                <View style={[styles.avatarPlaceholder, { backgroundColor: '#F1F5F9' }]}>
+                    {item.user?.profileImage ? (
+                        <Image source={{ uri: `${BASE_URL}${item.user.profileImage}` }} style={{ width: '100%', height: '100%', borderRadius: 10 }} />
+                    ) : (
+                        <Text style={styles.avatarInitialsLight}>{getInitials(item.user?.name || item.name)}</Text>
                     )}
                 </View>
+                <View style={{ flex: 1, marginHorizontal: 12 }}>
+                    <Text style={styles.recentName} numberOfLines={1}>{item.user?.name || item.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.recentPlan} numberOfLines={1}>{item.chitPlan?.planName || item.planName}</Text>
+                        {displayAccNo && (
+                            <View style={{ marginLeft: 6, backgroundColor: '#EDF2F7', paddingHorizontal: 4, borderRadius: 3 }}>
+                                <Text style={{ fontSize: 9, color: '#4A5568', fontWeight: 'bold' }}>{displayAccNo}</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.recentAmount}>₹{item.amount?.toLocaleString()}</Text>
+                    <Text style={styles.recentDate}>{formatDate(item.paymentDate || item.date, true)}</Text>
+                </View>
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.recentAmount}>₹{item.amount?.toLocaleString()}</Text>
-                <Text style={styles.recentDate}>{formatDate(item.paymentDate || item.date, true)}</Text>
-            </View>
-        </View>
-    );
+        );
+    };
 
     return (
         <LinearGradient

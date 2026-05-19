@@ -55,8 +55,6 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
         });
     };
 
-    console.log("Gold rates : ", goldRates);
-
 
     // Initial Fetch and Master Cycle
     useEffect(() => {
@@ -117,7 +115,6 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
                     if (latestPrice) {
                         exRate = latestPrice;
                         fetchSuccess = true;
-                        console.log("EX Rate (Yahoo) fetched:", exRate);
                     }
                 }
 
@@ -149,7 +146,6 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
                         dataXAU_USD = { price: gData.price };
                         dataXAG_USD = { price: sData.price };
                         fetchSuccess = true;
-                        console.log("Gold/Silver Prices (Free API) fetched");
                     }
                 }
 

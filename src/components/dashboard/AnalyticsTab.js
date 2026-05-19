@@ -792,6 +792,14 @@ const AnalyticsTab = ({ user }) => {
                             <Icon name="store" size={10} color={COLORS?.secondary} />
                             <Text style={styles.merchantName}>{plan.merchant?.name}</Text>
                         </View>
+                        {plan.acc_no ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                <Icon name="id-badge" size={9} color="#915200" />
+                                <Text style={{ fontSize: 10, color: '#915200', fontWeight: '700', marginLeft: 4 }}>
+                                    Acc No: {plan.acc_no}
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: effectiveStatus === 'active' ? '#E8F5E9' : (effectiveStatus === 'closed' || effectiveStatus === 'requested_closure') ? '#fff3e0' : '#eee' }]}>
                         <Text style={[styles.statusText, { color: effectiveStatus === 'active' ? '#2E7D32' : (effectiveStatus === 'closed' || effectiveStatus === 'requested_closure') ? '#ef6c00' : '#666' }]}>
@@ -1086,12 +1094,12 @@ const AnalyticsTab = ({ user }) => {
                     <Text style={styles.sectionTitle}>My Subscriptions</Text>
                     <Text style={styles.sectionSubtitle}>Track your gold savings progress</Text>
                 </View>
-                {user.acc_no && (
+                {/* {user.acc_no && (
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}>
                         <Text style={{ fontSize: 10, color: COLORS?.dark, fontWeight: 'bold' }}>A/C NO</Text>
                         <Text style={{ fontSize: 12, color: COLORS?.primary, fontWeight: '800' }}>{user.acc_no}</Text>
                     </View>
-                )}
+                )} */}
             </View>
         </View>
     );

@@ -79,17 +79,12 @@ const ProfileCard = ({ profile, onSelect, index }) => {
 
                 <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{profile.name || 'User'}</Text>
-                    {profile.email ? (
+                    {/* {profile.email ? (
                         <Text style={styles.cardEmail} numberOfLines={1}>{profile.email}</Text>
                     ) : (
                         <Text style={[styles.cardEmail, { fontStyle: 'italic', color: '#bbb' }]}>No email set</Text>
-                    )}
-                    {profile.acc_no ? (
-                        <View style={styles.accBadge}>
-                            <Icon name="university" size={9} color={THEME.primaryDark} />
-                            <Text style={styles.accText}>{profile.acc_no}</Text>
-                        </View>
-                    ) : null}
+                    )} */}
+
                 </View>
 
                 <View style={styles.selectArrow}>

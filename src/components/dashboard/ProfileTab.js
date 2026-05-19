@@ -41,7 +41,6 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
     const [email, setEmail] = useState(user.email || ''); // Add email state
     const [phone, setPhone] = useState(user.phone || '');
     const [address, setAddress] = useState(user.address || '');
-    const [acc_no, setAccNo] = useState(user.acc_no || '');
     const [panCard, setPanCard] = useState(user.panCard || '');
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -72,7 +71,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
         setLoading(true);
         setAlertMsg({ visible: false, type: '', text: '' });
         try {
-            await onUpdate({ name, email: email.trim(), phone, address, acc_no, panCard });
+            await onUpdate({ name, email: email.trim(), phone, address, panCard });
             setIsEditing(false);
         } catch (e) {
             const errMsg = e?.response?.data?.message || 'Update failed. Please try again.';
@@ -128,7 +127,6 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                     setEmail(user.email || ''); // Added email binding
                                     setPhone(user.phone || '');
                                     setAddress(user.address || '');
-                                    setAccNo(user.acc_no || '');
                                     setPanCard(user.panCard || '');
                                     setIsEditing(true);
                                 }}
@@ -142,12 +140,11 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                     {/* Profile Completion */}
                     {(() => {
                         let completed = 0;
-                        const total = 5;
+                        const total = 4;
                         if (user.name && user.name !== 'New User') completed++;
                         if (user.email) completed++;
                         if (user.phone) completed++;
                         if (user.address) completed++;
-                        if (user.acc_no) completed++;
                         if (user.panCard) completed++;
 
                         const progress = completed / total;
@@ -266,16 +263,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                         numberOfLines={3}
                                         />
                                 </View>
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Account Number (Auto-generated)</Text>
-                                    <TextInput
-                                        style={[styles.input, { backgroundColor: '#f0f0f0', color: '#888' }]}
-                                        value={acc_no}
-                                        editable={false}
-                                        placeholderTextColor="#aaa"
-                                    />
-                                    <Text style={{ fontSize: 10, color: '#999', marginTop: 4 }}>Account number is assigned upon your first subscription.</Text>
-                                </View>
+
                                 <View style={styles.inputContainer}>
                                     <Text style={styles.label}>PAN Card (Optional)</Text>
                                     <TextInput
@@ -357,15 +345,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                         )}
                                     </View>
                                 </View>
-                                <View style={styles.detailRow}>
-                                    <View style={styles.iconBox}>
-                                        <Icon name="university" size={14} color={THEME.primaryDark} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.detailLabel}>Account Number</Text>
-                                        <Text style={styles.detailValue}>{user.acc_no || 'Not provided'}</Text>
-                                    </View>
-                                </View>
+
                                 <View style={styles.detailRow}>
                                     <View style={styles.iconBox}>
                                         <Icon name="id-card" size={14} color={THEME.primaryDark} />

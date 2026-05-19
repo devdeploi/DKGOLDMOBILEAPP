@@ -455,6 +455,7 @@ const MerchantUsers = ({ user }) => {
 
     const [selectedUserForModal, setSelectedUserForModal] = useState(null);
     const [selectedPlanForModal, setSelectedPlanForModal] = useState(null);
+    const [selectedSubscriberIdForModal, setSelectedSubscriberIdForModal] = useState(null);
     const [userDetailsModalVisible, setUserDetailsModalVisible] = useState(false);
     const [isEditingUser, setIsEditingUser] = useState(false);
     const [editForm, setEditForm] = useState({
@@ -505,7 +506,7 @@ const MerchantUsers = ({ user }) => {
                 const config = { headers: { Authorization: `Bearer ${user.token}` } };
                 const planId = selectedPlanForModal?._id;
                 const { data } = await axios.get(
-                    `${APIURL}/users/validate-acc-no?acc_no=${encodeURIComponent(newAccNo)}&excludeUserId=${selectedUserForModal._id}${planId ? `&planId=${planId}` : ''}`,
+                    `${APIURL}/users/validate-acc-no?acc_no=${encodeURIComponent(newAccNo)}&excludeUserId=${selectedUserForModal._id}${planId ? `&planId=${planId}` : ''}${selectedSubscriberIdForModal ? `&excludeSubscriptionId=${selectedSubscriberIdForModal}` : ''}`,
                     config
                 );
                 setAccNoValidation(data);
@@ -522,11 +523,11 @@ const MerchantUsers = ({ user }) => {
             showCustomAlert("Error", "Name is required", "error");
             return;
         }
-        // Block save if acc_no has a known active conflict
-        if (accNoValidation && !accNoValidation.available && accNoValidation.hasActivePlan) {
+        // Block save if acc_no has a known conflict
+        if (accNoValidation && !accNoValidation.available) {
             showCustomAlert(
                 "Acc No Conflict",
-                `Acc No ${editForm.acc_no} is already assigned to ${accNoValidation.conflictUserName} who has an active ${accNoValidation.activePlanName} plan. Please use a different number.`,
+                `Acc No ${editForm.acc_no} is already assigned to ${accNoValidation.conflictUserName}${accNoValidation.hasActivePlan ? ' who has an active ' + accNoValidation.activePlanName + ' plan' : ''}. Please use a different number or tap the suggestion.`,
                 "error"
             );
             return;
@@ -540,14 +541,32 @@ const MerchantUsers = ({ user }) => {
                 email: editForm.email,
                 panCard: editForm.panCard,
                 address: editForm.address,
-                acc_no: editForm.acc_no || undefined
+                acc_no: editForm.acc_no || undefined,
+                planId: selectedPlanForModal?._id || undefined,
+                subscriptionId: selectedSubscriberIdForModal || undefined
             };
             await axios.put(`${APIURL}/users/${selectedUserForModal._id}`, payload, config);
 
             // Update local state for the modal
             setSelectedUserForModal(prev => ({ ...prev, ...editForm }));
 
-            // Refresh main data list to reflect changes
+            // Refresh main data list locally to reflect changes instantly
+            setSubscribers(prevSubscribers => 
+                prevSubscribers.map(sub => {
+                    if (sub.user && sub.user._id === selectedUserForModal._id) {
+                        return {
+                            ...sub,
+                            user: {
+                                ...sub.user,
+                                ...editForm
+                            }
+                        };
+                    }
+                    return sub;
+                })
+            );
+
+            // Refresh in background to ensure sync
             fetchData();
 
             setIsEditingUser(false);
@@ -1356,19 +1375,22 @@ const MerchantUsers = ({ user }) => {
         return result;
     }, [subscribers, searchQuery, statusFilter, planFilter, sortBy, searchType]);
 
+    // Reset page to 1 only when filters/sort change
     useEffect(() => {
-        setDisplayedSubscribers(allFilteredSubscribers.slice(0, BATCH_SIZE));
         setPage(1);
-    }, [allFilteredSubscribers]);
+    }, [searchQuery, statusFilter, planFilter, sortBy, searchType]);
+
+    // Update displayed subscribers based on current page and filtered results
+    useEffect(() => {
+        setDisplayedSubscribers(allFilteredSubscribers.slice(0, page * BATCH_SIZE));
+    }, [allFilteredSubscribers, page]);
 
     const handleLoadMore = () => {
         if (loadingMore || displayedSubscribers.length >= allFilteredSubscribers.length) return;
         setLoadingMore(true);
 
         setTimeout(() => {
-            const nextPage = page + 1;
-            setDisplayedSubscribers(allFilteredSubscribers.slice(0, nextPage * BATCH_SIZE));
-            setPage(nextPage);
+            setPage(prev => prev + 1);
             setLoadingMore(false);
         }, 1000);
     };
@@ -1691,6 +1713,7 @@ const MerchantUsers = ({ user }) => {
                         onPress={() => {
                             setSelectedUserForModal(item.user);
                             setSelectedPlanForModal(item.plan || item.chitPlan);
+                            setSelectedSubscriberIdForModal(item.subscriptionId);
                             setUserDetailsModalVisible(true);
                         }}
                     >
@@ -1796,6 +1819,7 @@ const MerchantUsers = ({ user }) => {
                                 onPress={() => {
                                     setSelectedUserForModal(item.user);
                                     setSelectedPlanForModal(item.plan || item.chitPlan);
+                                    setSelectedSubscriberIdForModal(item._id || item.subscriberId);
                                     setUserDetailsModalVisible(true);
                                 }}
                             >
@@ -1931,6 +1955,7 @@ const MerchantUsers = ({ user }) => {
                             onPress={() => {
                                 setSelectedUserForModal(item.user);
                                 setSelectedPlanForModal(item.plan || item.chitPlan);
+                                setSelectedSubscriberIdForModal(item._id || item.subscriberId);
                                 setUserDetailsModalVisible(true);
                             }}
                         >
@@ -2470,6 +2495,7 @@ const MerchantUsers = ({ user }) => {
                                                     onPress={() => {
                                                         setSelectedUserForModal(pay.user);
                                                         setSelectedPlanForModal(pay.plan || pay.chitPlan);
+                                                        setSelectedSubscriberIdForModal(pay.subscriptionId || pay._id);
                                                         setUserDetailsModalVisible(true);
                                                     }}
                                                 >

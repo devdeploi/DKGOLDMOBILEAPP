@@ -787,7 +787,7 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                                                         </View>
                                                         <View>
                                                             <Text style={styles.subName}>{sub.user?.name}</Text>
-                                                            <Text style={styles.subAccNo}>Acc: {sub.user?.acc_no || 'N/A'}</Text>
+                                                            <Text style={styles.subAccNo}>Acc: {sub.acc_no || sub.user?.acc_no || 'N/A'}</Text>
                                                         </View>
                                                     </View>
                                                     <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 10 }}>
