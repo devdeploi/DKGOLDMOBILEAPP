@@ -360,26 +360,6 @@
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_RNShareSpec::@e6c4c2b5aedb2ea213b7"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_rnworklets::@68f58d84d4754f193387"
-		},
-		{
-			"backtrace" : 4,
 			"id" : "react_codegen_RNCSlider::@4898bc4726ecf1751b6a"
 		},
 		{
@@ -397,6 +377,26 @@
 		{
 			"backtrace" : 4,
 			"id" : "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_RNShareSpec::@e6c4c2b5aedb2ea213b7"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d"
+		},
+		{
+			"backtrace" : 4,
+			"id" : "react_codegen_rnworklets::@68f58d84d4754f193387"
 		}
 	],
 	"id" : "appmodules::@6890427a1f51a3e7e1df",
