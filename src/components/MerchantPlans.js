@@ -176,11 +176,20 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
             setLoadingSubscribers(true);
             const token = user.token;
             const res = await axios.get(`${APIURL}/chit-plans/${planId}/subscribers`, {
-                params: { page, limit: 10, search },
+                params: { page, limit: 50, search },
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            setPlanSubscribers(res.data.subscribers || []);
+            const subs = res.data.subscribers || [];
+            const sortedSubs = [...subs].sort((a, b) => {
+                const accA = String(a.acc_no || a.user?.acc_no || '').trim();
+                const accB = String(b.acc_no || b.user?.acc_no || '').trim();
+                if (!accA && !accB) return 0;
+                if (!accA) return 1;
+                if (!accB) return -1;
+                return accA.localeCompare(accB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            setPlanSubscribers(sortedSubs);
             setSubscribersTotal(res.data.total || 0);
             setSubscribersTotalPages(res.data.pages || 0);
             setSubscribersPage(res.data.page || 1);

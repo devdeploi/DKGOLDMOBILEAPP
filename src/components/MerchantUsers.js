@@ -1362,14 +1362,20 @@ const MerchantUsers = ({ user }) => {
         result.sort((a, b) => {
             if (sortBy === 'name') {
                 return (a.user?.name || '').localeCompare(b.user?.name || '');
-            } else if (sortBy === 'acc_no') {
-                const accA = parseInt(a.user?.acc_no || '0');
-                const accB = parseInt(b.user?.acc_no || '0');
-                return accA - accB;
-            } else {
-                // Default: recent (joinedAt descending)
-                return new Date(b.subscription?.joinedAt || 0) - new Date(a.subscription?.joinedAt || 0);
             }
+
+            const isFiltered = searchQuery || statusFilter !== 'all' || planFilter !== 'all';
+            if (sortBy === 'acc_no' || isFiltered) {
+                const accA = String(a.user?.acc_no || a.subscription?.acc_no || '').trim();
+                const accB = String(b.user?.acc_no || b.subscription?.acc_no || '').trim();
+                if (!accA && !accB) return 0;
+                if (!accA) return 1;
+                if (!accB) return -1;
+                return accA.localeCompare(accB, undefined, { numeric: true, sensitivity: 'base' });
+            }
+
+            // Default: recent (joinedAt descending)
+            return new Date(b.subscription?.joinedAt || 0) - new Date(a.subscription?.joinedAt || 0);
         });
 
         return result;
