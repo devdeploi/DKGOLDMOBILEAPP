@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useEffect } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     TextInput,
@@ -12,7 +12,6 @@ import {
     Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { COLORS } from '../styles/theme';
 import { APIURL } from '../constants/api';
@@ -23,7 +22,9 @@ import TermsAndConditions from '../components/TermsAndConditions';
 import UserPolicy from '../components/UserPolicy';
 
 const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
+    const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
+    const [address, setAddress] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -91,7 +92,7 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
     };
 
     const handleSendOtp = async () => {
-        if (!phone || !password) {
+        if (!name.trim() || !phone || !address.trim() || !password || !confirmPassword) {
             setAlertConfig({ visible: true, title: 'Error', message: 'Please fill all required fields', type: 'error' });
             return;
         }
@@ -143,8 +144,9 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
 
             // 2. Create account
             const { data } = await axios.post(`${APIURL}/users`, {
-                name: 'New User',
+                name: name.trim(),
                 phone,
+                address: address.trim(),
                 password,
                 role: 'user'
             });
@@ -176,12 +178,7 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
     };
 
     return (
-        <LinearGradient
-            colors={['#f2e07bff', '#c1ab8eff', '#915200']}
-            start={{ x: 1, y: 1 }}
-            end={{ x: 0, y: 0 }}
-            style={styles.container}
-        >
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <SafeAreaView style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     <View style={styles.card}>
@@ -199,6 +196,19 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
 
                         <View style={styles.inputGroup}>
                             <View style={styles.iconInputContainer}>
+                                <Icon name="user" size={16} color={COLORS?.primary} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Full Name"
+                                    placeholderTextColor="#A0AEC0"
+                                    value={name}
+                                    onChangeText={setName}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <View style={styles.iconInputContainer}>
                                 <Icon name="phone-alt" size={16} color={COLORS?.primary} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
@@ -208,6 +218,20 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                                     onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ''))}
                                     keyboardType="phone-pad"
                                     maxLength={10}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <View style={styles.iconInputContainer}>
+                                <Icon name="map-marker-alt" size={16} color={COLORS?.primary} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Complete Address"
+                                    placeholderTextColor="#A0AEC0"
+                                    value={address}
+                                    onChangeText={setAddress}
+                                    multiline
                                 />
                             </View>
                         </View>
@@ -395,7 +419,7 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                     setShowPolicy(false);
                 }}
             />
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 

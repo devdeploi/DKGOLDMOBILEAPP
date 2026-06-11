@@ -19,6 +19,9 @@
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/RNImagePickerSpec_autolinked_build/CMakeFiles/edit_cache.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/RNImagePickerSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/RNRazorpayCheckoutSpec_autolinked_build/CMakeFiles/react_codegen_RNRazorpayCheckoutSpec.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/RNRazorpayCheckoutSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/RNRazorpayCheckoutSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/rnreanimated_autolinked_build/CMakeFiles/edit_cache.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64/rnreanimated_autolinked_build/CMakeFiles/rebuild_cache.dir

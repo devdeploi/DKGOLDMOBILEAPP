@@ -2,9 +2,8 @@
 /* Force rebuild */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { StatusBar, View, StyleSheet } from 'react-native';
+import { StatusBar, View, StyleSheet, ImageBackground } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import axios from 'axios';
 import { APIURL } from './src/constants/api';
@@ -220,11 +219,10 @@ function App() {
   const renderScreen = () => {
     if (isLoadingSession) {
       return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} 
-            style={{ flex: 1 }} 
+        <ImageBackground
+            source={require('./public/assests/DKGOLDBG.png')}
+            style={{ flex: 1 }}
+            resizeMode="cover"
         />
       );
     }

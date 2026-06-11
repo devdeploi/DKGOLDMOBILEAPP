@@ -1,8 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-native/no-inline-styles */
-import LinearGradient from 'react-native-linear-gradient';
 import React, { useState, useEffect } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     StyleSheet,
@@ -11,6 +10,7 @@ import {
     Modal,
     Image
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
@@ -284,12 +284,7 @@ const UserDashboardScreen = ({ user: initialUser, onLogout, onSelectMerchant, on
     ];
 
     return (
-        <LinearGradient
-            colors={['#ffffffff', '#ffffffff']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.container}
-        >
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
                 {/* Header */}
                 <View style={[styles.header, { position: 'relative' }]}>
@@ -344,7 +339,7 @@ const UserDashboardScreen = ({ user: initialUser, onLogout, onSelectMerchant, on
                 buttons={alertConfig.buttons}
                 onClose={hideAlert}
             />
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 

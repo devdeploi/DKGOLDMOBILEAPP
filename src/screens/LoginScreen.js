@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useRef, useEffect } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     TextInput,
@@ -19,7 +19,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/FontAwesome5';
-import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../styles/theme';
 import { APIURL, BASE_URL } from '../constants/api';
 
@@ -370,12 +369,7 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
 
     if (isForgotPassword) {
         return (
-            <LinearGradient
-                colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-                start={{ x: 1, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.container}
-            >
+            <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
                 <SafeAreaView style={{ flex: 1 }}>
                     <ScrollView contentContainerStyle={styles.scrollContent}>
                         <View style={styles.card}>
@@ -511,17 +505,12 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
                     buttons={alertConfig.buttons}
                     onClose={hideAlert}
                 />
-            </LinearGradient >
+            </ImageBackground>
         );
     }
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.container}
-        >
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <SafeAreaView style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.card}>
@@ -675,7 +664,7 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
                 buttons={alertConfig.buttons}
                 onClose={hideAlert}
             />
-        </LinearGradient >
+        </ImageBackground>
     );
 };
 

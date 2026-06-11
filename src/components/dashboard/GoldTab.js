@@ -12,7 +12,8 @@ import {
     useWindowDimensions,
     PixelRatio,
     TouchableOpacity,
-    TextInput
+    TextInput,
+    ImageBackground
 } from 'react-native';
 import { useGoldRate } from '../../context/GoldRateContext';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -70,7 +71,7 @@ const AnimatedPriceCell = ({ value, prevValue, rowId, flex }) => {
     }, [value]);
 
     const highlightColor = isUp ? '#22c55e' : '#ef4444';
-    const textColor = isUp ? '#22c55e' : (isDown ? '#ef4444' : '#1a1a1a');
+    const textColor = isUp ? '#22c55e' : (isDown ? '#ef4444' : '#000');
 
     const bgInterpolate = animValue.interpolate({
         inputRange: [0, 1],
@@ -219,7 +220,7 @@ const GoldTab = () => {
     const retailGstRows = goldRates.rows.filter(r => ['22k_gst', '18k_gst'].includes(r.id));
 
     return (
-        <View style={styles.container}>
+        <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <ScrollView
                 style={styles.tableBody}
                 showsVerticalScrollIndicator={false}
@@ -508,7 +509,7 @@ const GoldTab = () => {
                     </Text>
                 </View>
             </View>
-        </View>
+        </ImageBackground>
     );
 };
 
@@ -524,7 +525,7 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
+        backgroundColor: 'transparent',
     },
     loader: {
         flex: 1,
@@ -610,7 +611,7 @@ const styles = StyleSheet.create({
         marginRight: 2,
     },
     featuredPrice: {
-        color: '#fff',
+        color: '#000000ff',
         fontSize: 34,
         fontWeight: '900',
     },
@@ -624,13 +625,13 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     timestampText: {
-        color: '#fff',
+        color: '#000000ff',
         fontSize: 11,
         fontWeight: 'bold',
     },
     tableWrapper: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(255, 255, 255, 0.73)',
         marginTop: 1,
         paddingTop: 10,
         elevation: 5,
@@ -648,7 +649,7 @@ const styles = StyleSheet.create({
     },
     headerColText: {
         fontSize: normalize(13),
-        color: '#92400e',
+        color: '#000',
         fontWeight: '900',
         letterSpacing: 1.2,
     },
@@ -670,10 +671,10 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     evenRow: {
-        backgroundColor: '#fff',
+        backgroundColor: 'transparent',
     },
     oddRow: {
-        backgroundColor: '#FBFBFB',
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
     },
     cell: {
         justifyContent: 'center',
@@ -682,7 +683,7 @@ const styles = StyleSheet.create({
     descriptionText: {
         fontSize: normalize(16),
         fontWeight: '900',
-        color: '#1a1a1a',
+        color: '#000',
         marginBottom: 2,
     },
     unitBadge: {
@@ -765,10 +766,10 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
     },
     calcBannerTitle: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '900',
-        color: '#FCD34D',
-        letterSpacing: 0.3,
+        color: '#fff',
+        letterSpacing: 0.5,
     },
     calcBannerSub: {
         fontSize: 10,
@@ -787,9 +788,10 @@ const styles = StyleSheet.create({
     },
     // Carat chips with built-in rate
     calcSectionLabel: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: '#94a3b8',
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginLeft: 8,
         letterSpacing: 1,
         marginBottom: 8,
         paddingHorizontal: 16,
@@ -1043,7 +1045,7 @@ const styles = StyleSheet.create({
         paddingVertical: 9,
     },
     receiptRowAlt: {
-        backgroundColor: '#FAFAFA',
+        backgroundColor: 'transparent',
     },
     receiptRowLeft: {
         flexDirection: 'row',
@@ -1110,7 +1112,7 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#fff',
+        backgroundColor: 'transparent',
         borderTopWidth: 1,
         borderTopColor: '#e2d183',
         paddingBottom: Platform.OS === 'ios' ? 25 : 10,
@@ -1196,7 +1198,7 @@ const styles = StyleSheet.create({
     clockText: {
         fontSize: 12,
         fontWeight: 'bold',
-        color: '#636E72',
+        color: '#000',
         fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
     },
     // Jewellery Section Styles
@@ -1281,7 +1283,7 @@ const styles = StyleSheet.create({
     exValueTop: {
         fontSize: 20,
         fontWeight: '900',
-        color: '#1e293b',
+        color: '#fff',
     },
     exInrSymbol: {
         fontSize: 16,

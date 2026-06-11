@@ -1,7 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 
 export const SkeletonItem = ({ width, height, borderRadius = 4, style }) => {
     const animatedValue = useRef(new Animated.Value(0)).current;
@@ -43,10 +42,7 @@ export const SkeletonItem = ({ width, height, borderRadius = 4, style }) => {
                     transform: [{ translateX }],
                 }}
             >
-                <LinearGradient
-                    colors={['transparent', 'rgba(255,255,255,0.5)', 'transparent']}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
+                <View
                     style={StyleSheet.absoluteFill}
                 />
             </Animated.View>

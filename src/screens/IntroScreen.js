@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Animated, Modal, TouchableOpacity, Linking, Platform, BackHandler, ActivityIndicator } from 'react-native';
+import { ImageBackground, View, Text, StyleSheet, Image, Animated, Modal, TouchableOpacity, Linking, Platform, BackHandler, ActivityIndicator } from 'react-native';
 import { COLORS } from '../styles/theme';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
@@ -171,10 +171,7 @@ const IntroScreen = ({ onFinish }) => {
     };
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} style={styles.container}>
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
                 <View style={styles.logoContainer}>
                     <Image
@@ -262,7 +259,7 @@ const IntroScreen = ({ onFinish }) => {
                     <Text style={styles.checkingText}>Checking for updates...</Text>
                 </View>
             )}
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 
@@ -294,12 +291,15 @@ const styles = StyleSheet.create({
     },
     poweredBy: {
         fontSize: 10,
-        color: '#000000',
+        color: '#ffffff',
         fontWeight: 'bold',
         letterSpacing: 1,
         textTransform: 'uppercase',
         fontStyle: 'italic',
         marginBottom: 5,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     safproLogo: {
         width: 100,
@@ -425,10 +425,13 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     checkingText: {
-        color: '#915200',
+        color: '#ffffff',
         fontSize: 12,
         fontWeight: 'bold',
         letterSpacing: 0.5,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     }
 });
 

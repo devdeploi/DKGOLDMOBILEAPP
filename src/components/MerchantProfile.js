@@ -1,11 +1,10 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, StyleSheet, RefreshControl } from 'react-native';
+import { ImageBackground, View, Text, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator, StyleSheet, RefreshControl } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { APIURL } from '../constants/api';
 import { launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
-import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../styles/theme';
 
 const MerchantProfile = ({
@@ -97,16 +96,12 @@ const MerchantProfile = ({
     };
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ flex: 1 }}>
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={{ flex: 1 }} resizeMode="cover">
             <ScrollView
                 contentContainerStyle={[styles.contentContainer, isEditingProfile && { paddingBottom: 100 }]}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[primaryColor]} />
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                 }
             >
                 {/* Header Card */}
@@ -378,7 +373,7 @@ const MerchantProfile = ({
                     </TouchableOpacity>
                 </View>
             )}
-        </LinearGradient >
+        </ImageBackground>
     );
 };
 

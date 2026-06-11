@@ -3,7 +3,7 @@
 /* eslint-disable react-native/no-inline-styles */
 
 import React, { useState, useEffect } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     StyleSheet,
@@ -20,7 +20,6 @@ import {
     Modal,
     FlatList
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
@@ -501,12 +500,7 @@ const MerchantDetailsScreen = ({ merchant, onBack, user }) => {
     );
 
     return (
-        <LinearGradient
-            colors={['#ebdc87', '#f3e9bd']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.container}
-        >
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom', 'left', 'right']}>
                 <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
 
@@ -592,7 +586,7 @@ const MerchantDetailsScreen = ({ merchant, onBack, user }) => {
                 buttons={alertConfig.buttons}
                 onClose={hideAlert}
             />
-        </LinearGradient >
+        </ImageBackground>
     );
 };
 
@@ -659,9 +653,12 @@ const styles = StyleSheet.create({
     merchantName: {
         fontSize: 22,
         fontWeight: '800',
-        color: COLORS?.dark,
+        color: '#ffffff',
         marginBottom: 6,
         letterSpacing: 0.5,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     merchantAddress: {
         fontSize: 14,

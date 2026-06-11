@@ -6,6 +6,7 @@
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-google-signin/google-signin/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-html-to-pdf/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-image-picker/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-share/android/build/generated/source/codegen/jni/CMakeLists.txt",
@@ -73,6 +74,11 @@
       "toolchain": "toolchain",
       "abi": "x86",
       "artifactName": "react_codegen_RNImagePickerSpec"
+    },
+    "react_codegen_RNRazorpayCheckoutSpec::@ba471378ee2eecf9e7b3": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNRazorpayCheckoutSpec"
     },
     "react_codegen_RNShareSpec::@e6c4c2b5aedb2ea213b7": {
       "toolchain": "toolchain",

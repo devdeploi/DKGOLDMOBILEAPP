@@ -4,21 +4,23 @@
 
 import LinearGradient from 'react-native-linear-gradient';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ImageBackground,
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
     Modal,
     ActivityIndicator,
-    Image
+    Image,
+    Animated,
+    Easing
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../styles/theme';
 import BottomNav from '../components/BottomNav';
 import axios from 'axios';
-import { APIURL } from '../constants/api';
+import { APIURL, BASE_URL } from '../constants/api';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 
 import MerchantOverview from '../components/MerchantOverview';
@@ -27,12 +29,51 @@ import MerchantUsers from '../components/MerchantUsers';
 import UnsubscribedUsersList from '../components/UnsubscribedUsersList';
 import MerchantProfile from '../components/MerchantProfile';
 import AdManager from '../components/AdManager';
+import MerchantReports from '../components/MerchantReports';
 import GoldTab from '../components/dashboard/GoldTab';
 import CustomAlert from '../components/CustomAlert';
 
 const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(false);
+    const slideAnim = useRef(new Animated.Value(-300)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    const openSidebar = () => {
+        setShowSidebar(true);
+        Animated.parallel([
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+                easing: Easing.out(Easing.ease)
+            }),
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true
+            })
+        ]).start();
+    };
+
+    const closeSidebar = () => {
+        Animated.parallel([
+            Animated.timing(slideAnim, {
+                toValue: -300,
+                duration: 250,
+                useNativeDriver: true,
+                easing: Easing.in(Easing.ease)
+            }),
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true
+            })
+        ]).start(() => {
+            setShowSidebar(false);
+        });
+    };
 
     // Custom Alert State
     const [alertConfig, setAlertConfig] = useState({
@@ -71,12 +112,9 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
 
     const merchantTabs = [
         { id: 'overview', icon: 'chart-pie', label: 'Overview' },
-        { id: 'gold', icon: 'coins', label: 'Live Rates' },
         { id: 'plans', icon: 'clipboard-list', label: 'My Plans' },
-        { id: 'subscribers', icon: 'users', label: 'Users' },
-        { id: 'new-users', icon: 'user-plus', label: 'New' },
-        { id: 'ads', icon: 'bullhorn', label: 'Promote' },
-        { id: 'profile', icon: 'user-cog', label: 'Profile', profileImage: profileData?.shopLogo || user?.shopLogo },
+        { id: 'subscribers', icon: 'users', label: 'Subscribers' },
+        { id: 'new-users', icon: 'user-plus', label: 'New Users' },
     ];
 
     const fetchPlans = useCallback(async () => {
@@ -297,6 +335,8 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 return <UnsubscribedUsersList user={stabilizedUser} />;
             case 'ads':
                 return <AdManager user={stabilizedUser} />;
+            case 'reports':
+                return <MerchantReports user={stabilizedUser} plans={plans} />;
             case 'profile':
                 return (
                     <MerchantProfile
@@ -318,27 +358,21 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
     };
 
     return (
-        <LinearGradient
-            colors={['#fffbf0', '#fffbf0']}
-            style={styles.container}
-        >
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
                 {/* Header */}
                 <View style={[styles.header, { position: 'relative' }]}>
                     <View style={styles.headerRow}>
+                        <TouchableOpacity
+                            style={[styles.logoutBtn, { marginRight: 10, paddingHorizontal: 10 }]}
+                            onPress={openSidebar}
+                        >
+                            <Icon name="bars" size={18} color="#915200" />
+                        </TouchableOpacity>
                         <Image source={require('../assets/logodk.png')} style={styles.logo} />
                     </View>
 
-                    <View style={styles.centerLogoContainer}>
-                        <Image source={require('../assets/DKTITLE.png')} style={styles.centerLogo} />
-                    </View>
-
-                    <TouchableOpacity
-                        style={styles.logoutBtn}
-                        onPress={() => setShowLogoutModal(true)}
-                    >
-                        <Icon name="sign-out-alt" size={14} color="#915200" />
-                    </TouchableOpacity>
+                    <Image source={require('../assets/DKTITLE.png')} style={styles.centerLogo} />
                 </View>
 
                 {/* Content */}
@@ -349,6 +383,88 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
 
             {/* BottomNav outside SafeAreaView — its paddingBottom from insets fills home-indicator area with gold color */}
             <BottomNav activeTab={activeTab} onTabChange={setActiveTab} tabs={merchantTabs} />
+
+            {/* Sidebar Modal */}
+            <Modal visible={showSidebar} transparent onRequestClose={closeSidebar}>
+                <View style={styles.sidebarOverlay}>
+                    {/* Animated Backdrop */}
+                    <Animated.View 
+                        style={[
+                            StyleSheet.absoluteFill, 
+                            { 
+                                backgroundColor: 'rgba(0,0,0,0.5)', 
+                                opacity: fadeAnim 
+                            }
+                        ]}
+                    >
+                        <TouchableOpacity style={{ flex: 1 }} onPress={closeSidebar} activeOpacity={1} />
+                    </Animated.View>
+
+                    <Animated.View style={[styles.sidebarContent, { transform: [{ translateX: slideAnim }] }]}>
+                        <LinearGradient
+                            colors={['#fffdf7', '#fbeea8']}
+                            style={StyleSheet.absoluteFill}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        />
+                        <View style={styles.sidebarHeader}>
+                            <TouchableOpacity style={styles.sidebarCloseBtn} onPress={closeSidebar}>
+                                <Icon name="times" size={22} color="#915200" />
+                            </TouchableOpacity>
+                            <View style={styles.profileImageWrapper}>
+                                { (profileData?.shopLogo || user?.shopLogo) ? (
+                                    <Image 
+                                        source={typeof (profileData?.shopLogo || user?.shopLogo) === 'string' ? { uri: `${BASE_URL}${profileData?.shopLogo || user?.shopLogo}` } : (profileData?.shopLogo || user?.shopLogo)} 
+                                        style={styles.sidebarProfileImage} 
+                                    />
+                                ) : (
+                                    <View style={[styles.sidebarProfileImage, { justifyContent: 'center', alignItems: 'center' }]}>
+                                        <Icon name="user" size={24} color="#915200" />
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={styles.sidebarName} numberOfLines={1}>{profileData?.name || user?.name || 'Merchant'}</Text>
+                            <Text style={styles.sidebarRole}>Merchant Portal</Text>
+                        </View>
+                        <View style={styles.sidebarMenu}>
+                            <TouchableOpacity 
+                                style={[styles.sidebarMenuItem, activeTab === 'reports' && styles.sidebarActiveMenuItem]} 
+                                onPress={() => { setActiveTab('reports'); closeSidebar(); }}
+                            >
+                                <Icon name="file-alt" size={18} color={activeTab === 'reports' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
+                                <Text style={[styles.sidebarMenuText, activeTab === 'reports' && styles.sidebarActiveMenuText]}>Reports</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.sidebarMenuItem, activeTab === 'gold' && styles.sidebarActiveMenuItem]} 
+                                onPress={() => { setActiveTab('gold'); closeSidebar(); }}
+                            >
+                                <Icon name="coins" size={18} color={activeTab === 'gold' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
+                                <Text style={[styles.sidebarMenuText, activeTab === 'gold' && styles.sidebarActiveMenuText]}>Live Rates</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.sidebarMenuItem, activeTab === 'ads' && styles.sidebarActiveMenuItem]} 
+                                onPress={() => { setActiveTab('ads'); closeSidebar(); }}
+                            >
+                                <Icon name="bullhorn" size={18} color={activeTab === 'ads' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
+                                <Text style={[styles.sidebarMenuText, activeTab === 'ads' && styles.sidebarActiveMenuText]}>Promote</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.sidebarMenuItem, activeTab === 'profile' && styles.sidebarActiveMenuItem]} 
+                                onPress={() => { setActiveTab('profile'); closeSidebar(); }}
+                            >
+                                <Icon name="user-cog" size={18} color={activeTab === 'profile' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
+                                <Text style={[styles.sidebarMenuText, activeTab === 'profile' && styles.sidebarActiveMenuText]}>Profile</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.sidebarFooter}>
+                            <TouchableOpacity style={styles.sidebarLogoutBtn} onPress={() => { closeSidebar(); setShowLogoutModal(true); }}>
+                                <Icon name="sign-out-alt" size={16} color="#fff" style={styles.sidebarIconLogout} />
+                                <Text style={styles.sidebarLogoutText}>Logout</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
 
             {/* Logout Modal */}
             <Modal visible={showLogoutModal} transparent animationType="fade">
@@ -377,7 +493,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 buttons={alertConfig.buttons}
                 onClose={hideAlert}
             />
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 
@@ -390,7 +506,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 15,
+        paddingVertical: 10,
         borderBottomWidth: 1,
         borderBottomColor: '#e2d183',
         backgroundColor: '#ebdc87', // Gold gradient start approximation
@@ -503,6 +619,132 @@ const styles = StyleSheet.create({
     confirmButtonText: {
         color: '#fff',
         fontWeight: '600',
+    },
+    // Sidebar Styles
+    sidebarOverlay: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+    },
+    sidebarContent: {
+        width: 260,
+        height: '100%',
+        paddingTop: 40,
+        shadowColor: '#000',
+        shadowOffset: { width: 3, height: 0 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 10,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    sidebarHeader: {
+        alignItems: 'center',
+        paddingVertical: 24,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(145, 82, 0, 0.15)',
+        position: 'relative',
+    },
+    sidebarCloseBtn: {
+        position: 'absolute',
+        top: 0,
+        right: 15,
+        padding: 10,
+        zIndex: 10,
+    },
+    profileImageWrapper: {
+        shadowColor: '#915200',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        elevation: 4,
+        borderRadius: 40,
+        padding: 2,
+        backgroundColor: '#fff',
+        marginBottom: 12,
+    },
+    sidebarProfileImage: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: '#f9f9f9',
+    },
+    sidebarName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#915200',
+        textAlign: 'center',
+    },
+    sidebarRole: {
+        fontSize: 12,
+        color: 'rgba(145, 82, 0, 0.6)',
+        marginTop: 2,
+        fontWeight: '500',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    sidebarMenu: {
+        flex: 1,
+        paddingTop: 20,
+        paddingHorizontal: 12,
+    },
+    sidebarMenuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        marginBottom: 6,
+    },
+    sidebarActiveMenuItem: {
+        backgroundColor: '#915200',
+        shadowColor: '#915200',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    sidebarIcon: {
+        width: 24,
+        textAlign: 'center',
+        marginRight: 12,
+    },
+    sidebarMenuText: {
+        fontSize: 15,
+        color: '#915200',
+        fontWeight: '600',
+    },
+    sidebarActiveMenuText: {
+        color: '#fff',
+        fontWeight: '700',
+    },
+    sidebarFooter: {
+        padding: 20,
+        paddingBottom: 30,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(145, 82, 0, 0.15)',
+    },
+    sidebarLogoutBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#e74c3c', // Premium Crimson Red
+        padding: 12,
+        borderRadius: 10,
+        justifyContent: 'center',
+        shadowColor: '#e74c3c',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    sidebarLogoutText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    sidebarIconLogout: {
+        marginRight: 8,
     },
 });
 

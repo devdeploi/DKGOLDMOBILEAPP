@@ -11,10 +11,10 @@ import {
     ScrollView,
     RefreshControl,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    ImageBackground
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
 import { APIURL } from '../constants/api';
@@ -71,8 +71,8 @@ const UnsubscribedUsersList = ({ user }) => {
     const selectedPlan = plans.find(p => p._id === subscribeForm.planId);
     const isUnlimited = selectedPlan?.type === 'unlimited';
     const effectiveGoldRate = Number(subscribeForm.customGoldRate) || (isUnlimited ? (user.goldRate24k || goldRate) : goldRate);
-    const calculatedWeight = (isUnlimited && subscribeForm.amount && effectiveGoldRate > 0) 
-        ? (Number(subscribeForm.amount) / effectiveGoldRate).toFixed(3) 
+    const calculatedWeight = (isUnlimited && subscribeForm.amount && effectiveGoldRate > 0)
+        ? (Number(subscribeForm.amount) / effectiveGoldRate).toFixed(3)
         : '0.000';
 
     // acc_no preview state
@@ -92,7 +92,7 @@ const UnsubscribedUsersList = ({ user }) => {
             if (!isRefreshing && pageNum === 1) setLoading(true);
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
             const { data } = await axios.get(`${APIURL}/chit-plans/unsubscribed-users?page=${pageNum}&search=${searchQuery}`, config);
-            
+
             if (pageNum === 1) {
                 setUsers(data.users);
             } else {
@@ -183,7 +183,7 @@ const UnsubscribedUsersList = ({ user }) => {
         setSubmitting(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            
+
             const payload = {
                 userId: selectedUser._id,
                 planId: subscribeForm.planId,
@@ -225,8 +225,8 @@ const UnsubscribedUsersList = ({ user }) => {
             type: 'warning',
             buttons: [
                 { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Delete', 
+                {
+                    text: 'Delete',
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -277,22 +277,21 @@ const UnsubscribedUsersList = ({ user }) => {
                     </View>
                 </View>
                 <View style={styles.actionButtons}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.deleteBtn}
                         onPress={() => handleDeleteUser(item)}
                     >
                         <Icon name="trash-alt" size={12} color="#e74c3c" />
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.assignBtn}
                         onPress={() => handleOpenSubscribe(item)}
                     >
-                        <LinearGradient
-                            colors={['#ebdc87', '#e2d183']}
+                        <View
                             style={styles.assignGradient}
                         >
                             <Icon name="user-plus" size={14} color="#915200" />
-                        </LinearGradient>
+                        </View>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -306,7 +305,7 @@ const UnsubscribedUsersList = ({ user }) => {
     );
 
     return (
-        <View style={styles.container}>
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <View style={styles.header}>
                 <View style={styles.searchContainer}>
                     <Icon name="search" size={16} color="#999" style={styles.searchIcon} />
@@ -335,7 +334,7 @@ const UnsubscribedUsersList = ({ user }) => {
                     onEndReached={loadMore}
                     onEndReachedThreshold={0.5}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#915200']} />
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                     }
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
@@ -348,7 +347,7 @@ const UnsubscribedUsersList = ({ user }) => {
 
             {/* Subscribe Modal */}
             <Modal visible={showSubscribeModal} transparent animationType="fade">
-                <KeyboardAvoidingView 
+                <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={styles.modalOverlay}
                 >
@@ -367,7 +366,7 @@ const UnsubscribedUsersList = ({ user }) => {
                                     style={[styles.input, subscribeForm.name.toLowerCase() === 'new user' && styles.inputError]}
                                     placeholder="Enter full name"
                                     value={subscribeForm.name}
-                                    onChangeText={(text) => setSubscribeForm({...subscribeForm, name: text})}
+                                    onChangeText={(text) => setSubscribeForm({ ...subscribeForm, name: text })}
                                 />
                                 {subscribeForm.name.toLowerCase() === 'new user' && (
                                     <Text style={styles.errorText}>Please change the name from "New User"</Text>
@@ -383,7 +382,7 @@ const UnsubscribedUsersList = ({ user }) => {
                                         keyboardType="email-address"
                                         autoCapitalize="none"
                                         value={subscribeForm.email}
-                                        onChangeText={(text) => setSubscribeForm({...subscribeForm, email: text})}
+                                        onChangeText={(text) => setSubscribeForm({ ...subscribeForm, email: text })}
                                     />
                                 </View>
                                 <View style={[styles.formGroup, { flex: 1 }]}>
@@ -392,7 +391,7 @@ const UnsubscribedUsersList = ({ user }) => {
                                         style={styles.input}
                                         placeholder="City / Area"
                                         value={subscribeForm.address}
-                                        onChangeText={(text) => setSubscribeForm({...subscribeForm, address: text})}
+                                        onChangeText={(text) => setSubscribeForm({ ...subscribeForm, address: text })}
                                     />
                                 </View>
                             </View>
@@ -408,8 +407,8 @@ const UnsubscribedUsersList = ({ user }) => {
                                                 key={p._id}
                                                 style={[styles.planCard, isSelected && styles.planCardSelected]}
                                                 onPress={() => setSubscribeForm({
-                                                    ...subscribeForm, 
-                                                    planId: p._id, 
+                                                    ...subscribeForm,
+                                                    planId: p._id,
                                                     customGoldRate: (p.type === 'unlimited' ? (user.goldRate24k || goldRate || 0) : (goldRate || 0)).toFixed(2)
                                                 })}
                                                 activeOpacity={0.75}
@@ -464,7 +463,7 @@ const UnsubscribedUsersList = ({ user }) => {
                                             placeholder="Min ₹100"
                                             keyboardType="numeric"
                                             value={subscribeForm.amount}
-                                            onChangeText={(text) => setSubscribeForm({...subscribeForm, amount: text})}
+                                            onChangeText={(text) => setSubscribeForm({ ...subscribeForm, amount: text })}
                                         />
                                     </View>
                                     <View style={[styles.formGroup, { flex: 1 }]}>
@@ -474,7 +473,7 @@ const UnsubscribedUsersList = ({ user }) => {
                                             placeholder="Rate"
                                             keyboardType="numeric"
                                             value={subscribeForm.customGoldRate}
-                                            onChangeText={(text) => setSubscribeForm({...subscribeForm, customGoldRate: text})}
+                                            onChangeText={(text) => setSubscribeForm({ ...subscribeForm, customGoldRate: text })}
                                         />
                                     </View>
                                 </View>
@@ -498,7 +497,7 @@ const UnsubscribedUsersList = ({ user }) => {
 
                             <View style={styles.formGroup}>
                                 <Text style={styles.label}>ASSIGNMENT DATE</Text>
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={styles.datePickerBtn}
                                     onPress={() => setShowDatePicker(true)}
                                 >
@@ -580,20 +579,20 @@ const UnsubscribedUsersList = ({ user }) => {
                                 )}
                             </View>
 
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[
-                                    styles.submitBtn, 
-                                    (!subscribeForm.planId || 
-                                     submitting || 
-                                     !subscribeForm.name || 
-                                     subscribeForm.name.toLowerCase() === 'new user' ||
-                                     (isUnlimited && !subscribeForm.amount)) && styles.disabledBtn
+                                    styles.submitBtn,
+                                    (!subscribeForm.planId ||
+                                        submitting ||
+                                        !subscribeForm.name ||
+                                        subscribeForm.name.toLowerCase() === 'new user' ||
+                                        (isUnlimited && !subscribeForm.amount)) && styles.disabledBtn
                                 ]}
                                 onPress={handleSubscribe}
                                 disabled={
-                                    !subscribeForm.planId || 
-                                    submitting || 
-                                    !subscribeForm.name || 
+                                    !subscribeForm.planId ||
+                                    submitting ||
+                                    !subscribeForm.name ||
                                     subscribeForm.name.toLowerCase() === 'new user' ||
                                     (isUnlimited && !subscribeForm.amount)
                                 }
@@ -652,7 +651,7 @@ const UnsubscribedUsersList = ({ user }) => {
                                 <Text style={styles.detailValue}>{selectedUser ? new Date(selectedUser.createdAt).toLocaleDateString() : ''}</Text>
                             </View>
 
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.submitBtn, { marginTop: 20 }]}
                                 onPress={() => {
                                     setShowUserModal(false);
@@ -674,18 +673,18 @@ const UnsubscribedUsersList = ({ user }) => {
                 buttons={alertConfig.buttons}
                 onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
             />
-        </View>
+        </ImageBackground>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fffbf0',
+        backgroundColor: 'transparent',
     },
     header: {
         padding: 15,
-        backgroundColor: '#fffbf0',
+        backgroundColor: 'transparent',
     },
     searchContainer: {
         flexDirection: 'row',
@@ -798,6 +797,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         overflow: 'hidden',
         elevation: 2,
+        backgroundColor: '#ebdc87',
     },
     assignGradient: {
         width: 36,

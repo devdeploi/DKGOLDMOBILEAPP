@@ -14,7 +14,6 @@ import {
     Switch,
     Animated
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../styles/theme';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import Slider from '@react-native-community/slider';
@@ -47,24 +46,24 @@ const SkeletonPlanCard = () => {
                 <View>
                     <View style={{ width: 140, height: 20, backgroundColor: '#E2E8F0', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
                         <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                            <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                            <View style={StyleSheet.absoluteFill} />
                         </Animated.View>
                     </View>
                     <View style={{ width: 80, height: 16, backgroundColor: '#E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
                         <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                            <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                            <View style={StyleSheet.absoluteFill} />
                         </Animated.View>
                     </View>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                     <View style={{ width: 70, height: 20, backgroundColor: '#E2E8F0', borderRadius: 4, marginBottom: 4, overflow: 'hidden' }}>
                         <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                            <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                            <View style={StyleSheet.absoluteFill} />
                         </Animated.View>
                     </View>
                     <View style={{ width: 40, height: 12, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
                         <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                            <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                            <View style={StyleSheet.absoluteFill} />
                         </Animated.View>
                     </View>
                 </View>
@@ -75,17 +74,17 @@ const SkeletonPlanCard = () => {
             <View style={styles.planDetails}>
                 <View style={{ width: 70, height: 14, backgroundColor: '#E2E8F0', borderRadius: 4, marginRight: 15, overflow: 'hidden' }}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                        <View style={StyleSheet.absoluteFill} />
                     </Animated.View>
                 </View>
                 <View style={{ width: 90, height: 14, backgroundColor: '#E2E8F0', borderRadius: 4, marginRight: 15, overflow: 'hidden' }}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                        <View style={StyleSheet.absoluteFill} />
                     </Animated.View>
                 </View>
                 <View style={{ width: 50, height: 16, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                        <View style={StyleSheet.absoluteFill} />
                     </Animated.View>
                 </View>
             </View>
@@ -93,17 +92,17 @@ const SkeletonPlanCard = () => {
             <View style={styles.actionRow}>
                 <View style={{ flex: 1, height: 32, backgroundColor: '#E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                        <View style={StyleSheet.absoluteFill} />
                     </Animated.View>
                 </View>
                 <View style={{ flex: 2, height: 32, backgroundColor: '#E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                        <View style={StyleSheet.absoluteFill} />
                     </Animated.View>
                 </View>
                 <View style={{ flex: 0.8, height: 32, backgroundColor: '#E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
                     <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
-                        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                        <View style={StyleSheet.absoluteFill} />
                     </Animated.View>
                 </View>
             </View>
@@ -291,8 +290,8 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
         const totalAmount = parseFloat(newPlan.amount);
         const duration = parseInt(newPlan.duration, 10);
         // For unlimited plans, the "amount" is effectively the monthly minimum
-        const monthlyAmount = newPlan.isUnlimited 
-            ? totalAmount 
+        const monthlyAmount = newPlan.isUnlimited
+            ? totalAmount
             : parseFloat((totalAmount / duration).toFixed(2));
 
         console.log('[MerchantPlans] handleCreateOrUpdatePlan →', { totalAmount, duration, monthlyAmount, isEditing });
@@ -436,18 +435,15 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
 
 
 
-    const isFormValid = newPlan.name.length > 0 && 
-                        newPlan.amount.length > 0 && 
-                        parseFloat(newPlan.amount) > 0 && 
-                        (newPlan.isUnlimited || (newPlan.duration && newPlan.duration > 0));
+    const isFormValid = newPlan.name.length > 0 &&
+        newPlan.amount.length > 0 &&
+        parseFloat(newPlan.amount) > 0 &&
+        (newPlan.isUnlimited || (newPlan.duration && newPlan.duration > 0));
 
     const showSkeletons = loadingPlans && displayedPlans.length === 0;
 
     return (
-        <LinearGradient
-            colors={['#c1ab8e', '#f2e07b', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} style={{ flex: 1 }}>
+        <View style={{ flex: 1 }}>
             {showSkeletons ? (
                 <View style={styles.contentContainer}>
                     <Text style={styles.sectionTitle}>My Chit Plans</Text>
@@ -554,7 +550,7 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                     }}
                     ListEmptyComponent={() => (
                         <View style={styles.emptyStateContainer}>
-                            <Icon name="box-open" size={50} color={COLORS?.secondary} style={styles.emptyStateIcon} />
+                            <Icon name="box-open" size={50} color='#fff' style={styles.emptyStateIcon} />
                             <Text style={styles.emptyStateText}>No plans found.</Text>
                             {canCreatePlan ? (
                                 <Text style={styles.emptyStateSubtext}>Create your first plan now!</Text>
@@ -834,7 +830,7 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
 
                                     {subscribersTotalPages > 1 && (
                                         <View style={styles.subPagination}>
-                                            <TouchableOpacity 
+                                            <TouchableOpacity
                                                 disabled={subscribersPage === 1}
                                                 onPress={() => handleSubscriberPagination(subscribersPage - 1)}
                                                 style={[styles.pageBtn, subscribersPage === 1 && { opacity: 0.3 }]}
@@ -842,7 +838,7 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                                                 <Icon name="chevron-left" size={14} color={COLORS?.primary} />
                                             </TouchableOpacity>
                                             <Text style={styles.subPageText}>Page {subscribersPage} of {subscribersTotalPages}</Text>
-                                            <TouchableOpacity 
+                                            <TouchableOpacity
                                                 disabled={subscribersPage === subscribersTotalPages}
                                                 onPress={() => handleSubscriberPagination(subscribersPage + 1)}
                                                 style={[styles.pageBtn, subscribersPage === subscribersTotalPages && { opacity: 0.3 }]}
@@ -872,7 +868,7 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                 onClose={hideAlert}
             />
 
-        </LinearGradient>
+        </View>
     );
 };
 
@@ -884,7 +880,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#fff',
         marginBottom: 15,
     },
     warningBanner: {
@@ -1043,18 +1039,18 @@ const styles = StyleSheet.create({
         paddingVertical: 40
     },
     emptyStateIcon: {
-        opacity: 0.3,
+        // opacity: 0.3,
         marginBottom: 15
     },
     emptyStateText: {
         textAlign: 'center',
-        color: '#4a5568',
+        color: '#fff',
         fontSize: 16,
         fontWeight: '600',
         marginBottom: 5
     },
     emptyStateSubtext: {
-        color: '#718096',
+        color: '#fff',
         fontSize: 14
     },
 

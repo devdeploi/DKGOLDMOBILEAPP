@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     StyleSheet,
@@ -15,7 +15,6 @@ import {
     Dimensions,
     KeyboardAvoidingView
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { BASE_URL } from '../../constants/api';
 import { COLORS } from '../../styles/theme';
@@ -87,12 +86,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-            <LinearGradient
-                colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ flex: 1 }}
-            >
+            <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={{ flex: 1 }} resizeMode="cover">
                 <ScrollView
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}
@@ -100,7 +94,6 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={handleRefresh}
-                            colors={[THEME.primaryDark]}
                             tintColor={THEME.primaryDark}
                         />
                     }
@@ -160,11 +153,8 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                     <Text style={styles.progressPercent}>{percent}%</Text>
                                 </View>
                                 <View style={styles.progressBarBg}>
-                                    <LinearGradient
-                                        colors={[THEME.primary, THEME.primaryDark]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={[styles.progressBarFill, { width: `${percent}%` }]}
+                                    <View
+                                        style={[styles.progressBarFill, { width: `${percent}%`, backgroundColor: THEME.primaryDark }]}
                                     />
                                 </View>
                                 {percent < 100 && (
@@ -178,8 +168,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                     <View style={styles.card}>
                         <View style={styles.profileHeader}>
                             <TouchableOpacity onPress={onUpdateImage} disabled={!isEditing} style={styles.avatarContainer}>
-                                <LinearGradient
-                                    colors={[THEME.primary, THEME.background]}
+                                <View
                                     style={styles.avatarGradient}
                                 >
                                     {user.profileImage ? (
@@ -192,7 +181,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                             {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                                         </Text>
                                     )}
-                                </LinearGradient>
+                                </View>
                                 {isEditing && (
                                     <View style={styles.cameraBadge}>
                                         <Icon name="camera" size={12} color="#fff" />
@@ -368,11 +357,8 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                             onPress={onSwitchProfile}
                             activeOpacity={0.85}
                         >
-                            <LinearGradient
-                                colors={['#f7f0d8', '#fff8e6']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={{ borderRadius: 20, padding: 20 }}
+                            <View
+                                style={{ borderRadius: 20, padding: 20, backgroundColor: '#f7f0d8' }}
                             >
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <View style={[styles.iconBox, { backgroundColor: '#fff4d0', width: 44, height: 44, borderRadius: 22 }]}>
@@ -386,13 +372,13 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                         <Icon name="chevron-right" size={13} color={THEME.primaryDark} />
                                     </View>
                                 </View>
-                            </LinearGradient>
+                            </View>
                         </TouchableOpacity>
                     )}
 
                     <View style={{ height: 40 }} />
                 </ScrollView>
-            </LinearGradient>
+            </ImageBackground>
         </KeyboardAvoidingView>
     );
 };
@@ -422,12 +408,18 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: COLORS?.dark,
+        color: '#ffffff',
         marginBottom: 4,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     sectionSubtitle: {
         fontSize: 13,
-        color: COLORS?.dark,
+        color: '#e6ded4',
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     editButton: {
         flexDirection: 'row',

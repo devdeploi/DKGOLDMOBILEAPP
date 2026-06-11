@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     TouchableOpacity,
@@ -12,7 +12,6 @@ import {
     Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { BASE_URL } from '../constants/api';
 
@@ -61,11 +60,8 @@ const ProfileCard = ({ profile, onSelect, index }) => {
                 onPress={() => onSelect(profile)}
                 style={styles.card}
             >
-                <LinearGradient
-                    colors={colorPair}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.avatarGradient}
+                <View
+                    style={[styles.avatarGradient, { backgroundColor: colorPair[0] }]}
                 >
                     {profile.profileImage ? (
                         <Image
@@ -75,7 +71,7 @@ const ProfileCard = ({ profile, onSelect, index }) => {
                     ) : (
                         <Text style={styles.avatarInitials}>{initials}</Text>
                     )}
-                </LinearGradient>
+                </View>
 
                 <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{profile.name || 'User'}</Text>
@@ -106,12 +102,7 @@ const ProfileSelectScreen = ({ profiles, onSelect, onLogout }) => {
     };
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ flex: 1 }}
-        >
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={{ flex: 1 }} resizeMode="cover">
             <SafeAreaView style={{ flex: 1 }}>
                 <ScrollView
                     contentContainerStyle={styles.container}
@@ -163,7 +154,7 @@ const ProfileSelectScreen = ({ profiles, onSelect, onLogout }) => {
                     </TouchableOpacity>
                 </ScrollView>
             </SafeAreaView>
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 
@@ -187,16 +178,22 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 26,
         fontWeight: 'bold',
-        color: '#2c2c2c',
+        color: '#ffffff',
         marginBottom: 8,
         letterSpacing: 0.5,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#4a4a4a',
+        color: '#e6ded4',
         textAlign: 'center',
         lineHeight: 20,
         marginBottom: 16,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     countPill: {
         flexDirection: 'row',
@@ -310,11 +307,11 @@ const styles = StyleSheet.create({
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: 'rgba(0,0,0,0.12)',
+        backgroundColor: 'rgba(255, 255, 255, 1)',
     },
     dividerText: {
         marginHorizontal: 12,
-        color: '#555',
+        color: '#ffffffff',
         fontSize: 13,
     },
     logoutBtn: {

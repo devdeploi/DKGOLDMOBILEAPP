@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Dimensions, RefreshControl, Image, TouchableOpacity, FlatList, TextInput, Animated, Easing } from 'react-native';
+import { ImageBackground, View, Text, ScrollView, StyleSheet, Dimensions, RefreshControl, Image, TouchableOpacity, FlatList, TextInput, Animated, Easing } from 'react-native';
 import { COLORS } from '../styles/theme';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { PieChart } from 'react-native-chart-kit';
-import LinearGradient from 'react-native-linear-gradient';
 import { BASE_URL } from '../constants/api';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useGoldRate } from '../context/GoldRateContext';
@@ -303,15 +302,10 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
     };
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.wrapper}
-        >
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.wrapper} resizeMode="cover">
             <ScrollView
                 contentContainerStyle={styles.container}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS?.primary]} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Gold Rates synchronized via context */}
@@ -328,13 +322,10 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
 
                 {/* Collection Summary Card */}
                 <View style={styles.glassBannerWrapper}>
-                    <LinearGradient
-                        colors={[COLORS?.primary, '#B8860B']} // Brand color gradient
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    <View // Brand color gradient}}
                         style={styles.glassBanner}
                     >
-                        <LinearGradient
-                            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0)']}
+                        <View
                             style={StyleSheet.absoluteFill}
                         />
 
@@ -389,18 +380,15 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
 
                         <View style={styles.decoCircle1} />
                         <View style={styles.decoCircle2} />
-                    </LinearGradient>
+                    </View>
                 </View>
 
                 {/* Settlement Summary Card */}
                 {/* <View style={[styles.glassBannerWrapper, { marginTop: -5 }]}>
-                    <LinearGradient
-                        colors={['#EF4444', '#991B1B']} // Red gradient for settlement
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    <View // Red gradient for settlement}}
                         style={styles.glassBanner}
                     >
-                        <LinearGradient
-                            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0)']}
+                        <View
                             style={StyleSheet.absoluteFill}
                         />
 
@@ -455,7 +443,7 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
 
                         <View style={styles.decoCircle1} />
                         <View style={styles.decoCircle2} />
-                    </LinearGradient>
+                    </View>
                 </View> */}
 
                 {/* Stats Grid - Updated with specific request items */}
@@ -685,12 +673,11 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
 
 
             </ScrollView >
-            {/* <LinearGradient
-                colors={['rgba(248, 250, 252, 0)', '#F8FAFC']}
+            {/* <View
                 style={styles.bottomFade}
                 pointerEvents="none"
             /> */}
-        </LinearGradient>
+        </ImageBackground>
 
     );
 };
@@ -719,13 +706,19 @@ const styles = StyleSheet.create({
     },
     greeting: {
         fontSize: 14,
-        color: COLORS?.secondary,
-        fontWeight: '600'
+        color: '#fff8e7',
+        fontWeight: '600',
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     subGreeting: {
         fontSize: 22,
-        color: COLORS?.dark,
-        fontWeight: '800'
+        color: '#ffffff',
+        fontWeight: '800',
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     headerAvatar: {
         width: 44,
@@ -750,7 +743,8 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
         minHeight: 180,
         overflow: 'hidden',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        backgroundColor: COLORS?.primary
     },
     glassContent: {
         flexDirection: 'row',

@@ -1,7 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, RefreshControl, Image, Linking, TouchableOpacity } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import { ImageBackground, View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, RefreshControl, Image, Linking, TouchableOpacity } from 'react-native';
 import { COLORS } from '../../styles/theme';
 import { LineChart, PieChart } from 'react-native-chart-kit'; // Ensure this is installed
 import axios from 'axios';
@@ -155,14 +154,11 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
     };
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} style={styles.wrapper}>
+        <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={styles.wrapper} resizeMode="cover">
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS?.primary]} />
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
             >
                 <AdBanner ads={ads} />
@@ -351,12 +347,11 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                 )}
 
             </ScrollView>
-            {/* <LinearGradient
-                colors={['rgba(248, 250, 252, 0)', '#F8FAFC']}
+            {/* <View
                 style={styles.bottomFade}
                 pointerEvents="none"
             /> */}
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 
@@ -380,12 +375,18 @@ const styles = StyleSheet.create({
     welcomeText: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: COLORS?.dark,
+        color: '#ffffff',
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     subText: {
         fontSize: 14,
-        color: COLORS?.secondary,
-        marginTop: 4
+        color: '#fff8e7',
+        marginTop: 4,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     sectionTitle: {
         fontSize: 18,
@@ -393,7 +394,10 @@ const styles = StyleSheet.create({
         marginTop: 20,
         marginBottom: 15,
         textAlign: 'center',
-        color: COLORS?.dark,
+        color: '#ffffff',
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     chartContainer: {
         backgroundColor: '#fff',

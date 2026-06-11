@@ -1,13 +1,14 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ActivityIndicator, Modal, TextInput, Image, Alert, Platform, ScrollView, Linking } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import { ImageBackground, View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ActivityIndicator, Modal, TextInput, Image, Alert, Platform, ScrollView, Linking } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
+import RazorpayCheckout from 'react-native-razorpay';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { COLORS } from '../../styles/theme';
 import { APIURL, BASE_URL } from '../../constants/api';
+import { RAZORPAY_KEY_ID } from '../../constants/razorpay';
 import SkeletonLoader from '../SkeletonLoader';
 
 import RNFS from 'react-native-fs';
@@ -51,7 +52,6 @@ const AnalyticsTab = ({ user }) => {
     const [selectedPlanForOffline, setSelectedPlanForOffline] = useState(null);
     const [offlineForm, setOfflineForm] = useState({
         notes: '',
-        proofImage: null, // { uri, type, fileName }
         date: new Date(), // Store as Date object
     });
     const [customAmount, setCustomAmount] = useState(''); // For unlimited plans
@@ -545,13 +545,13 @@ const AnalyticsTab = ({ user }) => {
     const submitOfflinePayment = async () => {
         if (!selectedPlanForOffline) return;
 
-        if (!offlineForm.proofImage) {
-            showAlert('Required', 'Please upload a screenshot of your payment.', 'warning');
-            return;
-        }
-
         // Always use the user-entered customAmount (editable for all plan types)
         const amountToPay = customAmount;
+
+        if (selectedPlanForOffline?.type === 'unlimited' && (!amountToPay || isNaN(amountToPay) || Number(amountToPay) < 500)) {
+            showAlert('Error', 'Minimum investment amount for unlimited plans is ₹500.', 'warning');
+            return;
+        }
 
         if (!amountToPay || isNaN(amountToPay) || Number(amountToPay) <= 0) {
             showAlert('Invalid Amount', 'Please enter a valid payment amount.', 'warning');
@@ -560,58 +560,63 @@ const AnalyticsTab = ({ user }) => {
 
         setSubmittingOffline(true);
         try {
-            const config = {
-                headers: {
-                    Authorization: `Bearer ${user.token}`,
-                    'Content-Type': 'multipart/form-data' // Important for file upload
-                }
-            };
-
-            let proofImageUrl = '';
-
-            // 1. Upload Image
-            const formData = new FormData();
-            formData.append('image', {
-                uri: Platform.OS === 'android' ? offlineForm.proofImage.uri : offlineForm.proofImage.uri.replace('file://', ''),
-                type: offlineForm.proofImage.type,
-                name: offlineForm.proofImage.fileName || 'proof.jpg',
+            // 1. Create Razorpay Order
+            const { data: order } = await axios.post(`${APIURL}/payments/create-order`, {
+                amount: amountToPay
+            }, {
+                headers: { Authorization: `Bearer ${user.token}` }
             });
 
-            try {
-                const uploadRes = await axios.post(`${APIURL}/upload`, formData, config);
-                proofImageUrl = uploadRes.data; // Assuming it returns path string
-            } catch (uploadErr) {
-                console.error("Upload failed", uploadErr);
-                Alert.alert("Upload Failed", "Could not upload proof image. Please try again.");
-                setSubmittingOffline(false);
-                return;
-            }
-
-            // 2. Submit Request
-            const requestBody = {
-                chitPlanId: selectedPlanForOffline.planId, // The actual plan ID
-                subscriptionId: selectedPlanForOffline._id, // The specific subscription ID
-                amount: amountToPay,
-                goldRate: lockedGoldRate || goldRate, // Send the rate locked in modal
-                notes: offlineForm.notes,
-                proofImage: proofImageUrl,
-                date: offlineForm.date.toISOString().split('T')[0] // Convert Date to YYYY-MM-DD
+            // 2. Open Razorpay Checkout
+            const options = {
+                description: `Installment for ${selectedPlanForOffline.planName}`,
+                image: `${BASE_URL}${selectedPlanForOffline.merchant?.shopLogo}`,
+                currency: 'INR',
+                key: RAZORPAY_KEY_ID,
+                amount: order.amount,
+                name: selectedPlanForOffline.merchant?.name || 'DK Gold',
+                order_id: order.id,
+                prefill: {
+                    email: user.email || '',
+                    contact: user.phone || '',
+                    name: user.name || ''
+                },
+                theme: { color: COLORS?.primary }
             };
 
-            // Reset content type for JSON
+            const data = await RazorpayCheckout.open(options);
+
+            // 3. Submit Request with signature
+            const requestBody = {
+                razorpay_order_id: data.razorpay_order_id,
+                razorpay_payment_id: data.razorpay_payment_id,
+                razorpay_signature: data.razorpay_signature,
+                chitPlanId: selectedPlanForOffline.planId, 
+                subscriptionId: selectedPlanForOffline._id, 
+                amount: amountToPay,
+                goldRate: lockedGoldRate || goldRate,
+                notes: offlineForm.notes
+            };
+
             const jsonConfig = {
                 headers: { Authorization: `Bearer ${user.token}` }
             };
 
-            await axios.post(`${APIURL}/payments/offline/request`, requestBody, jsonConfig);
+            await axios.post(`${APIURL}/payments/verify`, requestBody, jsonConfig);
 
             setOfflineModalVisible(false);
-            showAlert('Success', 'Your payment has been successfully recorded.', 'success');
+            showAlert('Success', 'Your payment was successful.', 'success');
             fetchMyPlans(); // Refresh to update status and total saved
 
         } catch (error) {
-            console.error("Offline Request Failed", error);
-            Alert.alert("Error", "Failed to submit request.");
+            console.error("Payment Error:", error);
+            if (error.code === 0 || error.code === 2) {
+                // Payment cancelled by user
+                Alert.alert("Payment Cancelled", "You cancelled the payment process.");
+            } else {
+                const msg = error.response?.data?.message || 'Failed to submit payment';
+                Alert.alert("Error", msg);
+            }
         } finally {
             setSubmittingOffline(false);
         }
@@ -851,6 +856,11 @@ const AnalyticsTab = ({ user }) => {
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>Total Saved</Text>
                                 <Text style={styles.statValue}>₹{remainingSaved ? remainingSaved.toLocaleString() : 0}</Text>
+                            </View>
+
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>Attempts</Text>
+                                <Text style={styles.statValue}>{plan.history ? plan.history.length : 0}</Text>
                             </View>
 
                             {showGold && (
@@ -1124,10 +1134,7 @@ const AnalyticsTab = ({ user }) => {
     };
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} style={styles.wrapper}>
+        <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={styles.wrapper} resizeMode="cover">
 
             <FlatList
                 data={displayedPlans}
@@ -1143,8 +1150,7 @@ const AnalyticsTab = ({ user }) => {
                 showsVerticalScrollIndicator={false}
             />
 
-            {/* <LinearGradient
-                colors={['rgba(248, 250, 252, 0)', '#F8FAFC']}
+            {/* <View
                 style={styles.bottomFade}
                 pointerEvents="none"
             /> */}
@@ -1224,72 +1230,10 @@ const AnalyticsTab = ({ user }) => {
                             contentContainerStyle={{ paddingBottom: 20 }}
                             keyboardShouldPersistTaps="handled"
                         >
-                            {/* UPI Instruction & Pay Card */}
-                            <LinearGradient
-                                colors={['#FFF9E1', '#FFF']}
-                                style={styles.upiCard}
-                            >
-                                <View style={styles.upiHeader}>
-                                    <View style={styles.upiHeaderLeft}>
-                                        <View style={styles.upiIconCircle}>
-                                            <Icon name="university" size={12} color="#B45309" />
-                                        </View>
-                                        <Text style={styles.upiLabel}>Merchant UPI (Tap to Pay)</Text>
-                                    </View>
-                                    <View style={styles.stepBadge}>
-                                        <Text style={styles.stepBadgeText}>Step 1</Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.upiBody}>
-                                    <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        onPress={() => openUPIPayment(selectedPlanForOffline)}
-                                        disabled={!selectedPlanForOffline?.merchant?.upiId}
-                                        style={styles.upiIdContainer}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.upiIdText} numberOfLines={1}>
-                                                {selectedPlanForOffline?.merchant?.upiId || 'Not Available'}
-                                            </Text>
-                                            {selectedPlanForOffline?.merchant?.upiNumber && (
-                                                <Text style={{ fontSize: 11, color: COLORS?.secondary, marginTop: 2, fontWeight: '600' }}>
-                                                    Linked No: +91 {selectedPlanForOffline.merchant.upiNumber}
-                                                </Text>
-                                            )}
-                                        </View>
-                                        <Icon name="external-link-alt" size={12} color={COLORS?.primary} />
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.copyBadge}
-                                        onPress={() => {
-                                            if (selectedPlanForOffline?.merchant?.upiId) {
-                                                // Clipboard logic could go here
-                                                showAlert('Copied', 'UPI ID copied to clipboard.', 'success');
-                                            }
-                                        }}
-                                    >
-                                        <Icon name="copy" size={10} color={COLORS?.primary} />
-                                        <Text style={styles.copyBadgeText}>Copy</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={styles.amountAlert}>
-                                    <Icon name="info-circle" size={12} color="#B45309" />
-                                    <Text style={styles.amountAlertText}>
-                                        Pay <Text style={{ fontWeight: 'bold' }}>₹{isPlanUnlimited(selectedPlanForOffline) ? (customAmount ? Number(customAmount).toLocaleString() : '---') : Number(selectedPlanForOffline?.monthlyAmount).toLocaleString()}</Text> using any UPI app.
-                                    </Text>
-                                </View>
-                            </LinearGradient>
-
                             {/* Payment Details Form */}
                             <View style={styles.formContainer}>
                                 <View style={styles.formHeader}>
                                     <Text style={styles.formTitle}>Payment Details</Text>
-                                    <View style={[styles.stepBadge, { backgroundColor: '#EEF2FF' }]}>
-                                        <Text style={[styles.stepBadgeText, { color: '#4338CA' }]}>Step 2</Text>
-                                    </View>
                                 </View>
 
                                 <View style={styles.inputGroup}>
@@ -1298,7 +1242,7 @@ const AnalyticsTab = ({ user }) => {
                                         <Text style={styles.currencyPrefix}>₹</Text>
                                         <TextInput
                                             style={styles.flexInput}
-                                            placeholder="0.00"
+                                            placeholder={isPlanUnlimited(selectedPlanForOffline) ? "Minimum 500" : "0.00"}
                                             value={customAmount}
                                             onChangeText={setCustomAmount}
                                             keyboardType="numeric"
@@ -1306,7 +1250,24 @@ const AnalyticsTab = ({ user }) => {
                                             editable={true}
                                         />
                                     </View>
-                                    <Text style={styles.inputHint}>Enter any amount you wish to pay towards this plan.</Text>
+                                    <Text style={styles.inputHint}>
+                                        {isPlanUnlimited(selectedPlanForOffline) 
+                                            ? 'Enter investment amount (Minimum ₹500).' 
+                                            : 'Enter any amount you wish to pay towards this plan.'}
+                                    </Text>
+                                    {isPlanUnlimited(selectedPlanForOffline) && (
+                                        <Text style={{ 
+                                            fontSize: 12, 
+                                            color: (customAmount && Number(customAmount) < 500) ? '#dc3545' : '#b45309', 
+                                            marginTop: 6, 
+                                            fontWeight: '600' 
+                                        }}>
+                                            {(customAmount && Number(customAmount) < 500) 
+                                                ? '⚠️ Minimum investment amount is ₹500.' 
+                                                : 'Note: Minimum investment amount is ₹500.'
+                                            }
+                                        </Text>
+                                    )}
 
                                     {((selectedPlanForOffline?.returnType?.toLowerCase() === 'gold') || isPlanUnlimited(selectedPlanForOffline)) && goldRate > 0 && (
                                         <View style={{ marginTop: 15, marginBottom: 15, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
@@ -1324,116 +1285,37 @@ const AnalyticsTab = ({ user }) => {
                                                     {(customAmount && (lockedGoldRate || goldRate)) ? (parseFloat(customAmount) / (lockedGoldRate || goldRate)).toFixed(3) : '0.000'}g
                                                 </Text>
                                             </View>
-
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <Text style={{ fontSize: 11, color: '#92400E' }}>Total Gold Saved After This:</Text>
-                                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#B45309' }}>
-                                                    {((selectedPlanForOffline.totalGoldWeight || 0) + ((customAmount && (lockedGoldRate || goldRate)) ? (parseFloat(customAmount) / (lockedGoldRate || goldRate)) : 0)).toFixed(3)}g
-                                                </Text>
-                                            </View>
                                         </View>
-                                    )}
-                                </View>
-
-                                <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>Payment Date</Text>
-                                    <TouchableOpacity
-                                        activeOpacity={0.7}
-                                        style={styles.datePickerButton}
-                                        onPress={() => setShowDatePicker(true)}
-                                    >
-                                        <Icon name="calendar-alt" size={14} color={COLORS?.secondary} />
-                                        <Text style={styles.datePickerText}>
-                                            {offlineForm.date.toLocaleDateString('en-GB', {
-                                                day: '2-digit',
-                                                month: 'short',
-                                                year: 'numeric'
-                                            })}
-                                        </Text>
-                                        <Icon name="pen" size={10} color="#999" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                <DateTimePickerModal
-                                    isVisible={showDatePicker}
-                                    mode="date"
-                                    date={offlineForm.date}
-                                    onConfirm={(selectedDate) => {
-                                        setShowDatePicker(false);
-                                        if (selectedDate) {
-                                            setOfflineForm({ ...offlineForm, date: selectedDate });
-                                        }
-                                    }}
-                                    onCancel={() => setShowDatePicker(false)}
-                                    maximumDate={new Date()}
-                                />
-
-                                <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>Transaction ID / Notes</Text>
-                                    <TextInput
-                                        style={[styles.textInput, { minHeight: 60, textAlignVertical: 'top' }]}
-                                        placeholder="Enter UPI Ref No. or Notes..."
-                                        value={offlineForm.notes}
-                                        onChangeText={(t) => setOfflineForm({ ...offlineForm, notes: t })}
-                                        multiline
-                                        placeholderTextColor="#999"
-                                    />
-                                </View>
-
-                                <View style={[styles.inputGroup, { marginBottom: 0 }]}>
-                                    <Text style={styles.inputLabel}>Proof of Payment <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                    {offlineForm.proofImage ? (
-                                        <View style={styles.imagePreviewContainer}>
-                                            <Image source={{ uri: offlineForm.proofImage.uri }} style={styles.imagePreview} />
-                                            <TouchableOpacity
-                                                style={styles.removeImageButton}
-                                                onPress={() => setOfflineForm({ ...offlineForm, proofImage: null })}
-                                            >
-                                                <Icon name="times" size={12} color="#fff" />
-                                            </TouchableOpacity>
-                                            <View style={styles.imageFooter}>
-                                                <Icon name="image" size={12} color="#666" style={{ marginRight: 6 }} />
-                                                <Text style={styles.imageName} numberOfLines={1}>{offlineForm.proofImage.fileName || 'PaymentScreenshot.jpg'}</Text>
-                                            </View>
-                                        </View>
-                                    ) : (
-                                        <TouchableOpacity
-                                            activeOpacity={0.6}
-                                            style={styles.uploadButton}
-                                            onPress={pickImage}
-                                        >
-                                            <View style={styles.uploadIconCircle}>
-                                                <Icon name="camera" size={20} color={COLORS?.primary} />
-                                            </View>
-                                            <Text style={styles.uploadButtonText}>Tap to Upload Receipt</Text>
-                                            <Text style={styles.uploadHint}>JPG or PNG (Max 5MB)</Text>
-                                        </TouchableOpacity>
                                     )}
                                 </View>
                             </View>
 
-                            <TouchableOpacity
-                                style={[styles.submitButton, submittingOffline && { opacity: 0.7 }]}
-                                onPress={submitOfflinePayment}
-                                disabled={submittingOffline}
-                            >
-                                <LinearGradient
-                                    colors={[COLORS?.primary, '#B45309']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.submitGradient}
-                                >
-                                    {submittingOffline ? (
-                                        <ActivityIndicator color="#fff" size="small" />
-                                    ) : (
-                                        <>
-                                            <Text style={styles.submitButtonText}>Report Payment</Text>
-                                            <Icon name="arrow-right" size={12} color="#fff" style={{ marginLeft: 8 }} />
-                                        </>
-                                    )}
-                                </LinearGradient>
-                            </TouchableOpacity>
+                            {(() => {
+                                const isPayDisabled = submittingOffline || 
+                                    (isPlanUnlimited(selectedPlanForOffline) 
+                                        ? (!customAmount || isNaN(customAmount) || Number(customAmount) < 500)
+                                        : (!customAmount || isNaN(customAmount) || Number(customAmount) <= 0));
+                                return (
+                                    <TouchableOpacity
+                                        style={[styles.modalActionBtn, styles.modalSubmitBtn, isPayDisabled && { opacity: 0.5 }]}
+                                        onPress={submitOfflinePayment}
+                                        disabled={isPayDisabled}
+                                    >
+                                        <View
+                                            style={styles.submitGradient}
+                                        >
+                                            {submittingOffline ? (
+                                                <ActivityIndicator color="#fff" size="small" />
+                                            ) : (
+                                                <>
+                                                    <Text style={styles.submitButtonText}>Pay Securely via Razorpay</Text>
+                                                    <Icon name="arrow-right" size={12} color="#fff" style={{ marginLeft: 8 }} />
+                                                </>
+                                            )}
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })()}
                         </ScrollView>
                     </View>
                 </View>
@@ -1527,7 +1409,7 @@ const AnalyticsTab = ({ user }) => {
                     </View>
                 </View>
             </Modal>
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 
@@ -1552,13 +1434,19 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: COLORS?.dark,
+        color: '#ffffff',
         marginBottom: 4,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     sectionSubtitle: {
         fontSize: 13,
-        color: COLORS?.secondary,
+        color: '#e6ded4',
         marginBottom: 16,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     emptyContainer: {
         alignItems: 'center',

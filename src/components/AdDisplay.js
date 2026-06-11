@@ -12,7 +12,6 @@ import {
     ScrollView
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
-import LinearGradient from 'react-native-linear-gradient';
 import SchoolHubAd from './SchoolHubAd';
 import QuickproAd from './QuickproAd';
 import { BASE_URL } from '../constants/api';
@@ -309,8 +308,7 @@ const AdDisplay = ({ ads, visible: initialVisible = true, paused = false, userRo
                                 style={styles.adImage}
                                 resizeMode="contain"
                             />
-                            <LinearGradient
-                                colors={['transparent', 'rgba(0,0,0,0.8)']}
+                            <View
                                 style={styles.gradientOverlay}
                             />
                         </TouchableOpacity>

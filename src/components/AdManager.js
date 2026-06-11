@@ -1,6 +1,7 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useEffect, useRef } from 'react';
 import {
+    ImageBackground,
     View,
     Text,
     StyleSheet,
@@ -22,7 +23,6 @@ import { APIURL, BASE_URL } from '../constants/api';
 import { launchImageLibrary } from 'react-native-image-picker';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import CustomAlert from './CustomAlert';
-import LinearGradient from 'react-native-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -447,153 +447,150 @@ const AdManager = ({ user }) => {
     return (
         <View style={styles.container}>
             {/* Background Gradient */}
-            <LinearGradient
-                colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-            />
+            <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={StyleSheet.absoluteFill} resizeMode="cover">
 
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>My Promotion</Text>
-                <Text style={styles.headerSubtitle}>Manage your Business Global Ad</Text>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {loading ? (
-                    <View style={styles.activeContainer}>
-                        <SkeletonAdCard />
-                    </View>
-                ) : activeAd ? renderActiveState() : renderEmptyState()}
-            </ScrollView>
-
-            {/* Create/Edit Modal */}
-            <Modal visible={showModal} animationType="slide" presentationStyle="formSheet">
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>{editingAd ? 'Edit Campaign' : 'New Campaign'}</Text>
-                        <TouchableOpacity onPress={() => setShowModal(false)} style={styles.closeBtn}>
-                            <Icon name="times" size={18} color={COLORS?.secondary} />
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView contentContainerStyle={styles.modalContent}>
-                        {/* Image Picker */}
-                        <Text style={styles.label}>Campaign Creatives</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
-                            {existingImages.map((url, i) => (
-                                <View key={`exist-${i}`} style={styles.imagePreview}>
-                                    <Image source={{ uri: `${BASE_URL}${url}` }} style={styles.thumbImage} />
-                                    <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveExistingImage(i)}>
-                                        <Icon name="times" size={10} color="#fff" />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-                            {imageFiles.map((file, i) => (
-                                <View key={`new-${i}`} style={styles.imagePreview}>
-                                    <Image source={{ uri: file.uri }} style={styles.thumbImage} />
-                                    <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveNewImage(i)}>
-                                        <Icon name="times" size={10} color="#fff" />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-                            {(existingImages.length + imageFiles.length < 5) && (
-                                <TouchableOpacity style={styles.addImageBtn} onPress={handleImagePick}>
-                                    <Icon name="plus" size={20} color={COLORS?.primary} />
-                                    <Text style={styles.addText}>Add Photo</Text>
-                                </TouchableOpacity>
-                            )}
-                        </ScrollView>
-
-                        {/* Info Fields */}
-                        <Text style={styles.label}>Headline</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="e.g. Special Diwali Offer"
-                            value={title}
-                            onChangeText={setTitle}
-                            placeholderTextColor="#999"
-                        />
-
-                        <Text style={styles.label}>Frequency</Text>
-                        <View style={styles.readOnlyInput}>
-                            <Icon name="clock" size={14} color={COLORS?.secondary} style={{ marginRight: 8 }} />
-                            <Text style={styles.readOnlyText}>Ad runs automatically every 15 minutes</Text>
-                        </View>
-
-                        <Text style={styles.label}>Description</Text>
-                        <TextInput
-                            style={[styles.input, styles.textArea]}
-                            placeholder="Describe your offer in detail..."
-                            value={description}
-                            onChangeText={setDescription}
-                            multiline
-                            numberOfLines={3}
-                            placeholderTextColor="#999"
-                        />
-
-                        <Text style={styles.label}>Target Link (Optional)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="https://yourwebsite.com"
-                            value={link}
-                            onChangeText={setLink}
-                            autoCapitalize="none"
-                            placeholderTextColor="#999"
-                        />
-
-                        {/* Dates */}
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={styles.label}>Start Date</Text>
-                                <View style={[styles.dateInput, { backgroundColor: '#f0f2f5' }]}>
-                                    <Text style={[styles.dateText, { color: COLORS?.secondary }]}>{startDate.toLocaleDateString()}</Text>
-                                    <Icon name="calendar-alt" size={14} color={COLORS?.secondary} />
-                                </View>
-                            </View>
-                            <View style={styles.col}>
-                                <Text style={styles.label}>End Date</Text>
-                                <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
-                                    <Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text>
-                                    <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        <DateTimePickerModal
-                            isVisible={showEndPicker}
-                            mode="date"
-                            date={endDate}
-                            onConfirm={handleEndDateConfirm}
-                            onCancel={() => setShowEndPicker(false)}
-                            minimumDate={startDate}
-                        />
-
-                        <TouchableOpacity
-                            style={[styles.saveBtn, uploading && { opacity: 0.8 }]}
-                            onPress={handleCreateOrUpdateAd}
-                            disabled={uploading}
-                        >
-
-                            <Text style={styles.saveBtnText}>
-                                {uploading ? 'LAUNCHING...' : (editingAd ? 'Save Changes' : 'Go Active')}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <View style={{ height: 40 }} />
-                    </ScrollView>
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>My Promotion</Text>
+                    <Text style={styles.headerSubtitle}>Manage your Business Global Ad</Text>
                 </View>
-            </Modal>
 
-            <CustomAlert
-                visible={alertConfig.visible}
-                title={alertConfig.title}
-                message={alertConfig.message}
-                type={alertConfig.type}
-                buttons={alertConfig.buttons}
-                onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
-            />
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    {loading ? (
+                        <View style={styles.activeContainer}>
+                            <SkeletonAdCard />
+                        </View>
+                    ) : activeAd ? renderActiveState() : renderEmptyState()}
+                </ScrollView>
+
+                {/* Create/Edit Modal */}
+                <Modal visible={showModal} animationType="slide" presentationStyle="formSheet">
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{editingAd ? 'Edit Campaign' : 'New Campaign'}</Text>
+                            <TouchableOpacity onPress={() => setShowModal(false)} style={styles.closeBtn}>
+                                <Icon name="times" size={18} color={COLORS?.secondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView contentContainerStyle={styles.modalContent}>
+                            {/* Image Picker */}
+                            <Text style={styles.label}>Campaign Creatives</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                                {existingImages.map((url, i) => (
+                                    <View key={`exist-${i}`} style={styles.imagePreview}>
+                                        <Image source={{ uri: `${BASE_URL}${url}` }} style={styles.thumbImage} />
+                                        <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveExistingImage(i)}>
+                                            <Icon name="times" size={10} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                                {imageFiles.map((file, i) => (
+                                    <View key={`new-${i}`} style={styles.imagePreview}>
+                                        <Image source={{ uri: file.uri }} style={styles.thumbImage} />
+                                        <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveNewImage(i)}>
+                                            <Icon name="times" size={10} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                                {(existingImages.length + imageFiles.length < 5) && (
+                                    <TouchableOpacity style={styles.addImageBtn} onPress={handleImagePick}>
+                                        <Icon name="plus" size={20} color={COLORS?.primary} />
+                                        <Text style={styles.addText}>Add Photo</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </ScrollView>
+
+                            {/* Info Fields */}
+                            <Text style={styles.label}>Headline</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g. Special Diwali Offer"
+                                value={title}
+                                onChangeText={setTitle}
+                                placeholderTextColor="#999"
+                            />
+
+                            <Text style={styles.label}>Frequency</Text>
+                            <View style={styles.readOnlyInput}>
+                                <Icon name="clock" size={14} color={COLORS?.secondary} style={{ marginRight: 8 }} />
+                                <Text style={styles.readOnlyText}>Ad runs automatically every 15 minutes</Text>
+                            </View>
+
+                            <Text style={styles.label}>Description</Text>
+                            <TextInput
+                                style={[styles.input, styles.textArea]}
+                                placeholder="Describe your offer in detail..."
+                                value={description}
+                                onChangeText={setDescription}
+                                multiline
+                                numberOfLines={3}
+                                placeholderTextColor="#999"
+                            />
+
+                            <Text style={styles.label}>Target Link (Optional)</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="https://yourwebsite.com"
+                                value={link}
+                                onChangeText={setLink}
+                                autoCapitalize="none"
+                                placeholderTextColor="#999"
+                            />
+
+                            {/* Dates */}
+                            <View style={styles.row}>
+                                <View style={styles.col}>
+                                    <Text style={styles.label}>Start Date</Text>
+                                    <View style={[styles.dateInput, { backgroundColor: '#f0f2f5' }]}>
+                                        <Text style={[styles.dateText, { color: COLORS?.secondary }]}>{startDate.toLocaleDateString()}</Text>
+                                        <Icon name="calendar-alt" size={14} color={COLORS?.secondary} />
+                                    </View>
+                                </View>
+                                <View style={styles.col}>
+                                    <Text style={styles.label}>End Date</Text>
+                                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
+                                        <Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text>
+                                        <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <DateTimePickerModal
+                                isVisible={showEndPicker}
+                                mode="date"
+                                date={endDate}
+                                onConfirm={handleEndDateConfirm}
+                                onCancel={() => setShowEndPicker(false)}
+                                minimumDate={startDate}
+                            />
+
+                            <TouchableOpacity
+                                style={[styles.saveBtn, uploading && { opacity: 0.8 }]}
+                                onPress={handleCreateOrUpdateAd}
+                                disabled={uploading}
+                            >
+
+                                <Text style={styles.saveBtnText}>
+                                    {uploading ? 'LAUNCHING...' : (editingAd ? 'Save Changes' : 'Go Active')}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <View style={{ height: 40 }} />
+                        </ScrollView>
+                    </View>
+                </Modal>
+
+                <CustomAlert
+                    visible={alertConfig.visible}
+                    title={alertConfig.title}
+                    message={alertConfig.message}
+                    type={alertConfig.type}
+                    buttons={alertConfig.buttons}
+                    onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+                />
+            </ImageBackground>
         </View>
+
     );
 };
 
@@ -610,12 +607,12 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: COLORS?.dark,
+        color: '#fff',
         // marginLeft: 8,
     },
     headerSubtitle: {
         fontSize: 12,
-        color: COLORS?.secondary,
+        color: '#fff',
         marginTop: 4,
     },
     scrollContent: {

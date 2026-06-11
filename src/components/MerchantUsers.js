@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useEffect, useCallback } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     FlatList,
@@ -20,7 +20,6 @@ import {
     Alert,
     Keyboard
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../styles/theme';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
@@ -2001,6 +2000,11 @@ const MerchantUsers = ({ user }) => {
                             <Text style={styles.statValue}>₹{remainingAmountValue}</Text>
                         </View>
 
+                        <View style={styles.statItem}>
+                            <Text style={styles.statLabel}>No. of Attempts</Text>
+                            <Text style={styles.statValue}>{item.subscription.installmentsPaid || 0}</Text>
+                        </View>
+
                         {(showGoldConversion || goldGrams > 0) && (
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>Gold Saved</Text>
@@ -2193,7 +2197,7 @@ const MerchantUsers = ({ user }) => {
             <View style={[styles.section, { marginTop: pendingPayments.length > 0 ? 20 : 0 }]}>
                 <View style={styles.sectionHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        <Icon name="users" size={16} color={COLORS?.primary} />
+                        <Icon name="users" size={16} color='#fff' />
                         <Text style={styles.sectionTitle}>Subscribers ({allFilteredSubscribers.length})</Text>
                     </View>
                     <TouchableOpacity
@@ -2317,10 +2321,10 @@ const MerchantUsers = ({ user }) => {
                 {showDateInput && (
                     <View style={{ marginBottom: 15 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: COLORS?.primary, flex: 1 }}>Search by Date or Range</Text>
+                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#fff', flex: 1 }}>Search by Date or Range</Text>
                             {dailyPayments && (
                                 <TouchableOpacity onPress={clearDateSearch}>
-                                    <Text style={{ color: COLORS?.error, fontSize: 12 }}>Clear Results</Text>
+                                    <Text style={{ color: '#fff', fontSize: 12 }}>Clear Results</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -2459,7 +2463,7 @@ const MerchantUsers = ({ user }) => {
                         {isRangeSearch && dailyPayments && (
                             <View style={{ 
                                 flexDirection: 'row', 
-                                backgroundColor: COLORS?.primary + '10', 
+                                backgroundColor: '#fff', 
                                 padding: 12, 
                                 borderRadius: 10, 
                                 marginTop: 15,
@@ -2573,17 +2577,14 @@ const MerchantUsers = ({ user }) => {
         }
         return (
             <View style={styles.emptyContainer}>
-                <Icon name="users-slash" size={40} color={COLORS?.secondary} />
+                <Icon name="users-slash" size={40} color='#fff' />
                 <Text style={styles.emptyText}>{searchQuery ? 'No users matching search.' : 'No subscribers found.'}</Text>
             </View>
         );
     };
 
     return (
-        <LinearGradient
-            colors={['#c1ab8eff', '#f2e07bff', '#915200']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} style={styles.container}>
+        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             {/* Hidden GoldTicker to fetch rates safely */}
             <View style={{ height: 0, opacity: 0 }}>
                 <GoldTicker />
@@ -2642,14 +2643,13 @@ const MerchantUsers = ({ user }) => {
                 onEndReached={handleLoadMore}
                 onEndReachedThreshold={0.5}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS?.primary]} />
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             />
 
-            {/* <LinearGradient
-                colors={['rgba(248, 249, 250, 0)', '#f8f9fa']}
+            {/* <View
                 style={styles.bottomFade}
                 pointerEvents="none"
             /> */}
@@ -3636,7 +3636,7 @@ const MerchantUsers = ({ user }) => {
                     </TouchableOpacity>
                 </View>
             </Modal>
-        </LinearGradient >
+        </ImageBackground>
     );
 };
 
@@ -3668,7 +3668,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS?.dark,
+        color: '#fff',
         marginLeft: 8,
     },
     // Pending Card
@@ -3946,7 +3946,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         marginTop: 10,
-        color: COLORS?.secondary,
+        color: '#fff',
     },
     // Modal
     modalOverlay: {
@@ -4152,7 +4152,7 @@ const styles = StyleSheet.create({
     },
     resultTitle: {
         fontSize: 14,
-        color: '#666',
+        color: '#fff',
         marginBottom: 10,
         fontWeight: '600'
     },

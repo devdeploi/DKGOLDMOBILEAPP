@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useEffect } from 'react';
-import {
+import { ImageBackground,
     View,
     Text,
     StyleSheet,
@@ -18,11 +18,12 @@ import {
     Linking
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
-import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { launchImageLibrary } from 'react-native-image-picker';
+import RazorpayCheckout from 'react-native-razorpay';
 import { COLORS } from '../../styles/theme';
 import { APIURL, BASE_URL } from '../../constants/api';
+import { RAZORPAY_KEY_ID } from '../../constants/razorpay';
 import { SkeletonItem } from '../SkeletonLoader';
 import CustomAlert from '../CustomAlert';
 import GoldTicker from '../GoldTicker';
@@ -42,8 +43,6 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     // Subscription Modal State
     const [showSubscribeModal, setShowSubscribeModal] = useState(false);
     const [selectedPlanForSub, setSelectedPlanForSub] = useState(null);
-    const [proofImage, setProofImage] = useState(null);
-    const [transactionId, setTransactionId] = useState('');
     const [subNote, setSubNote] = useState('');
     const [subscriptionAmount, setSubscriptionAmount] = useState(''); // Added for unlimited plans
     const [submitting, setSubmitting] = useState(false);
@@ -111,13 +110,11 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         }
 
         setSelectedPlanForSub(plan);
-        setProofImage(null);
         if (plan.type === 'unlimited') {
-            setSubscriptionAmount(plan.monthlyAmount.toString()); // Default to min amount
+            setSubscriptionAmount('500'); // Minimum 500
         } else {
             setSubscriptionAmount('');
         }
-        setTransactionId('');
         setSubNote('');
 
         // Calculate merchant-specific rate
@@ -196,37 +193,54 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     };
 
     const submitSubscription = async () => {
-        if (!proofImage) {
-            Alert.alert("Required", "Please upload a screenshot of your payment.");
+        let amountToPay = selectedPlanForSub?.type === 'unlimited' ? subscriptionAmount : selectedPlanForSub?.monthlyAmount;
+
+        if (selectedPlanForSub?.type === 'unlimited' && (!amountToPay || isNaN(amountToPay) || Number(amountToPay) < 500)) {
+            Alert.alert("Error", "Minimum investment amount for unlimited plans is ₹500.");
+            return;
+        }
+
+        if (!amountToPay || isNaN(amountToPay) || Number(amountToPay) <= 0) {
+            Alert.alert("Error", "Please enter a valid amount.");
             return;
         }
 
         setSubmitting(true);
         try {
-            // 1. Upload Image
-            const formData = new FormData();
-            formData.append('image', {
-                uri: Platform.OS === 'android' ? proofImage.uri : proofImage.uri.replace('file://', ''),
-                type: proofImage.type || 'image/jpeg',
-                name: proofImage.fileName || 'payment_proof.jpg',
+            // 1. Create Razorpay Order
+            const { data: order } = await axios.post(`${APIURL}/payments/create-order`, {
+                amount: amountToPay
+            }, {
+                headers: { Authorization: `Bearer ${user.token}` }
             });
 
-            const uploadRes = await axios.post(`${APIURL}/upload`, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    Authorization: `Bearer ${user.token}`,
+            // 2. Open Razorpay Checkout
+            const options = {
+                description: `Subscription for ${selectedPlanForSub.planName}`,
+                image: `${BASE_URL}${merchant?.shopLogo}`,
+                currency: 'INR',
+                key: RAZORPAY_KEY_ID,
+                amount: order.amount,
+                name: merchant?.name || 'DK Gold',
+                order_id: order.id,
+                prefill: {
+                    email: user.email || '',
+                    contact: user.phone || '',
+                    name: user.name || ''
                 },
-            });
+                theme: { color: COLORS?.primary }
+            };
 
-            const imageUrl = uploadRes.data;
+            const data = await RazorpayCheckout.open(options);
 
-            // 2. Submit Subscription Request
+            // 3. Submit Subscription Request with signature
             await axios.post(`${APIURL}/chit-plans/${selectedPlanForSub._id}/subscribe`, {
-                proofImage: imageUrl,
-                transactionId,
+                razorpay_payment_id: data.razorpay_payment_id,
+                razorpay_order_id: data.razorpay_order_id,
+                razorpay_signature: data.razorpay_signature,
                 note: subNote,
-                amount: selectedPlanForSub.type === 'unlimited' ? subscriptionAmount : undefined,
-                goldRate: lockedGoldRate || goldRate // Send the rate locked in modal
+                amount: amountToPay,
+                goldRate: lockedGoldRate || goldRate
             }, {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
@@ -237,16 +251,21 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
             setAlertConfig({
                 visible: true,
                 title: 'Success',
-                message: 'Your subscription has been successfully recorded and approved.',
+                message: 'Your payment was successful and subscription is now active.',
                 type: 'success'
             });
-            fetchPlans(); // status might not update immediately until approved, but good to refresh
-            fetchMySubscriptions(); // Refresh to see pending state if handled
+            fetchPlans(); 
+            fetchMySubscriptions();
         } catch (error) {
             console.error("Subscription Error:", error);
             setSubmitting(false);
-            const msg = error.response?.data?.message || 'Failed to submit request';
-            Alert.alert("Error", msg);
+            if (error.code === 0 || error.code === 2) {
+                // Payment cancelled by user
+                Alert.alert("Payment Cancelled", "You cancelled the payment process.");
+            } else {
+                const msg = error.response?.data?.message || 'Failed to submit request';
+                Alert.alert("Error", msg);
+            }
         }
     };
 
@@ -272,8 +291,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
 
     const renderHeader = () => (
         <View style={styles.header}>
-            <LinearGradient
-                colors={['rgba(0,0,0,0.3)', 'transparent']}
+            <View
                 style={styles.headerGradient}
             />
             {merchant.shopImages && merchant.shopImages.length > 0 ? (
@@ -303,7 +321,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                 <View style={styles.profileDetails}>
                     <Text style={styles.profileName}>{merchant.name}</Text>
                     <View style={styles.profileLocationRow}>
-                        <Icon name="map-marker-alt" size={14} color={COLORS?.secondary} style={{ marginRight: 5 }} />
+                        <Icon name="map-marker-alt" size={14} color="#f0f0f0" style={{ marginRight: 5 }} />
                         <Text style={styles.profileAddress} numberOfLines={2}>{merchant.address || 'Address not available'}</Text>
                     </View>
                     {merchant.upiId && (
@@ -426,28 +444,20 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     };
 
     return (
-        <LinearGradient
-            colors={['#f2e07bff', '#c1ab8eff']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }} style={styles.container}>
+        <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
 
             <FlatList
                 ListHeaderComponent={
                     <>
-                        {renderHeader()}
-
-                        <View style={{ marginTop: -30, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: '#FAFBFC', overflow: 'hidden' }}>
-                            <LinearGradient
-                                colors={['#c1ab8eff', '#f2e07bff']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}>
+                        <View style={{ paddingTop: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: 'transparent', overflow: 'hidden' }}>
+                            <View>
                                 {renderMerchantProfile()}
                                 {renderInfoSection()}
                                 {renderGallery()}
                                 <View style={[styles.sectionContainer, { paddingBottom: 10 }]}>
                                     <Text style={styles.sectionTitle}>Available Plans</Text>
                                 </View>
-                            </LinearGradient>
+                            </View>
 
                         </View>
                     </>
@@ -535,28 +545,20 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                             )}
 
                             <View style={styles.upiCard}>
-                                <Text style={styles.upiLabel}>Merchant UPI Details (Tap to Pay)</Text>
-                                <TouchableOpacity style={styles.upiRow} onPress={handleUpiPayment}>
-                                    <Text style={styles.upiValue}>{merchant?.upiId || 'Not Available'}</Text>
-                                    <Icon name="external-link-alt" size={16} color={COLORS?.primary} style={{ marginLeft: 10 }} />
-                                    <Text style={{ marginLeft: 5, color: COLORS?.primary, fontSize: 12, fontWeight: 'bold' }}>PAY NOW</Text>
-                                </TouchableOpacity>
-                                {merchant?.upiNumber && (
-                                    <Text style={[styles.upiValue, { marginTop: 5 }]}>Number: {merchant.upiNumber}</Text>
-                                )}
+                                <Text style={styles.upiLabel}>Payment Details</Text>
                                 {selectedPlanForSub?.type === 'unlimited' ? (
                                     <View style={{ marginBottom: 15 }}>
-                                        <Text style={styles.label}>Enter Investment Amount (Min ₹{selectedPlanForSub.monthlyAmount})</Text>
+                                        <Text style={styles.label}>Enter Investment Amount (Min ₹500)</Text>
                                         <TextInput
                                             style={styles.input}
-                                            placeholder={`Minimum ₹${selectedPlanForSub.monthlyAmount}`}
+                                            placeholder="Minimum ₹500"
                                             value={subscriptionAmount}
                                             onChangeText={setSubscriptionAmount}
                                             keyboardType="numeric"
                                         />
                                     </View>
                                 ) : (
-                                    <Text style={styles.helperText}>Pay ₹{selectedPlanForSub?.monthlyAmount} using any UPI app.</Text>
+                                    <Text style={styles.helperText}>Pay ₹{selectedPlanForSub?.monthlyAmount} via Razorpay securely.</Text>
                                 )}
                                 {(selectedPlanForSub?.returnType?.toLowerCase() === 'gold' || selectedPlanForSub?.type === 'unlimited') && goldRate > 0 && (
                                     <View style={{ marginTop: 15, marginBottom: 15, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
@@ -579,16 +581,6 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                             </View>
 
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>Transaction ID / Reference No (Optional)</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter UPI numeric ID"
-                                    value={transactionId}
-                                    onChangeText={setTransactionId}
-                                />
-                            </View>
-
-                            <View style={styles.formGroup}>
                                 <Text style={styles.label}>Notes (Optional)</Text>
                                 <TextInput
                                     style={styles.input}
@@ -598,27 +590,24 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                                 />
                             </View>
 
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Payment Screenshot (Mandatory) *</Text>
-                                <TouchableOpacity style={styles.uploadBtn} onPress={handleChoosePhoto}>
-                                    {proofImage ? (
-                                        <Image source={{ uri: proofImage.uri }} style={styles.uploadedThumb} />
-                                    ) : (
-                                        <View style={{ alignItems: 'center' }}>
-                                            <Icon name="cloud-upload-alt" size={24} color={COLORS?.primary} />
-                                            <Text style={styles.uploadText}>Tap to Upload</Text>
-                                        </View>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-
-                            <TouchableOpacity
-                                style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
-                                onPress={submitSubscription}
-                                disabled={submitting}
-                            >
-                                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Submit</Text>}
-                            </TouchableOpacity>
+                            {(() => {
+                                const isSubPayDisabled = submitting || 
+                                    (selectedPlanForSub?.type === 'unlimited' 
+                                        ? (!subscriptionAmount || isNaN(subscriptionAmount) || Number(subscriptionAmount) < 500)
+                                        : (!subscriptionAmount || isNaN(subscriptionAmount) || Number(subscriptionAmount) <= 0));
+                                return (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.submitBtn, 
+                                            isSubPayDisabled ? { backgroundColor: '#bdc3c7', opacity: 0.7 } : { backgroundColor: COLORS?.primary }
+                                        ]}
+                                        onPress={submitSubscription}
+                                        disabled={isSubPayDisabled}
+                                    >
+                                        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Pay Securely via Razorpay</Text>}
+                                    </TouchableOpacity>
+                                );
+                            })()}
 
                         </ScrollView>
                     </View>
@@ -633,12 +622,12 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                 buttons={alertConfig.buttons}
                 onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
             />
-        </LinearGradient>
+        </ImageBackground>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: 'linear-gradient(to right, #c1ab8eff, #f2e07bff, #915200)' },
+    container: { flex: 1 },
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // Header
@@ -656,9 +645,9 @@ const styles = StyleSheet.create({
     },
     profileLogo: { width: '100%', height: '100%', resizeMode: 'cover' },
     profileDetails: { flex: 1 },
-    profileName: { fontSize: 22, fontWeight: 'bold', color: COLORS?.dark, marginBottom: 4 },
+    profileName: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
     profileLocationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    profileAddress: { color: COLORS?.secondary, fontSize: 13, flex: 1 },
+    profileAddress: { color: '#f0f0f0', fontSize: 13, flex: 1 },
     profileUpiRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, backgroundColor: '#F3E5F5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' },
     profileUpiText: { color: COLORS?.primary, fontSize: 12, fontWeight: '600' },
     logoText: { fontSize: 30, fontWeight: 'bold', color: COLORS?.primary },
@@ -673,7 +662,7 @@ const styles = StyleSheet.create({
     infoValue: { fontSize: 14, fontWeight: '600', color: COLORS?.dark },
 
     // Gallery
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS?.dark, marginBottom: 15 },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 15 },
     galleryImage: { width: 120, height: 120, borderRadius: 12, marginRight: 12, resizeMode: 'contain' },
 
     // Plans

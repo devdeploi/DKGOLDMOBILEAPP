@@ -1,5 +1,4 @@
 import { View, Text, StyleSheet } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { useGoldRate } from '../context/GoldRateContext';
 
@@ -17,11 +16,8 @@ const GoldTicker = () => {
     );
 
     return (
-        <LinearGradient
-            colors={['#eadb84ff', '#ebdc87']}
+        <View
             style={styles.cardContainer}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
         >
             <View style={styles.cardHeader}>
                 <View style={styles.liveTagContainer}>
@@ -53,7 +49,7 @@ const GoldTicker = () => {
                     );
                 })}
             </View>
-        </LinearGradient>
+        </View>
     );
 };
 
@@ -67,7 +63,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 8,
         borderWidth: 1,
-        borderColor: 'rgba(183, 121, 31, 0.15)'
+        borderColor: 'rgba(183, 121, 31, 0.15)',
+        backgroundColor: '#ebdc87',
     },
     cardHeader: {
         flexDirection: 'row',

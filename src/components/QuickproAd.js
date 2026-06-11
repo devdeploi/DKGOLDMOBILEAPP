@@ -12,7 +12,6 @@ import {
     ScrollView
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
-import LinearGradient from 'react-native-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 
@@ -199,8 +198,7 @@ const QuickproAd = ({ visible, onClose, variant = 'full' }) => {
                                 style={styles.adImage}
                                 resizeMode="contain"
                             />
-                            <LinearGradient
-                                colors={['transparent', 'rgba(0,0,0,0.8)']}
+                            <View
                                 style={styles.gradientOverlay}
                             />
                         </TouchableOpacity>

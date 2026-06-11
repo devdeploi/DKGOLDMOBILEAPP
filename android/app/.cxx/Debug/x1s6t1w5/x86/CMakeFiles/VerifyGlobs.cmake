@@ -176,6 +176,30 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs")
 endif()
 
+# react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/RNRazorpayCheckoutSpec-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/react/renderer/components/RNRazorpayCheckoutSpec/*.cpp")
+set(OLD_GLOB
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/react/renderer/components/RNRazorpayCheckoutSpec/ComponentDescriptors.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/react/renderer/components/RNRazorpayCheckoutSpec/EventEmitters.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/react/renderer/components/RNRazorpayCheckoutSpec/Props.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/react/renderer/components/RNRazorpayCheckoutSpec/ShadowNodes.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/react/renderer/components/RNRazorpayCheckoutSpec/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB
