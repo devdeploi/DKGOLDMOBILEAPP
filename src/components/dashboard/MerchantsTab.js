@@ -594,7 +594,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                                 const isSubPayDisabled = submitting || 
                                     (selectedPlanForSub?.type === 'unlimited' 
                                         ? (!subscriptionAmount || isNaN(subscriptionAmount) || Number(subscriptionAmount) < 500)
-                                        : (!subscriptionAmount || isNaN(subscriptionAmount) || Number(subscriptionAmount) <= 0));
+                                        : false);
                                 return (
                                     <TouchableOpacity
                                         style={[

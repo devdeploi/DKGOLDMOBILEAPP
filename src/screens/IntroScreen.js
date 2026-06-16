@@ -99,7 +99,7 @@ const IntroScreen = ({ onFinish }) => {
                     setCheckingUpdate(false);
                     return;
                 }
-                
+
                 // Case 2: Version is one version back from latest (e.g. user has 1.1.3, latest is 1.1.4)
                 if (data.latestVersion && isVersionLower(currentVersion, data.latestVersion)) {
                     setUpdateConfig(data);
@@ -175,17 +175,14 @@ const IntroScreen = ({ onFinish }) => {
             <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
                 <View style={styles.logoContainer}>
                     <Image
-                        source={require('../assets/DK.png')}
+                        source={require('../assets/DK_white.png')}
                         style={styles.logo}
                     />
                 </View>
 
                 <View style={styles.poweredByContainer}>
-                    <Text style={styles.poweredBy}>Powered By</Text>
-                    <Image
-                        source={require('../../public/assests/Safpro-logo.png')}
-                        style={styles.safproLogo}
-                    />
+                    <Text style={styles.poweredBy}>Developed by</Text>
+                    <Text style={styles.poweredBy}>SAFPRO TECHNOLOGY SOLUTIONS</Text>
                 </View>
             </Animated.View>
 
@@ -208,9 +205,9 @@ const IntroScreen = ({ onFinish }) => {
                             ]}>
                                 <Image source={require('../assets/DK.png')} style={styles.updateLogo} />
                             </Animated.View>
-                            
-                            <Animated.View style={{ 
-                                opacity: textOpacity, 
+
+                            <Animated.View style={{
+                                opacity: textOpacity,
                                 transform: [{ translateY: textTranslateY }],
                                 alignItems: 'center',
                                 width: '100%'
@@ -218,11 +215,11 @@ const IntroScreen = ({ onFinish }) => {
                                 <Text style={styles.updateTitle}>
                                     {updateType === 'mandatory' ? 'Update Required' : 'New Update Available'}
                                 </Text>
-                                
+
                                 <View style={styles.divider} />
-                                
+
                                 <Text style={styles.updateMessage}>
-                                    {updateType === 'mandatory' 
+                                    {updateType === 'mandatory'
                                         ? (updateConfig?.message || 'A new version of DK GOLD is available. Please update to continue using the app.')
                                         : 'A newer version of DK GOLD is available with enhanced features and performance improvements.'}
                                 </Text>
@@ -425,7 +422,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     checkingText: {
-        color: '#ffffff',
+        color: '#000000',
         fontSize: 12,
         fontWeight: 'bold',
         letterSpacing: 0.5,

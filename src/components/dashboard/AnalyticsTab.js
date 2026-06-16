@@ -1297,13 +1297,11 @@ const AnalyticsTab = ({ user }) => {
                                         : (!customAmount || isNaN(customAmount) || Number(customAmount) <= 0));
                                 return (
                                     <TouchableOpacity
-                                        style={[styles.modalActionBtn, styles.modalSubmitBtn, isPayDisabled && { opacity: 0.5 }]}
+                                        style={[styles.submitSolidButton, isPayDisabled && { opacity: 0.5 }]}
                                         onPress={submitOfflinePayment}
                                         disabled={isPayDisabled}
                                     >
-                                        <View
-                                            style={styles.submitGradient}
-                                        >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                             {submittingOffline ? (
                                                 <ActivityIndicator color="#fff" size="small" />
                                             ) : (

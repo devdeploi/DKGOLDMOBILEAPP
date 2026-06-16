@@ -2,10 +2,10 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable react-native/no-inline-styles */
 
-import LinearGradient from 'react-native-linear-gradient';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ImageBackground,
+import {
+    ImageBackground,
     View,
     Text,
     StyleSheet,
@@ -22,7 +22,7 @@ import BottomNav from '../components/BottomNav';
 import axios from 'axios';
 import { APIURL, BASE_URL } from '../constants/api';
 import Icon from 'react-native-vector-icons/FontAwesome5';
-
+import LinearGradient from 'react-native-linear-gradient';
 import MerchantOverview from '../components/MerchantOverview';
 import MerchantPlans from '../components/MerchantPlans';
 import MerchantUsers from '../components/MerchantUsers';
@@ -388,12 +388,12 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             <Modal visible={showSidebar} transparent onRequestClose={closeSidebar}>
                 <View style={styles.sidebarOverlay}>
                     {/* Animated Backdrop */}
-                    <Animated.View 
+                    <Animated.View
                         style={[
-                            StyleSheet.absoluteFill, 
-                            { 
-                                backgroundColor: 'rgba(0,0,0,0.5)', 
-                                opacity: fadeAnim 
+                            StyleSheet.absoluteFill,
+                            {
+                                backgroundColor: 'rgba(0,0,0,0.5)',
+                                opacity: fadeAnim
                             }
                         ]}
                     >
@@ -412,10 +412,10 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                                 <Icon name="times" size={22} color="#915200" />
                             </TouchableOpacity>
                             <View style={styles.profileImageWrapper}>
-                                { (profileData?.shopLogo || user?.shopLogo) ? (
-                                    <Image 
-                                        source={typeof (profileData?.shopLogo || user?.shopLogo) === 'string' ? { uri: `${BASE_URL}${profileData?.shopLogo || user?.shopLogo}` } : (profileData?.shopLogo || user?.shopLogo)} 
-                                        style={styles.sidebarProfileImage} 
+                                {(profileData?.shopLogo || user?.shopLogo) ? (
+                                    <Image
+                                        source={typeof (profileData?.shopLogo || user?.shopLogo) === 'string' ? { uri: `${BASE_URL}${profileData?.shopLogo || user?.shopLogo}` } : (profileData?.shopLogo || user?.shopLogo)}
+                                        style={styles.sidebarProfileImage}
                                     />
                                 ) : (
                                     <View style={[styles.sidebarProfileImage, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -427,29 +427,29 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                             <Text style={styles.sidebarRole}>Merchant Portal</Text>
                         </View>
                         <View style={styles.sidebarMenu}>
-                            <TouchableOpacity 
-                                style={[styles.sidebarMenuItem, activeTab === 'reports' && styles.sidebarActiveMenuItem]} 
+                            <TouchableOpacity
+                                style={[styles.sidebarMenuItem, activeTab === 'reports' && styles.sidebarActiveMenuItem]}
                                 onPress={() => { setActiveTab('reports'); closeSidebar(); }}
                             >
                                 <Icon name="file-alt" size={18} color={activeTab === 'reports' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
                                 <Text style={[styles.sidebarMenuText, activeTab === 'reports' && styles.sidebarActiveMenuText]}>Reports</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.sidebarMenuItem, activeTab === 'gold' && styles.sidebarActiveMenuItem]} 
+                            <TouchableOpacity
+                                style={[styles.sidebarMenuItem, activeTab === 'gold' && styles.sidebarActiveMenuItem]}
                                 onPress={() => { setActiveTab('gold'); closeSidebar(); }}
                             >
                                 <Icon name="coins" size={18} color={activeTab === 'gold' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
                                 <Text style={[styles.sidebarMenuText, activeTab === 'gold' && styles.sidebarActiveMenuText]}>Live Rates</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.sidebarMenuItem, activeTab === 'ads' && styles.sidebarActiveMenuItem]} 
+                            <TouchableOpacity
+                                style={[styles.sidebarMenuItem, activeTab === 'ads' && styles.sidebarActiveMenuItem]}
                                 onPress={() => { setActiveTab('ads'); closeSidebar(); }}
                             >
                                 <Icon name="bullhorn" size={18} color={activeTab === 'ads' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
                                 <Text style={[styles.sidebarMenuText, activeTab === 'ads' && styles.sidebarActiveMenuText]}>Promote</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.sidebarMenuItem, activeTab === 'profile' && styles.sidebarActiveMenuItem]} 
+                            <TouchableOpacity
+                                style={[styles.sidebarMenuItem, activeTab === 'profile' && styles.sidebarActiveMenuItem]}
                                 onPress={() => { setActiveTab('profile'); closeSidebar(); }}
                             >
                                 <Icon name="user-cog" size={18} color={activeTab === 'profile' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
