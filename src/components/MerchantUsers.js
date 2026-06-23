@@ -581,24 +581,38 @@ const MerchantUsers = ({ user }) => {
 
     const fetchImageAsBase64 = async (url) => {
         try {
-            // If it's a local file from resolveAssetSource
-            if (url && (url.startsWith('file://') || url.startsWith('/'))) {
+            if (!url) return null;
+            if (url.startsWith('file://') || url.startsWith('/')) {
                 const cleanPath = url.replace('file://', '');
-                const base64Data = await RNFS.readFile(cleanPath, 'base64');
-                return `data:image/png;base64,${base64Data}`;
+                try {
+                    const base64Data = await RNFS.readFile(cleanPath, 'base64');
+                    return `data:image/png;base64,${base64Data}`;
+                } catch (e) {
+                    console.error("Local file read error:", e);
+                    return null;
+                }
             }
 
-            // Fallback for remote URLs or others
-            const response = await fetch(url);
-            const blob = await response.blob();
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
+            const extMatch = url.match(/\.(jpeg|jpg|png|gif|webp)/i);
+            const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
+            const mimeType = ext === 'jpg' ? 'jpeg' : ext;
+            const tempFile = `${RNFS.CachesDirectoryPath}/temp_img_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
+
+            const result = await RNFS.downloadFile({
+                fromUrl: url,
+                toFile: tempFile,
+            }).promise;
+
+            if (result.statusCode === 200) {
+                const base64Data = await RNFS.readFile(tempFile, 'base64');
+                RNFS.unlink(tempFile).catch(() => {});
+                return `data:image/${mimeType};base64,${base64Data}`;
+            } else {
+                console.error("Failed to download image, status:", result.statusCode);
+                return null;
+            }
         } catch (error) {
-            console.error("Error fetching image:", error);
+            console.error("Error fetching image as Base64:", error);
             return null;
         }
     };
@@ -745,6 +759,7 @@ const MerchantUsers = ({ user }) => {
                     <div class="title-section">
                         <h1>PAYMENT RECEIPT</h1>
                         <p>Date: ${generationDate}</p>
+                        ${payment.receiptNumber ? `<p style="font-weight: bold; margin-top: 5px;">Receipt No: ${payment.receiptNumber}</p>` : ''}
                     </div>
 
                     <div class="grid">

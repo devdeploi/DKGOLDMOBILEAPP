@@ -18,9 +18,6 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import axios from 'axios';
 import { APIURL } from '../constants/api';
 import { COLORS } from '../styles/theme';
-import { generatePDF } from 'react-native-html-to-pdf';
-import Share from 'react-native-share';
-import RNFS from 'react-native-fs';
 import CustomAlert from './CustomAlert';
 import FCMService from '../services/FCMService';
 
@@ -38,6 +35,7 @@ const MerchantReports = ({ user, plans }) => {
 
     const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)));
     const [endDate, setEndDate] = useState(new Date());
+    const [isAllTime, setIsAllTime] = useState(true);
 
     const [isStartPickerVisible, setStartPickerVisible] = useState(false);
     const [isEndPickerVisible, setEndPickerVisible] = useState(false);
@@ -81,6 +79,9 @@ const MerchantReports = ({ user, plans }) => {
             const toDateStr = endDate.toISOString().split('T')[0];
 
             let url = `${APIURL}/payments/search/range?fromDate=${fromDateStr}&toDate=${toDateStr}`;
+            if (isAllTime) {
+                url = `${APIURL}/payments/search/range?allData=true`;
+            }
             if (selectedPlanId !== 'all') {
                 url += `&planId=${selectedPlanId}`;
             }
@@ -124,265 +125,28 @@ const MerchantReports = ({ user, plans }) => {
         try {
             setExporting(true);
 
-            if (!generatePDF) {
-                showAlert("Rebuild Required", "PDF Export requires a native module update. Please rebuild the app (e.g. run 'npx react-native run-android') to enable this feature.", "warning");
-                setExporting(false);
-                return;
-            }
+            // Get FCM Token for background push notification
+            const fcmToken = await FCMService.getFCMToken();
 
+            const token = user.token;
 
-            // Generate HTML table for the PDF
-            let htmlContent = `
-                <html>
-                <head>
-                    <style>
-                        body { 
-                            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
-                            padding: 30px; 
-                            color: #333;
-                            background-color: #fff;
-                        }
-                        .header-container {
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                            border-bottom: 2px solid #D4AF37;
-                            padding-bottom: 20px;
-                            margin-bottom: 30px;
-                        }
-                        .logo {
-                            max-width: 150px;
-                            height: auto;
-                        }
-                        .header-title {
-                            text-align: right;
-                        }
-                        h1 { 
-                            color: #D4AF37; 
-                            margin: 0;
-                            font-size: 28px;
-                            text-transform: uppercase;
-                            letter-spacing: 1px;
-                        }
-                        .subtitle {
-                            color: #666;
-                            font-size: 14px;
-                            margin-top: 5px;
-                        }
-                        .info-section {
-                            display: flex;
-                            justify-content: space-between;
-                            margin-bottom: 30px;
-                            background-color: #fcf8f2;
-                            padding: 15px;
-                            border-radius: 8px;
-                            border-left: 4px solid #D4AF37;
-                        }
-                        .info-block {
-                            display: flex;
-                            flex-direction: column;
-                        }
-                        .info-label {
-                            font-size: 12px;
-                            color: #888;
-                            text-transform: uppercase;
-                            letter-spacing: 0.5px;
-                        }
-                        .info-value {
-                            font-size: 16px;
-                            font-weight: bold;
-                            color: #333;
-                            margin-top: 4px;
-                        }
-                        table { 
-                            width: 100%; 
-                            border-collapse: collapse; 
-                            margin-top: 10px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                        }
-                        th, td { 
-                            border-bottom: 1px solid #eee; 
-                            padding: 12px 15px; 
-                            text-align: left; 
-                        }
-                        th { 
-                            background-color: #D4AF37; 
-                            color: white; 
-                            font-weight: 600;
-                            text-transform: uppercase;
-                            font-size: 12px;
-                            letter-spacing: 0.5px;
-                        }
-                        tr:nth-child(even) { background-color: #fafafa; }
-                        tr:hover { background-color: #f5f5f5; }
-                        .footer { 
-                            margin-top: 40px; 
-                            padding-top: 20px;
-                            border-top: 1px solid #eee;
-                            font-size: 11px; 
-                            text-align: center; 
-                            color: #999; 
-                        }
-                        .badge {
-                            padding: 4px 8px;
-                            border-radius: 4px;
-                            font-size: 11px;
-                            font-weight: bold;
-                            color: white;
-                            display: inline-block;
-                        }
-                        .badge-received { background-color: #27ae60; }
-                        .badge-settled { background-color: #e74c3c; }
-                        .badge-partial { background-color: #f39c12; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header-container">
-                        <img class="logo" src="${Image.resolveAssetSource(require('../assets/DK.png')).uri}" alt="DK GOLD Logo" />
-                        <div class="header-title">
-                            <h1>Payment Report</h1>
-                            <div class="subtitle">Official Transaction Statement</div>
-                        </div>
-                    </div>
-                    
-                    <div class="info-section">
-                        <div class="info-block">
-                            <span class="info-label">Merchant Name</span>
-                            <span class="info-value">${user.name || 'N/A'}</span>
-                        </div>
-                        <div class="info-block">
-                            <span class="info-label">Date Range</span>
-                            <span class="info-value">${formatIndianDate(startDate)} - ${formatIndianDate(endDate)}</span>
-                        </div>
-                        <div class="info-block">
-                            <span class="info-label">Total Records</span>
-                            <span class="info-value">${payments.length}</span>
-                        </div>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Name</th>
-                                <th>Mobile</th>
-                                <th>Plan Name</th>
-                                <th>Status</th>
-                                <th>Acc No</th>
-                                <th>Amount (₹)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            payments.forEach(p => {
-                const pDate = formatIndianDate(p.paymentDate || p.createdAt || p.date);
-                const uName = p.user?.name || 'Unknown';
-                const phone = p.user?.phone || 'N/A';
-                const planName = p.isSettlement ? p.planName : (p.chitPlan?.planName || 'N/A');
-
-                let typeText = 'Received';
-                let badgeClass = 'badge-received';
-                if (p.isSettlement) {
-                    if (p.isPartial) {
-                        typeText = 'Partial Settled';
-                        badgeClass = 'badge-partial';
-                    } else {
-                        typeText = 'Settled';
-                        badgeClass = 'badge-settled';
-                    }
+            await axios.post(`${APIURL}/payments/export-pdf-background`, {
+                fromDate: isAllTime ? null : startDate.toISOString(),
+                toDate: isAllTime ? null : endDate.toISOString(),
+                planId: selectedPlanId,
+                allData: isAllTime.toString(),
+                fcmToken: fcmToken
+            }, {
+                headers: {
+                    Authorization: `Bearer ${token}`
                 }
-
-                const amountColor = p.isSettlement ? '#e74c3c' : '#27ae60';
-                const subAccNo = p.subAccNo || p.user?.acc_no || 'N/A';
-                const amount = p.amount || 0;
-
-                htmlContent += `
-                    <tr>
-                        <td>${pDate}</td>
-                        <td><strong>${uName}</strong></td>
-                        <td>${phone}</td>
-                        <td>${planName}</td>
-                        <td><span class="badge ${badgeClass}">${typeText}</span></td>
-                        <td>${subAccNo}</td>
-                        <td style="color: ${amountColor}; font-weight: bold; font-size: 15px;">₹${amount}</td>
-                    </tr>
-                `;
             });
 
-            htmlContent += `
-                        </tbody>
-                    </table>
-                    <div class="footer">
-                        <p>Powered by</p>
-                        <img src="${Image.resolveAssetSource(require('../assets/Safpro-logo.png')).uri}" alt="Safpro Logo" style="width: 100px; height: auto; margin-bottom: 10px;" />
-                    </div>
-                </body>
-                </html>
-            `;
+            showAlert("Export Started", "Your PDF is being generated in the background. You will receive a notification and it will be downloaded automatically when ready.", "success");
 
-            const rawFileName = `Payment_Report_${new Date().getTime()}`;
-            const cleanFileName = rawFileName.replace(/[^a-z0-9]/gi, '_');
-            let options = {
-                html: htmlContent,
-                fileName: cleanFileName,
-                directory: 'Documents',
-            };
-
-            const file = await generatePDF(options);
-
-            if (file.filePath) {
-                if (Platform.OS === 'android') {
-                    const downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanFileName}.pdf`;
-                    try {
-                        const exists = await RNFS.exists(downloadPath);
-                        if (exists) {
-                            await RNFS.unlink(downloadPath);
-                        }
-                        await RNFS.copyFile(file.filePath, downloadPath);
-
-                        // Show local notification
-                        FCMService.displayLocalNotification('Download Complete', 'Your payment report PDF has been saved successfully to your Downloads folder.');
-
-                        showAlert("Success", "PDF saved successfully to Downloads folder. Do you want to share it?", "success", [
-                            {
-                                text: "Share",
-                                onPress: async () => {
-                                    try {
-                                        await Share.open({
-                                            url: `file://${downloadPath}`,
-                                            title: 'Payment Report PDF',
-                                        });
-                                    } catch (e) {
-                                        console.log("Share cancel/error:", e);
-                                    }
-                                }
-                            },
-                            { text: "OK" }
-                        ]);
-                    } catch (copyErr) {
-                        console.error("File Copy Error:", copyErr);
-                        // Fallback to share original file directly
-                        await Share.open({
-                            url: `file://${file.filePath}`,
-                            title: 'Payment Report PDF',
-                        });
-                    }
-                } else {
-                    await Share.open({
-                        url: `file://${file.filePath}`,
-                        title: 'Payment Report PDF',
-                    });
-                }
-            } else {
-                showAlert("Error", "Could not generate PDF file.", "error");
-            }
         } catch (error) {
-            console.error("PDF Export Error:", error);
-            // Ignore user cancellation error from Share
-            if (error.message && !error.message.includes("User did not share")) {
-                showAlert("Export Failed", "There was an issue exporting the PDF.", "error");
-            }
+            console.error("Background PDF Export Error:", error);
+            showAlert("Export Failed", "There was an issue starting the PDF export.", "error");
         } finally {
             setExporting(false);
         }
@@ -443,7 +207,7 @@ const MerchantReports = ({ user, plans }) => {
                     <View style={styles.filtersHeaderRight}>
                         {!filtersExpanded && (
                             <Text style={styles.filtersSummaryText} numberOfLines={1}>
-                                {selectedPlanName} | {formatIndianDate(startDate)} - {formatIndianDate(endDate)}
+                                {selectedPlanName} | {isAllTime ? 'All Time' : `${formatIndianDate(startDate)} - ${formatIndianDate(endDate)}`}
                             </Text>
                         )}
                         <Icon name={filtersExpanded ? "chevron-up" : "chevron-down"} size={14} color="#fff" style={{ marginLeft: 8 }} />
@@ -459,23 +223,41 @@ const MerchantReports = ({ user, plans }) => {
                             <Icon name="chevron-down" size={14} color="#666" />
                         </TouchableOpacity>
 
-                        {/* Date Selectors */}
-                        <View style={styles.dateRow}>
-                            <View style={styles.dateCol}>
-                                <Text style={styles.label}>Start Date</Text>
-                                <TouchableOpacity style={styles.dateBtn} onPress={() => setStartPickerVisible(true)}>
-                                    <Icon name="calendar" size={14} color="#915200" />
-                                    <Text style={styles.dateText}>{formatIndianDate(startDate)}</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.dateCol}>
-                                <Text style={styles.label}>End Date</Text>
-                                <TouchableOpacity style={styles.dateBtn} onPress={() => setEndPickerVisible(true)}>
-                                    <Icon name="calendar" size={14} color="#915200" />
-                                    <Text style={styles.dateText}>{formatIndianDate(endDate)}</Text>
-                                </TouchableOpacity>
-                            </View>
+                        {/* Data Scope Selector */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <TouchableOpacity 
+                                style={[styles.scopeBtn, !isAllTime && styles.scopeBtnActive]}
+                                onPress={() => setIsAllTime(false)}
+                            >
+                                <Text style={[styles.scopeBtnText, !isAllTime && styles.scopeBtnTextActive]}>Date Range</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.scopeBtn, isAllTime && styles.scopeBtnActive]}
+                                onPress={() => setIsAllTime(true)}
+                            >
+                                <Text style={[styles.scopeBtnText, isAllTime && styles.scopeBtnTextActive]}>All Data</Text>
+                            </TouchableOpacity>
                         </View>
+
+                        {/* Date Selectors */}
+                        {!isAllTime && (
+                            <View style={styles.dateRow}>
+                                <View style={styles.dateCol}>
+                                    <Text style={styles.label}>Start Date</Text>
+                                    <TouchableOpacity style={styles.dateBtn} onPress={() => setStartPickerVisible(true)}>
+                                        <Icon name="calendar" size={14} color="#915200" />
+                                        <Text style={styles.dateText}>{formatIndianDate(startDate)}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.dateCol}>
+                                    <Text style={styles.label}>End Date</Text>
+                                    <TouchableOpacity style={styles.dateBtn} onPress={() => setEndPickerVisible(true)}>
+                                        <Icon name="calendar" size={14} color="#915200" />
+                                        <Text style={styles.dateText}>{formatIndianDate(endDate)}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
 
                         {/* Search Button */}
                         <TouchableOpacity style={styles.searchBtn} onPress={fetchReport} disabled={loading}>
@@ -536,20 +318,26 @@ const MerchantReports = ({ user, plans }) => {
                     </View>
                 </View>
 
-                {payments.length === 0 && !loading ? (
-                    <View style={styles.emptyState}>
-                        <Icon name="folder-open" size={40} color="#fff" style={{ marginBottom: 10 }} />
-                        <Text style={styles.emptyStateText}>No payments found for the selected criteria.</Text>
-                    </View>
-                ) : (
-                    <FlatList
-                        data={payments}
-                        keyExtractor={(item) => item._id}
-                        renderItem={renderPaymentItem}
-                        contentContainerStyle={{ paddingBottom: 20 }}
-                        showsVerticalScrollIndicator={false}
-                    />
-                )}
+                <FlatList
+                    data={loading ? [] : payments}
+                    keyExtractor={(item) => item._id || Math.random().toString()}
+                    renderItem={renderPaymentItem}
+                    contentContainerStyle={{ paddingBottom: 20 }}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        loading ? (
+                            <View style={{ padding: 40, alignItems: 'center' }}>
+                                <ActivityIndicator size="large" color="#D4AF37" />
+                                <Text style={{ marginTop: 10, color: '#666' }}>Fetching reports...</Text>
+                            </View>
+                        ) : (
+                            <View style={styles.emptyState}>
+                                <Icon name="folder-open" size={40} color="#fff" style={{ marginBottom: 10 }} />
+                                <Text style={styles.emptyStateText}>No payments found for the selected criteria.</Text>
+                            </View>
+                        )
+                    }
+                />
             </View>
 
             {/* Plan Selection Modal */}
@@ -668,6 +456,29 @@ const styles = StyleSheet.create({
         color: '#f0f0f0',
         marginBottom: 4,
         fontWeight: '500',
+    },
+    scopeBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        backgroundColor: '#fafafa',
+        marginHorizontal: 2,
+        borderRadius: 8,
+    },
+    scopeBtnActive: {
+        backgroundColor: COLORS?.primary || '#915200',
+        borderColor: COLORS?.primary || '#915200',
+    },
+    scopeBtnText: {
+        fontSize: 13,
+        color: '#333',
+        fontWeight: '500',
+    },
+    scopeBtnTextActive: {
+        color: '#fff',
+        fontWeight: 'bold',
     },
     dropdownBtn: {
         flexDirection: 'row',

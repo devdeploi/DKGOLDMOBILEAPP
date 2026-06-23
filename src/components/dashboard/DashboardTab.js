@@ -1,6 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useEffect } from 'react';
-import { ImageBackground, View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, RefreshControl, Image, Linking, TouchableOpacity } from 'react-native';
+import { ImageBackground, View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, RefreshControl, Image, Linking, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import { COLORS } from '../../styles/theme';
 import { LineChart, PieChart } from 'react-native-chart-kit'; // Ensure this is installed
 import axios from 'axios';
@@ -20,8 +20,28 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
 
     // Use global synchronized gold rate
     const { goldRate } = useGoldRate();
+    const [isDataVisible, setIsDataVisible] = useState(false);
+    const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [verifyingPassword, setVerifyingPassword] = useState(false);
 
-
+    const handleVerifyPassword = async () => {
+        if (!passwordInput) return;
+        setVerifyingPassword(true);
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            const { data } = await axios.post(`${APIURL}/users/verify-password`, { password: passwordInput }, config);
+            if (data.success) {
+                setIsDataVisible(true);
+                setIsPasswordModalVisible(false);
+                setPasswordInput('');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Incorrect password. Please try again.');
+        } finally {
+            setVerifyingPassword(false);
+        }
+    };
 
     const [stats, setStats] = useState({
         totalSaved: 0,
@@ -34,6 +54,18 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
     const [monthlyData, setMonthlyData] = useState({ labels: [], data: [] });
     const [planDistribution, setPlanDistribution] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
+    const [activeCardIndex, setActiveCardIndex] = useState(0);
+
+    const handleScroll = (event) => {
+        const slideSize = event.nativeEvent.layoutMeasurement.width;
+        if (slideSize > 0) {
+            const index = event.nativeEvent.contentOffset.x / slideSize;
+            const roundIndex = Math.round(index);
+            if (activeCardIndex !== roundIndex) {
+                setActiveCardIndex(roundIndex);
+            }
+        }
+    };
 
     useEffect(() => {
         if (user) {
@@ -111,7 +143,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
             });
 
 
-            setRecentActivity(activePlans.slice(0, 5));
+            setRecentActivity(activePlans);
         } catch (error) {
             console.error("Dashboard Fetch Error", error);
         } finally {
@@ -163,14 +195,116 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
             >
                 <AdBanner ads={ads} />
                 <View style={styles.headerSection}>
-                    <Text style={styles.welcomeText}>Hello, {user.name}</Text>
-                    <Text style={styles.subText}>Here is your financial overview</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View>
+                            <Text style={styles.welcomeText}>Hello, {user.name}</Text>
+                            <Text style={styles.subText}>Here is your financial overview</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => {
+                            if (isDataVisible) {
+                                setIsDataVisible(false);
+                            } else {
+                                setIsPasswordModalVisible(true);
+                            }
+                        }} style={{ padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 }}>
+                            <Icon name={isDataVisible ? "eye-slash" : "eye"} size={18} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                {/* Ads Component - Removed, now global */}
+                {/* Recent Activity List - Horizontal Scroll */}
+                <Text style={styles.sectionTitle}>Your Active Chits</Text>
+                {recentActivity.length > 0 ? (
+                    <View>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingVertical: 10 }}
+                            snapToInterval={width - 40}
+                            decelerationRate="fast"
+                            pagingEnabled
+                            onScroll={handleScroll}
+                            scrollEventThrottle={16}
+                        >
+                            {recentActivity.map((plan, index) => {
+                                const lastPaymentDate = plan.history?.length > 0 ? new Date(plan.history[0].paymentDate).toLocaleDateString() : 'N/A';
+                                const isUnlimited = plan.durationMonths === 0 || plan.returnType === 'gold' || (plan.planName && plan.planName.toLowerCase().includes('unlimited'));
 
+                                return (
+                                    <View key={index} style={{ marginBottom: 5, width: width - 40 }}>
+                                    <View style={styles.newPlanCard}>
+                                        <View style={styles.newPlanCardContent}>
+                                            <View style={styles.newPlanCardLeft}>
+                                                <Text style={styles.newPlanWelcomeText}>Welcome, {user.name}</Text>
+                                                <Text style={styles.newPlanPhoneText}>{user.phone}</Text>
 
-
+                                                <View style={styles.newPlanDetailRow}>
+                                                    <Text style={styles.newPlanLabel}>My Plan</Text>
+                                                    <Text style={styles.newPlanValue}>: {plan.planName}</Text>
+                                                </View>
+                                                <View style={styles.newPlanDetailRow}>
+                                                    <Text style={styles.newPlanLabel}>Type</Text>
+                                                    <Text style={styles.newPlanValue}>: {isUnlimited ? 'Unlimited' : 'Monthly'}</Text>
+                                                </View>
+                                                <View style={styles.newPlanDetailRow}>
+                                                    <Text style={styles.newPlanLabel}>Monthly Pay</Text>
+                                                    <Text style={styles.newPlanValue}>: Rs. {plan.monthlyAmount}</Text>
+                                                </View>
+                                                <View style={styles.newPlanDetailRow}>
+                                                    <Text style={styles.newPlanLabel}>Account No.</Text>
+                                                    <Text style={styles.newPlanValue}>: {plan.acc_no || 'N/A'}</Text>
+                                                </View>
+                                                <View style={styles.newPlanDetailRow}>
+                                                    <Text style={styles.newPlanLabel}>No. of Installment</Text>
+                                                    <Text style={styles.newPlanValue}>: {isUnlimited ? 'N/A' : plan.durationMonths}</Text>
+                                                </View>
+                                                <View style={styles.newPlanDetailRow}>
+                                                    <Text style={styles.newPlanLabel}>Total Amount</Text>
+                                                    <Text style={styles.newPlanValue}>: {isUnlimited ? 'N/A' : plan.totalAmount}</Text>
+                                                </View>
+                                                <View style={styles.newPlanDetailRow}>
+                                                    <Text style={styles.newPlanLabel}>Status</Text>
+                                                    <Text style={styles.newPlanValue}>: <Text style={{textTransform: 'capitalize'}}>{plan.status || 'Active'}</Text></Text>
+                                                </View>
+                                            </View>
+                                            <View style={styles.newPlanCardRight}>
+                                                <Icon name="arrow-trend-up" size={24} color="#6B8E23" style={{marginBottom: 5}} />
+                                                <Icon name="coins" size={28} color="#EBCB28" style={{opacity: 0.9}} />
+                                                <Icon name="seedling" size={16} color="#6B8E23" style={{marginTop: -10}} />
+                                            </View>
+                                        </View>
+                                        
+                                        <View style={[styles.newPlanCardFooter, { flexWrap: 'wrap', gap: 5, paddingVertical: 10 }]}>
+                                            <Text style={styles.newPlanFooterText}>Last Payment : {lastPaymentDate}</Text>
+                                            <Text style={styles.newPlanFooterText}>Paid : {isDataVisible ? `₹${(plan.totalSaved || 0)}` : '****'} ({plan.installmentsPaid})</Text>
+                                            {!isUnlimited && (
+                                                <Text style={styles.newPlanFooterText}>Remaining Due: {isDataVisible ? `₹${(plan.totalAmount - (plan.totalSaved || 0))}` : '****'} ({Math.max(0, plan.durationMonths - plan.installmentsPaid)})</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                </View>
+                            );
+                        })}
+                        </ScrollView>
+                        {recentActivity.length > 1 && (
+                            <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 15 }}>
+                                {recentActivity.map((_, i) => (
+                                    <View key={i} style={{
+                                        width: i === activeCardIndex ? 8 : 6,
+                                        height: i === activeCardIndex ? 8 : 6,
+                                        borderRadius: 4,
+                                        backgroundColor: i === activeCardIndex ? '#EBCB28' : 'rgba(255,255,255,0.4)',
+                                        marginHorizontal: 4
+                                    }} />
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                ) : (
+                    <View style={styles.activityCard}>
+                        <Text style={{ color: COLORS?.secondary }}>No active plans yet.</Text>
+                    </View>
+                )}
 
                 {/* Key Stats Cards */}
                 <View style={styles.statGrid}>
@@ -179,8 +313,8 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                             <Icon name="piggy-bank" size={20} color="#fff" style={{ opacity: 0.8 }} />
                             <Text style={[styles.statLabel, { color: '#fff' }]}>Total Saved</Text>
                         </View>
-                        <Text style={[styles.statValue, { color: '#fff' }]}>₹ {stats.totalSaved.toLocaleString()}</Text>
-                        <Text style={{ color: '#fff', fontSize: 10, opacity: 0.8 }}>Output: ~₹{stats.totalGoal.toLocaleString()}</Text>
+                        <Text style={[styles.statValue, { color: '#fff' }]}>{isDataVisible ? `₹ ${stats.totalSaved.toLocaleString()}` : '****'}</Text>
+                        <Text style={{ color: '#fff', fontSize: 10, opacity: 0.8 }}>Output: {isDataVisible ? `~₹${stats.totalGoal.toLocaleString()}` : '****'}</Text>
                     </View>
 
                     <View style={styles.statCard}>
@@ -188,7 +322,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                             <Icon name="calendar-check" size={20} color={COLORS?.primary} />
                             <Text style={styles.statLabel}>Monthly Due</Text>
                         </View>
-                        <Text style={[styles.statValue, { color: COLORS?.dark }]}>₹ {stats.monthlyCommitment.toLocaleString()}</Text>
+                        <Text style={[styles.statValue, { color: COLORS?.dark }]}>{isDataVisible ? `₹ ${stats.monthlyCommitment.toLocaleString()}` : '****'}</Text>
                         <Text style={{ color: COLORS?.secondary, fontSize: 10 }}>Across {stats.activeChits} Plans</Text>
                     </View>
                 </View>
@@ -211,7 +345,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                         <View style={styles.vaultBody}>
                             <View style={styles.weightDisplay}>
                                 <Text style={[styles.goldWeight, { color: COLORS?.primary }]}>
-                                    {stats.totalActualGoldWeight.toFixed(3)}
+                                    {isDataVisible ? stats.totalActualGoldWeight.toFixed(3) : '****'}
                                 </Text>
                                 <Text style={styles.weightUnit}>GRAMS</Text>
                             </View>
@@ -221,13 +355,13 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                             <View style={styles.vaultFooter}>
                                 <View style={{ width: '48%', alignItems: 'center' }}>
                                     <Text style={styles.footerMinLabel}>Amount Paid</Text>
-                                    <Text style={styles.footerMinVal}>₹{stats.totalSaved.toLocaleString()}</Text>
+                                    <Text style={styles.footerMinVal}>{isDataVisible ? `₹${stats.totalSaved.toLocaleString()}` : '****'}</Text>
                                 </View>
                                 <View style={{ width: 1, backgroundColor: '#F1F5F9', height: '100%' }} />
                                 <View style={{ width: '48%', alignItems: 'center' }}>
                                     <Text style={styles.footerMinLabel}>Live Rate Equiv.</Text>
                                     <Text style={[styles.footerMinVal, { color: COLORS?.secondary }]}>
-                                        {goldRate > 0 ? (stats.totalSaved / goldRate).toFixed(3) : '0.000'} g
+                                        {isDataVisible ? (goldRate > 0 ? (stats.totalSaved / goldRate).toFixed(3) : '0.000') : '****'} {isDataVisible ? 'g' : ''}
                                     </Text>
                                 </View>
                             </View>
@@ -299,7 +433,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                             {item.name}
                                         </Text>
                                     </View>
-                                    <Text style={styles.legendValue}>₹{item.population.toLocaleString()}</Text>
+                                    <Text style={styles.legendValue}>{isDataVisible ? `₹${item.population.toLocaleString()}` : '****'}</Text>
                                 </View>
                             ))}
                         </View>
@@ -308,49 +442,57 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
 
 
 
-                {/* Recent Activity List - Horizontal Scroll */}
-                <Text style={styles.sectionTitle}>Your Active Chits</Text>
-                {recentActivity.length > 0 ? (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingRight: 20 }}
-                    >
-                        {recentActivity.map((plan, index) => (
-                            <View key={index} style={styles.activityCardCompact}>
-                                <View style={styles.cardHeader}>
-                                    <View style={styles.activityIconSmall}>
-                                        <Icon name="gem" size={14} color={COLORS?.primary} />
-                                    </View>
-                                    <Text style={styles.activityStatusSmall}>{plan.status || 'Active'}</Text>
-                                </View>
 
-                                <Text style={styles.activityTitleCompact}>{plan.planName}</Text>
-
-                                <View style={styles.cardFooter}>
-                                    <View>
-                                        <Text style={styles.labelSmall}>Saved</Text>
-                                        <Text style={styles.amountSmall}>₹{((plan.totalSaved || 0) - (plan.deliveredAmount || 0)).toLocaleString()}</Text>
-                                    </View>
-                                    <View>
-                                        <Text style={styles.labelSmall}>Joined</Text>
-                                        <Text style={styles.dateSmall}>{new Date(plan.joinedAt || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        ))}
-                    </ScrollView>
-                ) : (
-                    <View style={styles.activityCard}>
-                        <Text style={{ color: COLORS?.secondary }}>No active plans yet.</Text>
-                    </View>
-                )}
 
             </ScrollView>
             {/* <View
                 style={styles.bottomFade}
                 pointerEvents="none"
             /> */}
+            {/* Password Modal */}
+            <Modal
+                visible={isPasswordModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setIsPasswordModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Enter Password</Text>
+                        <Text style={styles.modalSubTitle}>Please verify your password to view sensitive financial data.</Text>
+                        
+                        <TextInput
+                            style={styles.passwordInput}
+                            placeholder="Your Login Password"
+                            placeholderTextColor="#999"
+                            secureTextEntry={true}
+                            value={passwordInput}
+                            onChangeText={setPasswordInput}
+                            autoCapitalize="none"
+                        />
+
+                        <View style={styles.modalActionRow}>
+                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => {
+                                setIsPasswordModalVisible(false);
+                                setPasswordInput('');
+                            }}>
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.modalVerifyBtn, verifyingPassword && { opacity: 0.7 }]} 
+                                onPress={handleVerifyPassword}
+                                disabled={verifyingPassword}
+                            >
+                                {verifyingPassword ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <Text style={styles.modalVerifyText}>Verify</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </ImageBackground>
     );
 };
@@ -551,6 +693,69 @@ const styles = StyleSheet.create({
         borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center'
+    },
+    newPlanCard: {
+        backgroundColor: '#FFF9C4',
+        borderRadius: 15,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#EBCB28'
+    },
+    newPlanCardContent: {
+        padding: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between'
+    },
+    newPlanCardLeft: {
+        flex: 1
+    },
+    newPlanWelcomeText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#793D22'
+    },
+    newPlanPhoneText: {
+        fontSize: 12,
+        color: '#793D22',
+        marginBottom: 6
+    },
+    newPlanDetailRow: {
+        flexDirection: 'row',
+        marginBottom: 2
+    },
+    newPlanLabel: {
+        width: 100,
+        fontSize: 10,
+        color: '#793D22'
+    },
+    newPlanValue: {
+        fontSize: 10,
+        color: '#793D22',
+        fontWeight: '600',
+        flex: 1
+    },
+    newPlanCardRight: {
+        width: 50,
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        paddingBottom: 6
+    },
+    newPlanCardFooter: {
+        backgroundColor: '#EBCB28',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        paddingHorizontal: 12
+    },
+    newPlanFooterText: {
+        fontSize: 8,
+        color: '#553106',
+        fontWeight: '600'
     },
     bottomFade: {
         position: 'absolute',
@@ -797,6 +1002,80 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20
+    },
+    modalContent: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: COLORS?.dark,
+        marginBottom: 8
+    },
+    modalSubTitle: {
+        fontSize: 13,
+        color: COLORS?.secondary,
+        textAlign: 'center',
+        marginBottom: 20
+    },
+    passwordInput: {
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: COLORS?.dark,
+        marginBottom: 24,
+        backgroundColor: '#F8FAFC'
+    },
+    modalActionRow: {
+        flexDirection: 'row',
+        width: '100%',
+        justifyContent: 'space-between',
+        gap: 12
+    },
+    modalCancelBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center'
+    },
+    modalCancelText: {
+        color: COLORS?.secondary,
+        fontWeight: 'bold',
+        fontSize: 15
+    },
+    modalVerifyBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: COLORS?.primary,
+        alignItems: 'center'
+    },
+    modalVerifyText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 15
+    }
 });
 
 export default DashboardTab;

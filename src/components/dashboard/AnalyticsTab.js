@@ -84,23 +84,36 @@ const AnalyticsTab = ({ user }) => {
 
     const fetchImageAsBase64 = async (url) => {
         try {
-            if (url && (url.startsWith('file://') || url.startsWith('/'))) {
+            if (!url) return null;
+            if (url.startsWith('file://') || url.startsWith('/')) {
                 const cleanPath = url.replace('file://', '');
                 try {
                     const base64Data = await RNFS.readFile(cleanPath, 'base64');
                     return `data:image/png;base64,${base64Data}`;
                 } catch (e) {
                     console.error("Local file read error:", e);
+                    return null;
                 }
             }
-            const response = await fetch(url);
-            const blob = await response.blob();
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
+
+            const extMatch = url.match(/\\.(jpeg|jpg|png|gif|webp)/i);
+            const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
+            const mimeType = ext === 'jpg' ? 'jpeg' : ext;
+            const tempFile = `${RNFS.CachesDirectoryPath}/temp_img_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
+
+            const result = await RNFS.downloadFile({
+                fromUrl: url,
+                toFile: tempFile,
+            }).promise;
+
+            if (result.statusCode === 200) {
+                const base64Data = await RNFS.readFile(tempFile, 'base64');
+                RNFS.unlink(tempFile).catch(() => {});
+                return `data:image/${mimeType};base64,${base64Data}`;
+            } else {
+                console.error("Failed to download image, status:", result.statusCode);
+                return null;
+            }
         } catch (error) {
             console.error("Error fetching image:", error);
             return null;
@@ -240,6 +253,7 @@ const AnalyticsTab = ({ user }) => {
                     <div class="title-section">
                         <h1>PAYMENT RECEIPT</h1>
                         <p>Date: ${new Date().toLocaleDateString()}</p>
+                        ${payment.receiptNumber ? `<p style="font-weight: bold; margin-top: 5px;">Receipt No: ${payment.receiptNumber}</p>` : ''}
                     </div>
 
                     <div class="grid">
@@ -562,7 +576,11 @@ const AnalyticsTab = ({ user }) => {
         try {
             // 1. Create Razorpay Order
             const { data: order } = await axios.post(`${APIURL}/payments/create-order`, {
-                amount: amountToPay
+                amount: amountToPay,
+                chitPlanId: selectedPlanForOffline.planId,
+                subscriptionId: selectedPlanForOffline._id,
+                type: 'installment',
+                goldRate: lockedGoldRate || goldRate
             }, {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
@@ -784,10 +802,8 @@ const AnalyticsTab = ({ user }) => {
         const goldGrams = remainingGold.toFixed(3);
 
         return (
-            <TouchableOpacity
+            <View
                 style={styles.planCard}
-                onPress={() => setExpandedCardId(isExpanded ? null : plan._id)}
-                activeOpacity={0.7}
             >
                 {/* Always Visible Header */}
                 <View style={styles.planHeader}>
@@ -835,21 +851,6 @@ const AnalyticsTab = ({ user }) => {
                     </View>
                 </View>
 
-                {/* Expand/Collapse Indicator */}
-                <View style={styles.expandIndicator}>
-                    <Text style={styles.expandText}>
-                        {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
-                    </Text>
-                    <Icon
-                        name={isExpanded ? "chevron-up" : "chevron-down"}
-                        size={10}
-                        color={COLORS?.primary}
-                    />
-                </View>
-
-                {/* Expanded Content */}
-                {isExpanded && (
-                    <>
                         <View style={styles.divider} />
 
                         <View style={styles.statsGrid}>
@@ -1091,9 +1092,7 @@ const AnalyticsTab = ({ user }) => {
                                 )}
                             </View>
                         )}
-                    </>
-                )}
-            </TouchableOpacity>
+            </View>
         );
     };
 
@@ -1154,6 +1153,15 @@ const AnalyticsTab = ({ user }) => {
                 style={styles.bottomFade}
                 pointerEvents="none"
             /> */}
+
+            {/* Blocking Payment Modal */}
+            <Modal visible={submittingOffline} transparent={true} animationType="fade" onRequestClose={() => {}}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+                    <ActivityIndicator size="large" color="#d4af37" />
+                    <Text style={{ color: '#fff', marginTop: 15, fontSize: 18, fontWeight: 'bold' }}>Processing Payment...</Text>
+                    <Text style={{ color: '#e0e0e0', marginTop: 5, fontSize: 13, textAlign: 'center', paddingHorizontal: 20 }}>Please do not close the app, change tabs, or press back.</Text>
+                </View>
+            </Modal>
 
             <CustomAlert {...alertConfig} onClose={hideAlert} />
 

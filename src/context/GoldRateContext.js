@@ -11,7 +11,7 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
             { id: 'silver_usd', label: 'SILVER ($)', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'oz' },
             { id: 'usd_inr', label: 'USD / INR', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: '₹' },
             { id: '24k_inr', label: 'GOLD 24K', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'gm' },
-            { id: 'silver_inr', label: 'SILVER', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'kg' },
+            { id: 'silver_inr', label: 'SILVER', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'gm' },
             { id: '22k_inr', label: 'GOLD 22K', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'gm' },
             { id: '18k_inr', label: 'GOLD 18K', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'gm' },
             { id: '22k_gst', label: 'GOLD 22K (+GST)', price: 0, prevPrice: 0, buyRate: 0, sellRate: 0, prevBuy: 0, prevSell: 0, high: 0, low: 0, unit: 'gm' },
@@ -177,13 +177,13 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
             const silverOunceUSD = dataXAG_USD.price || 0;
             const baseGramINR = (usdOunce / troyWeight) * exRate;
             const base24Final = baseGramINR * MARKUP * GST;
-            const silverKgINR = (silverOunceUSD / troyWeight) * 1000 * exRate * MARKUP * GST;
+            const silverGramINR = (silverOunceUSD / troyWeight) * exRate * MARKUP * GST;
 
             lastBaseRates.current = {
                 usd: usdOunce,
                 silverUsd: silverOunceUSD,
                 inr24: base24Final,
-                inrSilver: silverKgINR,
+                inrSilver: silverGramINR,
                 exRate: exRate
             };
 
@@ -197,7 +197,7 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
                     }
                     else if (row.id === 'silver_usd') {
                         const manualSilver = Number(manualRatesRef.current?.silverRate);
-                        buy = sell = (manualSilver > 0) ? (manualSilver / exRate / 1000 * troyWeight) : silverOunceUSD;
+                        buy = sell = (manualSilver > 0) ? (manualSilver / exRate * troyWeight) : silverOunceUSD;
                     }
                     else if (row.id === 'usd_inr') buy = sell = exRate;
                     else if (row.id === '24k_inr') {
@@ -206,7 +206,7 @@ export const GoldRateProvider = ({ children, merchantRates }) => {
                         sell = (manual24k > 0) ? manual24k : buy;
                     }
                     else if (row.id === 'silver_inr') {
-                        buy = silverKgINR;
+                        buy = silverGramINR;
                         const manualSilver = Number(manualRatesRef.current?.silverRate);
                         sell = (manualSilver > 0) ? manualSilver : buy;
                     }

@@ -531,19 +531,23 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                                         <Icon name="eye" size={12} color={COLORS?.primary} />
                                         <Text style={styles.viewButtonText}>View</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, styles.editButton]}
-                                        onPress={() => openEditModal(plan)}
-                                    >
-                                        <Icon name="edit" size={12} color="#fff" />
-                                        <Text style={styles.editButtonText}>Edit</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, styles.deleteButton]}
-                                        onPress={() => handleDeletePlan(plan._id)}
-                                    >
-                                        <Icon name="trash" size={12} color="#fff" />
-                                    </TouchableOpacity>
+                                    {!user?.isStaff && (
+                                        <>
+                                            <TouchableOpacity
+                                                style={[styles.actionButton, styles.editButton]}
+                                                onPress={() => openEditModal(plan)}
+                                            >
+                                                <Icon name="edit" size={12} color="#fff" />
+                                                <Text style={styles.editButtonText}>Edit</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.actionButton, styles.deleteButton]}
+                                                onPress={() => handleDeletePlan(plan._id)}
+                                            >
+                                                <Icon name="trash" size={12} color="#fff" />
+                                            </TouchableOpacity>
+                                        </>
+                                    )}
                                 </View>
                             </View>
                         );
@@ -559,29 +563,31 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                     )}
                     ListFooterComponent={() => (
                         <View style={{ paddingBottom: 100 }}>
-                            <TouchableOpacity
-                                style={styles.addPlanButton}
-                                onPress={() => {
-                                    if (!user.upiId && !user.upiNumber) {
-                                        setAlertConfig({
-                                            visible: true,
-                                            title: 'Action Required',
-                                            message: 'Please add your UPI ID or UPI Number in your profile settings to create a chit plan.',
-                                            type: 'warning',
-                                            buttons: [{ text: 'OK', onPress: hideAlert }]
-                                        });
-                                        return;
-                                    }
-                                    resetForm();
-                                    setShowCreatePlanModal(true);
-                                }}
-                                activeOpacity={0.7}
-                            >
-                                <Icon name="plus" size={16} color={COLORS?.primary} style={styles.planDetailIcon} />
-                                <Text style={styles.addPlanText}>
-                                    Create New Plan
-                                </Text>
-                            </TouchableOpacity>
+                            {!user?.isStaff && (
+                                <TouchableOpacity
+                                    style={styles.addPlanButton}
+                                    onPress={() => {
+                                        if (!user.upiId && !user.upiNumber) {
+                                            setAlertConfig({
+                                                visible: true,
+                                                title: 'Action Required',
+                                                message: 'Please add your UPI ID or UPI Number in your profile settings to create a chit plan.',
+                                                type: 'warning',
+                                                buttons: [{ text: 'OK', onPress: hideAlert }]
+                                            });
+                                            return;
+                                        }
+                                        resetForm();
+                                        setShowCreatePlanModal(true);
+                                    }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Icon name="plus" size={16} color={COLORS?.primary} style={styles.planDetailIcon} />
+                                    <Text style={styles.addPlanText}>
+                                        Create New Plan
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
                             {loadingMore && (
                                 <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                                     <ActivityIndicator size="small" color={COLORS?.primary} />

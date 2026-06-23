@@ -111,12 +111,14 @@ const MerchantProfile = ({
                             <Text style={[styles.headerTitle, { color: COLORS?.dark }]}>Merchant Profile</Text>
                             <Text style={[styles.headerSubtitle, { color: COLORS?.secondary }]}>Manage your business details</Text>
                         </View>
-                        <TouchableOpacity
-                            onPress={() => setIsEditingProfile(!isEditingProfile)}
-                            style={[styles.editButton, { borderColor: primaryColor, backgroundColor: isEditingProfile ? '#fff' : 'transparent' }]}
-                        >
-                            <Text style={{ color: primaryColor, fontWeight: 'bold' }}>{isEditingProfile ? 'Cancel' : 'Edit'}</Text>
-                        </TouchableOpacity>
+                        {!user?.isStaff && (
+                            <TouchableOpacity
+                                onPress={() => setIsEditingProfile(!isEditingProfile)}
+                                style={[styles.editButton, { borderColor: primaryColor, backgroundColor: isEditingProfile ? '#fff' : 'transparent' }]}
+                            >
+                                <Text style={{ color: primaryColor, fontWeight: 'bold' }}>{isEditingProfile ? 'Cancel' : 'Edit'}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 
@@ -210,7 +212,7 @@ const MerchantProfile = ({
                             style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
                             value={profileData.upiId}
                             onChangeText={(text) => setProfileData({ ...profileData, upiId: text })}
-                            editable={isEditingProfile}
+                            editable={isEditingProfile && !user?.isStaff}
                             placeholder="e.g. merchant@upi"
                             placeholderTextColor="#999"
                             autoCapitalize="none"
@@ -223,7 +225,7 @@ const MerchantProfile = ({
                             style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
                             value={profileData.upiNumber}
                             onChangeText={(text) => setProfileData({ ...profileData, upiNumber: text })}
-                            editable={isEditingProfile}
+                            editable={isEditingProfile && !user?.isStaff}
                             placeholder="e.g. 9876543210"
                             placeholderTextColor="#999"
                             keyboardType="numeric"
@@ -262,7 +264,7 @@ const MerchantProfile = ({
                                 style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
                                 value={profileData.goldRate24k?.toString()}
                                 onChangeText={(text) => setProfileData({ ...profileData, goldRate24k: text.replace(/[^0-9]/g, '') })}
-                                editable={isEditingProfile}
+                                editable={isEditingProfile && !user?.isStaff}
                                 placeholder="Auto"
                                 placeholderTextColor="#999"
                                 keyboardType="numeric"
@@ -274,7 +276,7 @@ const MerchantProfile = ({
                                 style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
                                 value={profileData.goldRate22k?.toString()}
                                 onChangeText={(text) => setProfileData({ ...profileData, goldRate22k: text.replace(/[^0-9]/g, '') })}
-                                editable={isEditingProfile}
+                                editable={isEditingProfile && !user?.isStaff}
                                 placeholder="Auto"
                                 placeholderTextColor="#999"
                                 keyboardType="numeric"
@@ -286,19 +288,19 @@ const MerchantProfile = ({
                                 style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
                                 value={profileData.goldRate18k?.toString()}
                                 onChangeText={(text) => setProfileData({ ...profileData, goldRate18k: text.replace(/[^0-9]/g, '') })}
-                                editable={isEditingProfile}
+                                editable={isEditingProfile && !user?.isStaff}
                                 placeholder="Auto"
                                 placeholderTextColor="#999"
                                 keyboardType="numeric"
                             />
                         </View>
                         <View style={[styles.inputGroup, { width: '47%' }]}>
-                            <Text style={[styles.inputLabel, { color: primaryColor }]}>Silver Rate per kg</Text>
+                            <Text style={[styles.inputLabel, { color: primaryColor }]}>Silver Rate per gram</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: lightBg, color: '#000' }]}
                                 value={profileData.silverRate?.toString()}
                                 onChangeText={(text) => setProfileData({ ...profileData, silverRate: text.replace(/[^0-9]/g, '') })}
-                                editable={isEditingProfile}
+                                editable={isEditingProfile && !user?.isStaff}
                                 placeholder="Auto"
                                 placeholderTextColor="#999"
                                 keyboardType="numeric"

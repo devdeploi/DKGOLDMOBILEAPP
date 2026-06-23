@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ImageBackground,
     View,
     Text,
@@ -15,7 +15,8 @@ import { ImageBackground,
     TextInput,
     Platform,
     Alert,
-    Linking
+    Linking,
+    Animated
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
@@ -207,9 +208,11 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
 
         setSubmitting(true);
         try {
-            // 1. Create Razorpay Order
             const { data: order } = await axios.post(`${APIURL}/payments/create-order`, {
-                amount: amountToPay
+                amount: amountToPay,
+                chitPlanId: selectedPlanForSub._id,
+                type: 'subscription',
+                goldRate: lockedGoldRate || goldRate
             }, {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
@@ -394,52 +397,25 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
 
     const renderPlanCard = ({ item }) => {
         const isGold = item.returnType === 'Gold';
+        const displayAmount = item.type === 'unlimited' ? 'DIGI GOLD' : item.monthlyAmount;
 
         return (
-            <View style={styles.planCard}>
-                <View style={[styles.planHeader, isGold ? styles.goldHeader : styles.cashHeader]}>
-                    <Text style={[styles.planTypeBadge, { color: isGold ? '#856404' : '#155724' }]}>
-                        {isGold ? 'GOLD SCHEME' : 'CASH SCHEME'}
+            <View style={styles.premiumPlanCard}>
+                <TouchableOpacity 
+                    style={{width: '100%', alignItems: 'center'}}
+                    onPress={() => handleSubscribePress(item)}
+                    disabled={submitting}
+                >
+                    <View style={styles.premiumPlanBox}>
+                        <Text style={styles.premiumAmountText} numberOfLines={1} adjustsFontSizeToFit>
+                            {displayAmount}
+                        </Text>
+                    </View>
+                    <Text style={styles.premiumPlanName}>
+                        {item.planName} - {item.type === 'unlimited' ? 'Unlimited' : 'Monthly'}
                     </Text>
-                    <View style={styles.durationBadge}>
-                        <Icon name="clock" size={12} color="#fff" />
-                        <Text style={styles.durationText}>
-                            {item.type === 'unlimited' ? 'No Limit' : `${item.durationMonths} Months`}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.planBody}>
-                    <Text style={styles.planName}>{item.planName}</Text>
-                    {!!item.description && (
-                        <Text style={styles.planDescription}>{item.description}</Text>
-                    )}
-
-                    <View style={styles.amountRow}>
-                        <View>
-                            <Text style={styles.amountLabel}>{item.type === 'unlimited' ? 'Min Investment' : 'Monthly'}</Text>
-                            <Text style={styles.amountValue}>₹{item.monthlyAmount}</Text>
-                        </View>
-                        <View style={styles.verticalDivider} />
-                        <View>
-                            <Text style={styles.amountLabel}>Total Value</Text>
-                            <Text style={styles.totalValue}>
-                                {item.type === 'unlimited' ? 'Unlimited' : `₹${item.totalAmount?.toLocaleString()}`}
-                            </Text>
-                        </View>
-                    </View>
-
-                    <TouchableOpacity
-                        style={styles.subscribeBtn}
-                        onPress={() => handleSubscribePress(item)}
-                        disabled={submitting}
-                    >
-                        <Text style={styles.subscribeBtnText}>
-                            SUBSCRIBE NOW
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </View >
+                </TouchableOpacity>
+            </View>
         );
     };
 
@@ -447,6 +423,9 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
 
             <FlatList
+                key="grid-2"
+                numColumns={2}
+                columnWrapperStyle={styles.columnWrapper}
                 ListHeaderComponent={
                     <>
                         <View style={{ paddingTop: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: 'transparent', overflow: 'hidden' }}>
@@ -454,8 +433,11 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                                 {renderMerchantProfile()}
                                 {renderInfoSection()}
                                 {renderGallery()}
-                                <View style={[styles.sectionContainer, { paddingBottom: 10 }]}>
-                                    <Text style={styles.sectionTitle}>Available Plans</Text>
+                                <View style={[styles.sectionContainer, { paddingBottom: 10, alignItems: 'center' }]}>
+                                    <Text style={{ fontSize: 24, color: '#fff', fontWeight: 'bold' }}>DK GOLD</Text>
+                                    <Text style={{ fontSize: 12, color: '#f0f0f0', marginBottom: 10, fontStyle: 'italic' }}>Presents</Text>
+                                    <Text style={{ fontSize: 16, color: '#fff', fontWeight: '600', textAlign: 'center' }}>Digital Gold and Cash{'\n'}Saving Plans</Text>
+                                    <Text style={{ fontSize: 12, color: '#FCD34D', marginTop: 5 }}>{plans.length} Unique Plans</Text>
                                 </View>
                             </View>
 
@@ -474,6 +456,35 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                     ) : (
                         <Text style={styles.emptyText}>No plans available at the moment.</Text>
                     )
+                }
+                ListFooterComponent={
+                    plans.length > 0 ? (
+                        <View style={styles.trustSection}>
+                            <View style={styles.trustItem}>
+                                <Icon name="coins" size={30} color="#FCD34D" style={styles.trustIcon} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.trustLabel}>Your Gold is</Text>
+                                    <Text style={styles.trustValue}>100% INSURED</Text>
+                                </View>
+                            </View>
+                            
+                            <View style={styles.trustItem}>
+                                <Icon name="shield-alt" size={30} color="#FCD34D" style={styles.trustIcon} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.trustLabel}>Your Investment are</Text>
+                                    <Text style={styles.trustValue}>100% SAFE</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.trustItem}>
+                                <Icon name="hand-holding-usd" size={30} color="#FCD34D" style={styles.trustIcon} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.trustLabel}>withdraw</Text>
+                                    <Text style={styles.trustValue}>Any Time</Text>
+                                </View>
+                            </View>
+                        </View>
+                    ) : null
                 }
             />
 
@@ -614,6 +625,15 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                 </View>
             </Modal>
 
+            {/* Blocking Payment Modal */}
+            <Modal visible={submitting} transparent={true} animationType="fade" onRequestClose={() => {}}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+                    <ActivityIndicator size="large" color="#d4af37" />
+                    <Text style={{ color: '#fff', marginTop: 15, fontSize: 18, fontWeight: 'bold' }}>Processing Payment...</Text>
+                    <Text style={{ color: '#e0e0e0', marginTop: 5, fontSize: 13, textAlign: 'center', paddingHorizontal: 20 }}>Please do not close the app, change tabs, or press back.</Text>
+                </View>
+            </Modal>
+
             <CustomAlert
                 visible={alertConfig.visible}
                 title={alertConfig.title}
@@ -665,33 +685,88 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 15 },
     galleryImage: { width: 120, height: 120, borderRadius: 12, marginRight: 12, resizeMode: 'contain' },
 
-    // Plans
-    planCard: {
-        backgroundColor: '#fff', borderRadius: 20, marginHorizontal: 20, marginBottom: 20,
-        elevation: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#f0f0f0'
+    // Premium Plans
+    columnWrapperStyle: { justifyContent: 'space-between', paddingHorizontal: 10, marginBottom: 15 },
+    premiumPlanCard: {
+        flex: 1,
+        marginHorizontal: 8,
+        alignItems: 'center',
+        marginBottom: 12
     },
-    planHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, alignItems: 'center' },
-    goldHeader: { backgroundColor: '#FFF9C4' },
-    cashHeader: { backgroundColor: '#D4EDDA' },
-    planTypeBadge: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-    durationBadge: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, alignItems: 'center' },
-    durationText: { color: '#fff', fontSize: 10, fontWeight: 'bold', marginLeft: 4 },
-
-    planBody: { padding: 20 },
-    planName: { fontSize: 20, fontWeight: 'bold', color: COLORS?.dark, marginBottom: 5 },
-    planDescription: { fontSize: 13, color: COLORS?.secondary, marginBottom: 15, lineHeight: 18 },
-    amountRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-    verticalDivider: { width: 1, backgroundColor: '#eee' },
-    amountLabel: { fontSize: 12, color: COLORS?.secondary, marginBottom: 4 },
-    amountValue: { fontSize: 18, fontWeight: '600', color: COLORS?.dark },
-    totalValue: { fontSize: 22, fontWeight: '800', color: COLORS?.primary },
-
-    subscribeBtn: {
-        backgroundColor: COLORS?.primary, paddingVertical: 14, borderRadius: 12,
-        alignItems: 'center', flexDirection: 'row', justifyContent: 'center'
+    premiumPlanBox: {
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#D4AF37',
+        borderRadius: 10,
+        width: '100%',
+        height: 65,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 6,
+        shadowColor: '#D4AF37',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        marginBottom: 8,
+        paddingHorizontal: 5
     },
-    subscribedBtn: { backgroundColor: '#90A4AE' },
-    subscribeBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14, letterSpacing: 1 },
+    premiumAmountText: {
+        fontSize: 28,
+        fontWeight: '900',
+        color: '#D4AF37',
+        textShadowColor: 'rgba(212, 175, 55, 0.3)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
+    premiumPlanName: {
+        color: '#f8f8f8',
+        fontSize: 11,
+        fontWeight: '700',
+        textAlign: 'center',
+        paddingHorizontal: 5,
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+        lineHeight: 14
+    },
+
+    // Trust Section
+    trustSection: {
+        marginTop: 20,
+        marginBottom: 30,
+        alignItems: 'center',
+        width: '100%'
+    },
+    trustItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        marginBottom: 20,
+        width: 260
+    },
+    trustIcon: {
+        width: 50,
+        textAlign: 'center',
+        marginRight: 15
+    },
+    trustLabel: {
+        color: '#FCD34D',
+        fontSize: 14,
+        fontWeight: 'bold',
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
+        marginBottom: 2
+    },
+    trustValue: {
+        color: '#fff',
+        fontSize: 22,
+        fontWeight: '900',
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
+        letterSpacing: 1
+    },
 
     emptyText: { textAlign: 'center', color: COLORS?.secondary, marginTop: 40 },
 

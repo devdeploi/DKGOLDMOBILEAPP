@@ -169,7 +169,7 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
     const activePlansWithSubs = plans.filter(p => p.subscribers && p.subscribers.length > 0);
     const sortedBySubs = [...activePlansWithSubs].sort((a, b) => b.subscribers.length - a.subscribers.length);
 
-    const chartColors = [COLORS?.primary, '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#F472B6'];
+    const chartColors = ['#DC2626', '#FBBF24', '#F97316', '#059669', '#1E3A8A', '#4F46E5', '#D946EF'];
     const pieData = sortedBySubs.map((plan, index) => ({
         name: plan.planName,
         population: plan.subscribers.length,
@@ -188,6 +188,27 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
             isPlaceholder: true
         });
     }
+
+    const totalGoldSavedUnlimited = useMemo(() => {
+        let gold = 0;
+        plans.forEach(plan => {
+            const isUnlimited = plan.planName?.toLowerCase().includes('unlimited') || plan.planName?.toLowerCase().includes('infinity') || plan.type === 'unlimited';
+            if (isUnlimited) {
+                if (plan.subscribers) {
+                    plan.subscribers.forEach(sub => {
+                        if (sub.status === 'active' || plan.status === 'active') {
+                            gold += (sub.totalGoldWeight || 0) - (sub.deliveredGoldWeight || 0);
+                        }
+                    });
+                }
+            }
+        });
+        return gold.toFixed(3);
+    }, [plans]);
+
+    const totalCollection = useMemo(() => {
+        return (stats.activeUserCollection || 0) + (stats.settledAmount || 0);
+    }, [stats]);
 
     // 2. Users List for Speedometer
     const usersList = useMemo(() => {
@@ -447,71 +468,72 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                 </View> */}
 
                 {/* Stats Grid - Updated with specific request items */}
-                <View style={styles.minimalStats}>
+                <View style={[styles.minimalStats, { paddingHorizontal: 10 }]}>
                     <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Subscribers</Text>
+                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Subscribers</Text>
                         {showLoader ? (
-                            <RandomNumberLoader value={null} style={styles.statValue} />
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} />
                         ) : (
-                            <Text style={styles.statValue}>{stats.totalEnrolled || 0}</Text>
+                            <Text style={[styles.statValue, { fontSize: 11 }]}>{stats.totalEnrolled || 0}</Text>
                         )}
                     </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Active Collection</Text>
+                    {/* <View style={styles.statBox}>
+                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 9 }]}>Total Collection</Text>
                         {showLoader ? (
-                            <RandomNumberLoader value={null} style={styles.statValue} isCurrency={true} />
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} isCurrency={true} />
                         ) : (
-                            <Text style={styles.statValue}>{formatCurrencyCompact(stats.activeUserCollection - deliveryStats.total)}</Text>
+                            <Text style={[styles.statValue, { fontSize: 11 }]}>{totalCollection.toLocaleString()}</Text>
+                        )}
+                    </View> */}
+                    <View style={styles.statBox}>
+                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Active Collection</Text>
+                        {showLoader ? (
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} isCurrency={true} />
+                        ) : (
+                            <Text style={[styles.statValue, { fontSize: 11 }]}>{(stats.activeUserCollection - deliveryStats.total).toLocaleString()}</Text>
                         )}
                     </View>
-                    <View style={styles.statDivider} />
                     <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Settled Amount</Text>
+                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Settled Amount</Text>
                         {showLoader ? (
-                            <RandomNumberLoader value={null} style={styles.statValue} isCurrency={true} />
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} isCurrency={true} />
                         ) : (
-                            <Text style={styles.statValue}>{formatCurrencyCompact(stats.settledAmount + deliveryStats.total)}</Text>
+                            <Text style={[styles.statValue, { fontSize: 11 }]}>{(stats.settledAmount + deliveryStats.total).toLocaleString()}</Text>
                         )}
+                    </View>
+                    <View style={styles.statBox}>
+                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Gold Saved</Text>
+                        {showLoader ? (
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} />
+                        ) : (
+                            <Text style={[styles.statValue, { fontSize: 11 }]}>{totalGoldSavedUnlimited}gm</Text>
+                        )}
+                    </View>
+                </View>
+                {/* Bar Chart - Plan Distribution */}
+                <View style={styles.sectionCard}>
+                    <Text style={styles.sectionTitle}>Plan Distribution</Text>
+                    <View style={{ marginTop: 15 }}>
+                        {pieData.filter(p => !p.isPlaceholder).map((item, index) => {
+                            const maxPop = Math.max(...pieData.map(p => p.population), 1);
+                            const widthPercent = Math.max((item.population / maxPop) * 100, 2);
+                            return (
+                                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                    <View style={{ width: 150 }}>
+                                        <View style={{ width: `${widthPercent}%`, backgroundColor: item.color, height: 14 }} />
+                                    </View>
+                                    <Text style={{ fontSize: 10, color: '#333', marginLeft: 8 }}>
+                                        {item.name} ({item.population})
+                                    </Text>
+                                </View>
+                            );
+                        })}
                     </View>
                 </View>
 
                 <Calculator />
 
-                {/* Donut Chart - Plan Distribution */}
-                <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Plan Distribution</Text>
-                    <View style={styles.donutContainer}>
-                        <PieChart
-                            data={pieData.map(item => item.isPlaceholder ? { ...item, population: 1 } : item)}
-                            width={width}
-                            height={220}
-                            chartConfig={{
-                                color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                            }}
-                            accessor={"population"}
-                            backgroundColor={"transparent"}
-                            paddingLeft={width / 4}
-                            absolute
-                            hasLegend={false}
-                        />
-                        {/* <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}>
-                            <View style={styles.donutHoleContent}>
-                                <Text style={styles.donutTotal}>{stats.totalEnrolled}</Text>
-                                <Text style={styles.donutLabel}>Users</Text>
-                            </View>
-                        </View> */}
-                    </View>
-                    <View style={styles.legendContainer}>
-                        {pieData.map((item, idx) => (
-                            <View key={idx} style={styles.legendRow}>
-                                <View style={[styles.legendDot, { backgroundColor: item.color }]} />
-                                <Text style={styles.legendText} numberOfLines={1}>{item.name}</Text>
-                                <Text style={styles.legendValue}>({item.population})</Text>
-                            </View>
-                        ))}
-                    </View>
-                </View>
+                
 
                 {/* Payment Progress Speedometer */}
                 <View style={styles.sectionCard}>
@@ -914,7 +936,7 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     statLabel: {
-        fontSize: 11,
+        fontSize: 13,
         color: '#94A3B8',
         fontWeight: '600',
         marginBottom: 4

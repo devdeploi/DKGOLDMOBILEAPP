@@ -2,9 +2,10 @@
 import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import axios from 'axios';
-import { APIURL } from '../constants/api';
+import { APIURL, BASE_URL } from '../constants/api';
+import RNFS from 'react-native-fs';
 import { COLORS } from '../styles/theme';
-import { Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, ToastAndroid } from 'react-native';
 
 class FCMService {
     async requestUserPermission() {
@@ -89,6 +90,96 @@ class FCMService {
         });
     }
 
+    
+    async handleBackgroundDataMessage(remoteMessage) {
+        console.log('FCM remoteMessage:', JSON.stringify(remoteMessage));
+        if (remoteMessage?.data?.type === 'pdf_export_progress') {
+            const progress = parseInt(remoteMessage.data.progress, 10);
+            
+            if (progress >= 0 && progress < 100) {
+                console.log(`[PDF Export] Progress update: ${progress}%`);
+                // Show progress bar
+                await notifee.displayNotification({
+                    id: 'pdf_export',
+                    title: 'Exporting PDF',
+                    body: 'Your payment report is being generated...',
+                    android: {
+                        channelId: 'default',
+                        onlyAlertOnce: true,
+                        ongoing: true, // Keep it pinned while exporting
+                        progress: {
+                            max: 100,
+                            current: progress,
+                        },
+                    },
+                });
+            } else if (progress === 100) {
+                console.log(`[PDF Export] Progress complete (100%). Preparing to download.`);
+                // Download file
+                const downloadUrl = remoteMessage.data.downloadUrl;
+                if (downloadUrl) {
+                    const fullUrl = `${BASE_URL}${downloadUrl}`;
+                    const cleanFileName = `Payment_Report_${new Date().getTime()}`;
+                    const downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanFileName}.pdf`;
+                    console.log(`[PDF Export] Downloading file from ${fullUrl} to ${downloadPath}`);
+
+                    try {
+                        await notifee.displayNotification({
+                            id: 'pdf_export',
+                            title: 'Downloading PDF',
+                            body: 'Saving to your device...',
+                            android: {
+                                channelId: 'default',
+                                onlyAlertOnce: true,
+                                progress: { indeterminate: true },
+                            },
+                        });
+
+                        await RNFS.downloadFile({
+                            fromUrl: fullUrl,
+                            toFile: downloadPath,
+                        }).promise;
+                        console.log(`[PDF Export] Download successful! Saved at ${downloadPath}`);
+
+                        if (Platform.OS === 'android') {
+                            ToastAndroid.show('Report downloaded to Downloads folder!', ToastAndroid.LONG);
+                        }
+
+                        // Final Notification
+                        await notifee.displayNotification({
+                            id: 'pdf_export',
+                            title: 'Export Complete',
+                            body: 'Payment report has been saved to your Downloads folder.',
+                            android: {
+                                channelId: 'default',
+                                pressAction: {
+                                    id: 'default',
+                                },
+                            },
+                        });
+                    } catch (err) {
+                        console.error('Failed to download PDF:', err);
+                        await notifee.displayNotification({
+                            id: 'pdf_export',
+                            title: 'Export Failed',
+                            body: 'Could not download the generated PDF.',
+                            android: { channelId: 'default' },
+                        });
+                    }
+                }
+            } else if (progress < 0) {
+                await notifee.displayNotification({
+                    id: 'pdf_export',
+                    title: 'Export Failed',
+                    body: 'There was an error generating the PDF on the server.',
+                    android: { channelId: 'default' },
+                });
+            }
+        } else {
+            await this.onMessageReceived(remoteMessage);
+        }
+    }
+
     async onMessageReceived(remoteMessage) {
         // Display a notification
         await this.displayLocalNotification(
@@ -116,7 +207,7 @@ class FCMService {
     registerForegroundHandler() {
         return messaging().onMessage(async remoteMessage => {
             if (Platform.OS === 'android') {
-                await this.onMessageReceived(remoteMessage);
+                await this.handleBackgroundDataMessage(remoteMessage);
             }
             // iOS: do nothing, let the OS handle it
         });
