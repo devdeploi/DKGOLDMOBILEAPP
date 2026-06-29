@@ -32,6 +32,12 @@ import { useGoldRate } from '../../context/GoldRateContext';
 
 const { width } = Dimensions.get('window');
 
+const isPlanUnlimited = (plan) => {
+    if (!plan) return false;
+    const planNameStr = (plan.planName || '').toLowerCase();
+    return plan.type === 'unlimited' || plan.durationMonths === 0 || planNameStr.includes('unlimited') || planNameStr.includes('infinity');
+};
+
 const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     // We assume only one merchant is relevant or we pick the first one
     const merchant = merchants && merchants.length > 0 ? merchants[0] : null;
@@ -111,7 +117,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         }
 
         setSelectedPlanForSub(plan);
-        if (plan.type === 'unlimited') {
+        if (isPlanUnlimited(plan)) {
             setSubscriptionAmount('500'); // Minimum 500
         } else {
             setSubscriptionAmount('');
@@ -148,11 +154,19 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
             return;
         }
 
-        const amount = selectedPlanForSub?.type === 'unlimited' ? subscriptionAmount : selectedPlanForSub?.monthlyAmount;
+        const amount = isPlanUnlimited(selectedPlanForSub) ? subscriptionAmount : selectedPlanForSub?.monthlyAmount;
 
-        if (!amount || isNaN(amount) || Number(amount) <= 0) {
-            Alert.alert("Error", "Please enter a valid amount.");
-            return;
+        if (isPlanUnlimited(selectedPlanForSub)) {
+            const numAmount = Number(amount);
+            if (!amount || isNaN(amount) || numAmount < 500 || numAmount > 100000) {
+                Alert.alert("Error", "Investment amount for unlimited plans must be between ₹500 and ₹1,00,000.");
+                return;
+            }
+        } else {
+            if (!amount || isNaN(amount) || Number(amount) <= 0) {
+                Alert.alert("Error", "Please enter a valid amount.");
+                return;
+            }
         }
 
         const params = `pa=${encodeURIComponent(merchant.upiId)}&pn=${encodeURIComponent(merchant.name || 'Merchant')}&am=${Number(amount).toFixed(2)}&cu=INR&tn=${encodeURIComponent('DKGold Plan Payment')}`;
@@ -194,16 +208,19 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     };
 
     const submitSubscription = async () => {
-        let amountToPay = selectedPlanForSub?.type === 'unlimited' ? subscriptionAmount : selectedPlanForSub?.monthlyAmount;
+        let amountToPay = isPlanUnlimited(selectedPlanForSub) ? subscriptionAmount : selectedPlanForSub?.monthlyAmount;
 
-        if (selectedPlanForSub?.type === 'unlimited' && (!amountToPay || isNaN(amountToPay) || Number(amountToPay) < 500)) {
-            Alert.alert("Error", "Minimum investment amount for unlimited plans is ₹500.");
-            return;
-        }
-
-        if (!amountToPay || isNaN(amountToPay) || Number(amountToPay) <= 0) {
-            Alert.alert("Error", "Please enter a valid amount.");
-            return;
+        if (isPlanUnlimited(selectedPlanForSub)) {
+            const numAmount = Number(amountToPay);
+            if (!amountToPay || isNaN(amountToPay) || numAmount < 500 || numAmount > 100000) {
+                Alert.alert("Error", "Investment amount for unlimited plans must be between ₹500 and ₹1,00,000.");
+                return;
+            }
+        } else {
+            if (!amountToPay || isNaN(amountToPay) || Number(amountToPay) <= 0) {
+                Alert.alert("Error", "Please enter a valid amount.");
+                return;
+            }
         }
 
         setSubmitting(true);
@@ -557,21 +574,26 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
 
                             <View style={styles.upiCard}>
                                 <Text style={styles.upiLabel}>Payment Details</Text>
-                                {selectedPlanForSub?.type === 'unlimited' ? (
+                                {isPlanUnlimited(selectedPlanForSub) ? (
                                     <View style={{ marginBottom: 15 }}>
-                                        <Text style={styles.label}>Enter Investment Amount (Min ₹500)</Text>
+                                        <Text style={styles.label}>Enter Investment Amount (₹500 - ₹1,00,000)</Text>
                                         <TextInput
                                             style={styles.input}
-                                            placeholder="Minimum ₹500"
+                                            placeholder="Minimum ₹500, Maximum ₹1,00,000"
                                             value={subscriptionAmount}
                                             onChangeText={setSubscriptionAmount}
                                             keyboardType="numeric"
                                         />
+                                        {subscriptionAmount && (Number(subscriptionAmount) < 500 || Number(subscriptionAmount) > 100000) && (
+                                            <Text style={{ color: '#dc3545', fontSize: 12, marginTop: 4, fontWeight: '600' }}>
+                                                ⚠️ Amount must be between ₹500 and ₹1,00,000.
+                                            </Text>
+                                        )}
                                     </View>
                                 ) : (
                                     <Text style={styles.helperText}>Pay ₹{selectedPlanForSub?.monthlyAmount} via Razorpay securely.</Text>
                                 )}
-                                {(selectedPlanForSub?.returnType?.toLowerCase() === 'gold' || selectedPlanForSub?.type === 'unlimited') && goldRate > 0 && (
+                                {(selectedPlanForSub?.returnType?.toLowerCase() === 'gold' || isPlanUnlimited(selectedPlanForSub)) && goldRate > 0 && (
                                     <View style={{ marginTop: 15, marginBottom: 15, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
                                         <Text style={[styles.label, { color: '#92400E', marginBottom: 8 }]}>Applied Gold Rate (₹/gm)</Text>
                                         <View style={[styles.input, { backgroundColor: '#F3F4F6', borderColor: '#FCD34D', marginBottom: 12, height: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
@@ -580,17 +602,17 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                                             </Text>
                                             <Icon name="lock" size={12} color="#999" />
                                         </View>
-
+ 
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <Text style={{ fontSize: 12, color: '#92400E', fontWeight: 'bold' }}>Allocated Gold Weight:</Text>
                                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS?.dark }}>
-                                                {((selectedPlanForSub?.type === 'unlimited' ? Number(subscriptionAmount) : selectedPlanForSub?.monthlyAmount) / (lockedGoldRate || goldRate)).toFixed(3)}g
+                                                {((isPlanUnlimited(selectedPlanForSub) ? Number(subscriptionAmount) : selectedPlanForSub?.monthlyAmount) / (lockedGoldRate || goldRate)).toFixed(3)}g
                                             </Text>
                                         </View>
                                     </View>
                                 )}
                             </View>
-
+ 
                             <View style={styles.formGroup}>
                                 <Text style={styles.label}>Notes (Optional)</Text>
                                 <TextInput
@@ -600,11 +622,11 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                                     onChangeText={setSubNote}
                                 />
                             </View>
-
+ 
                             {(() => {
                                 const isSubPayDisabled = submitting || 
-                                    (selectedPlanForSub?.type === 'unlimited' 
-                                        ? (!subscriptionAmount || isNaN(subscriptionAmount) || Number(subscriptionAmount) < 500)
+                                    (isPlanUnlimited(selectedPlanForSub) 
+                                        ? (!subscriptionAmount || isNaN(subscriptionAmount) || Number(subscriptionAmount) < 500 || Number(subscriptionAmount) > 100000)
                                         : false);
                                 return (
                                     <TouchableOpacity

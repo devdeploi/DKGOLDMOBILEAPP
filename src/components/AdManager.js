@@ -86,6 +86,16 @@ const SkeletonAdCard = () => {
     );
 };
 
+const formatDateToIndian = (dateObj) => {
+    if (!dateObj) return '';
+    const date = new Date(dateObj);
+    if (isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
 const AdManager = ({ user }) => {
     const [ads, setAds] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -405,11 +415,11 @@ const AdManager = ({ user }) => {
                 <View style={styles.infoGrid}>
                     <View style={styles.infoItem}>
                         <Text style={styles.infoLabel}>Start Date</Text>
-                        <Text style={styles.infoValue}>{new Date(activeAd.startDate).toLocaleDateString()}</Text>
+                        <Text style={styles.infoValue}>{formatDateToIndian(activeAd.startDate)}</Text>
                     </View>
                     <View style={styles.infoItem}>
                         <Text style={styles.infoLabel}>End Date</Text>
-                        <Text style={styles.infoValue}>{new Date(activeAd.endDate).toLocaleDateString()}</Text>
+                        <Text style={styles.infoValue}>{formatDateToIndian(activeAd.endDate)}</Text>
                     </View>
                     {/* <View style={styles.infoItem}>
                         <Text style={styles.infoLabel}>Link</Text>
@@ -542,14 +552,14 @@ const AdManager = ({ user }) => {
                                 <View style={styles.col}>
                                     <Text style={styles.label}>Start Date</Text>
                                     <View style={[styles.dateInput, { backgroundColor: '#f0f2f5' }]}>
-                                        <Text style={[styles.dateText, { color: COLORS?.secondary }]}>{startDate.toLocaleDateString()}</Text>
+                                        <Text style={[styles.dateText, { color: COLORS?.secondary }]}>{formatDateToIndian(startDate)}</Text>
                                         <Icon name="calendar-alt" size={14} color={COLORS?.secondary} />
                                     </View>
                                 </View>
                                 <View style={styles.col}>
                                     <Text style={styles.label}>End Date</Text>
                                     <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
-                                        <Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text>
+                                        <Text style={styles.dateText}>{formatDateToIndian(endDate)}</Text>
                                         <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
                                     </TouchableOpacity>
                                 </View>

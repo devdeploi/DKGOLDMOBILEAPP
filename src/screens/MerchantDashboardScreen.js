@@ -30,8 +30,6 @@ import UnsubscribedUsersList from '../components/UnsubscribedUsersList';
 import MerchantProfile from '../components/MerchantProfile';
 import AdManager from '../components/AdManager';
 import GoldTab from '../components/dashboard/GoldTab';
-import MerchantSummaryTab from '../components/dashboard/MerchantSummaryTab';
-import MerchantReports from '../components/MerchantReports';
 import CustomAlert from '../components/CustomAlert';
 
 const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds }) => {
@@ -336,10 +334,6 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 return <UnsubscribedUsersList user={stabilizedUser} />;
             case 'ads':
                 return <AdManager user={stabilizedUser} />;
-            case 'summary':
-                return <MerchantSummaryTab user={stabilizedUser} />;
-            case 'reports':
-                return <MerchantReports user={stabilizedUser} plans={plans} />;
             case 'profile':
                 return (
                     <MerchantProfile
@@ -430,24 +424,6 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                             <Text style={styles.sidebarRole}>Merchant Portal</Text>
                         </View>
                         <View style={styles.sidebarMenu}>
-                            {!user?.isStaff && (
-                                <>
-                                    <TouchableOpacity
-                                        style={[styles.sidebarMenuItem, activeTab === 'reports' && styles.sidebarActiveMenuItem]}
-                                        onPress={() => { setActiveTab('reports'); closeSidebar(); }}
-                                    >
-                                        <Icon name="file-alt" size={18} color={activeTab === 'reports' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
-                                        <Text style={[styles.sidebarMenuText, activeTab === 'reports' && styles.sidebarActiveMenuText]}>Reports</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.sidebarMenuItem, activeTab === 'summary' && styles.sidebarActiveMenuItem]}
-                                        onPress={() => { setActiveTab('summary'); closeSidebar(); }}
-                                    >
-                                        <Icon name="file-invoice-dollar" size={18} color={activeTab === 'summary' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
-                                        <Text style={[styles.sidebarMenuText, activeTab === 'summary' && styles.sidebarActiveMenuText]}>Summary</Text>
-                                    </TouchableOpacity>
-                                </>
-                            )}
                             <TouchableOpacity
                                 style={[styles.sidebarMenuItem, activeTab === 'gold' && styles.sidebarActiveMenuItem]}
                                 onPress={() => { setActiveTab('gold'); closeSidebar(); }}

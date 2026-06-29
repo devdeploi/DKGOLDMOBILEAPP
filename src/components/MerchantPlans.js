@@ -214,6 +214,14 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
     };
 
     const handleDeleteSubscriber = (sub) => {
+        if (user?.isStaff) {
+            Toast.show({
+                type: 'error',
+                text1: 'Permission Denied',
+                text2: 'Staff members are not allowed to delete subscribers.'
+            });
+            return;
+        }
         setAlertConfig({
             visible: true,
             title: 'Delete Subscriber',
@@ -809,19 +817,21 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                                                             </View>
                                                         </View>
                                                         {/* Delete subscriber button */}
-                                                        <TouchableOpacity
-                                                            onPress={() => handleDeleteSubscriber(sub)}
-                                                            style={{
-                                                                width: 32,
-                                                                height: 32,
-                                                                borderRadius: 8,
-                                                                backgroundColor: '#FEE2E2',
-                                                                justifyContent: 'center',
-                                                                alignItems: 'center',
-                                                            }}
-                                                        >
-                                                            <Icon name="trash" size={13} color="#DC2626" />
-                                                        </TouchableOpacity>
+                                                        {!user?.isStaff && (
+                                                            <TouchableOpacity
+                                                                onPress={() => handleDeleteSubscriber(sub)}
+                                                                style={{
+                                                                    width: 32,
+                                                                    height: 32,
+                                                                    borderRadius: 8,
+                                                                    backgroundColor: '#FEE2E2',
+                                                                    justifyContent: 'center',
+                                                                    alignItems: 'center',
+                                                                }}
+                                                            >
+                                                                <Icon name="trash" size={13} color="#DC2626" />
+                                                            </TouchableOpacity>
+                                                        )}
                                                     </View>
                                                 </View>
                                             )}

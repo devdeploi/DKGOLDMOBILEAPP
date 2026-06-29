@@ -89,6 +89,23 @@ const TermsAndConditions = ({ visible, onClose, onAccept }) => {
                             </View>
                         </View>
 
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>4. App Development</Text>
+                            <View style={styles.card}>
+                                <Text style={styles.cardText}>
+                                    This application was built and developed by Safpro Technology Solutions.
+                                </Text>
+                                <View style={styles.bulletPoint}>
+                                    <Icon name="code" size={12} color={COLORS?.primary} style={{ marginTop: 4, marginRight: 8 }} />
+                                    <Text style={styles.bulletText}>Safpro Technology Solutions is only responsible for the technical creation of the app.</Text>
+                                </View>
+                                <View style={styles.bulletPoint}>
+                                    <Icon name="ban" size={12} color={COLORS?.primary} style={{ marginTop: 4, marginRight: 8 }} />
+                                    <Text style={styles.bulletText}>Safpro Technology Solutions has no involvement in DK Gold's business, payments, or policies, and there is no other kind of contact between app users and Safpro Technology Solutions.</Text>
+                                </View>
+                            </View>
+                        </View>
+
                         <View style={{ height: 40 }} />
                     </ScrollView>
 

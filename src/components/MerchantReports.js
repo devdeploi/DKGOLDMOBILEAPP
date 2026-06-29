@@ -80,7 +80,7 @@ const MerchantReports = ({ user, plans }) => {
 
             let url = `${APIURL}/payments/search/range?fromDate=${fromDateStr}&toDate=${toDateStr}`;
             if (isAllTime) {
-                url = `${APIURL}/payments/search/range?allData=true`;
+                url = `${APIURL}/payments/search/range?allData=true&fromDate=2000-01-01&toDate=2100-01-01`;
             }
             if (selectedPlanId !== 'all') {
                 url += `&planId=${selectedPlanId}`;
@@ -131,8 +131,8 @@ const MerchantReports = ({ user, plans }) => {
             const token = user.token;
 
             await axios.post(`${APIURL}/payments/export-pdf-background`, {
-                fromDate: isAllTime ? null : startDate.toISOString(),
-                toDate: isAllTime ? null : endDate.toISOString(),
+                fromDate: isAllTime ? '2000-01-01T00:00:00.000Z' : startDate.toISOString(),
+                toDate: isAllTime ? '2100-01-01T23:59:59.999Z' : endDate.toISOString(),
                 planId: selectedPlanId,
                 allData: isAllTime.toString(),
                 fcmToken: fcmToken
@@ -225,13 +225,13 @@ const MerchantReports = ({ user, plans }) => {
 
                         {/* Data Scope Selector */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.scopeBtn, !isAllTime && styles.scopeBtnActive]}
                                 onPress={() => setIsAllTime(false)}
                             >
                                 <Text style={[styles.scopeBtnText, !isAllTime && styles.scopeBtnTextActive]}>Date Range</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.scopeBtn, isAllTime && styles.scopeBtnActive]}
                                 onPress={() => setIsAllTime(true)}
                             >
@@ -328,7 +328,7 @@ const MerchantReports = ({ user, plans }) => {
                         loading ? (
                             <View style={{ padding: 40, alignItems: 'center' }}>
                                 <ActivityIndicator size="large" color="#D4AF37" />
-                                <Text style={{ marginTop: 10, color: '#666' }}>Fetching reports...</Text>
+                                <Text style={{ marginTop: 10, color: '#fff' }}>Fetching reports...</Text>
                             </View>
                         ) : (
                             <View style={styles.emptyState}>

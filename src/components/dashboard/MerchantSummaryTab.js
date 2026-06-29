@@ -16,13 +16,13 @@ const { width } = Dimensions.get('window');
 const MerchantSummaryTab = ({ user }) => {
     const [loading, setLoading] = useState(false);
     const [payments, setPayments] = useState([]);
-    
+
     // Filters
     const [isAllData, setIsAllData] = useState(true);
     const [fromDate, setFromDate] = useState(new Date());
     const [toDate, setToDate] = useState(new Date());
     const [paymentType, setPaymentType] = useState('all');
-    
+
     // Modals
     const [isFromPickerVisible, setFromPickerVisible] = useState(false);
     const [isToPickerVisible, setToPickerVisible] = useState(false);
@@ -57,9 +57,11 @@ const MerchantSummaryTab = ({ user }) => {
             setLoading(true);
             const token = user.token;
             let url = `${APIURL}/payments/search/range?allData=${isAllData}&paymentType=${paymentType}`;
-            
+
             if (!isAllData) {
                 url += `&fromDate=${fromDate.toISOString()}&toDate=${toDate.toISOString()}`;
+            } else {
+                url += `&fromDate=2000-01-01T00:00:00.000Z&toDate=2100-01-01T23:59:59.999Z`;
             }
 
             const { data } = await axios.get(url, {
@@ -67,14 +69,14 @@ const MerchantSummaryTab = ({ user }) => {
             });
 
             const fetchedPayments = data.payments || [];
-            
+
             // Calculate totals
             let calcTotals = { CASH: 0, UPI: 0, offline: 0, online: 0, totalAmount: 0 };
-            
+
             fetchedPayments.forEach(payment => {
                 const amount = Number(payment.amount) || 0;
                 calcTotals.totalAmount += amount;
-                
+
                 const type = payment.type || 'offline';
                 if (type.toUpperCase() === 'CASH') calcTotals.CASH += amount;
                 else if (type.toUpperCase() === 'UPI') calcTotals.UPI += amount;
@@ -146,16 +148,16 @@ const MerchantSummaryTab = ({ user }) => {
     const renderHeader = () => (
         <View style={styles.headerContainer}>
             <Text style={styles.title}>Summary Report</Text>
-            
+
             <View style={styles.filterSection}>
                 <View style={styles.switchRow}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={[styles.toggleBtn, isAllData ? styles.toggleBtnActive : null]}
                         onPress={() => setIsAllData(true)}
                     >
                         <Text style={[styles.toggleBtnText, isAllData ? styles.toggleBtnTextActive : null]}>All Data</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={[styles.toggleBtn, !isAllData ? styles.toggleBtnActive : null]}
                         onPress={() => setIsAllData(false)}
                     >
@@ -169,7 +171,7 @@ const MerchantSummaryTab = ({ user }) => {
                             <Text style={styles.dateText}>{fromDate.toLocaleDateString()}</Text>
                             <Icon name="calendar-alt" size={16} color="#666" />
                         </TouchableOpacity>
-                        <Text style={{marginHorizontal: 10, color: '#333'}}>to</Text>
+                        <Text style={{ marginHorizontal: 10, color: '#333' }}>to</Text>
                         <TouchableOpacity style={styles.dateInput} onPress={() => setToPickerVisible(true)}>
                             <Text style={styles.dateText}>{toDate.toLocaleDateString()}</Text>
                             <Icon name="calendar-alt" size={16} color="#666" />
@@ -179,7 +181,7 @@ const MerchantSummaryTab = ({ user }) => {
 
                 <View style={styles.typeFilterRow}>
                     {['all', 'CASH', 'UPI', 'OFFLINE', 'ONLINE'].map((type) => (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             key={type}
                             style={[styles.typeChip, paymentType === type && styles.typeChipActive]}
                             onPress={() => setPaymentType(type)}
@@ -223,7 +225,7 @@ const MerchantSummaryTab = ({ user }) => {
                     <Text style={styles.cardValue}>₹{totals.online}</Text>
                 </View>
             </View>
-            
+
             <View style={styles.totalHeader}>
                 <Text style={styles.totalHeaderText}>Total Collection: ₹{totals.totalAmount}</Text>
             </View>
@@ -237,8 +239,8 @@ const MerchantSummaryTab = ({ user }) => {
             <View style={styles.paymentLeft}>
                 <Text style={styles.paymentName}>{item.user?.name || 'Unknown'}</Text>
                 <Text style={styles.paymentDate}>{new Date(item.paymentDate || item.createdAt).toLocaleDateString()}</Text>
-                <Text style={{fontSize: 12, color: '#666', marginTop: 2}}>Mobile: {item.user?.phone || 'N/A'}</Text>
-                <Text style={{fontSize: 12, color: '#666', marginBottom: 4}}>Acc No: {item.subAccNo || 'N/A'}</Text>
+                <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Mobile: {item.user?.phone || 'N/A'}</Text>
+                <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Acc No: {item.subAccNo || 'N/A'}</Text>
                 <View style={styles.typeBadge}>
                     <Text style={styles.typeBadgeText}>{item.type || 'OFFLINE'}</Text>
                 </View>

@@ -213,7 +213,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                 </View>
 
                 {/* Recent Activity List - Horizontal Scroll */}
-                <Text style={styles.sectionTitle}>Your Active Chits</Text>
+                {/* <Text style={styles.sectionTitle}>Your Active Chits</Text> */}
                 {recentActivity.length > 0 ? (
                     <View>
                         <ScrollView
@@ -268,7 +268,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                                 </View>
                                             </View>
                                             <View style={styles.newPlanCardRight}>
-                                                <Icon name="arrow-trend-up" size={24} color="#6B8E23" style={{marginBottom: 5}} />
+                                                <Icon name="chart-line" size={34} color="#6B8E23" style={{marginBottom: 5}} />
                                                 <Icon name="coins" size={28} color="#EBCB28" style={{opacity: 0.9}} />
                                                 <Icon name="seedling" size={16} color="#6B8E23" style={{marginTop: -10}} />
                                             </View>
@@ -330,7 +330,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                 <Calculator />
 
                 {/* Gold Equivalence / Locked Gold Value */}
-                {stats.hasUnlimitedPlan ? (
+                {/* {stats.hasUnlimitedPlan ? (
                     <View style={styles.goldVaultCard}>
                         <View style={styles.vaultHeader}>
                             <View style={styles.vaultTitleCol}>
@@ -403,7 +403,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                             Join our Unlimited or Gold Return plans to secure digital gold at daily locked rates directly in your vault.
                         </Text>
                     </View>
-                )}
+                )} */}
 
                 {/* Plan Distribution (Pie) */}
                 {planDistribution.length > 0 && (

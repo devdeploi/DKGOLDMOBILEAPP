@@ -562,14 +562,17 @@ const AnalyticsTab = ({ user }) => {
         // Always use the user-entered customAmount (editable for all plan types)
         const amountToPay = customAmount;
 
-        if (selectedPlanForOffline?.type === 'unlimited' && (!amountToPay || isNaN(amountToPay) || Number(amountToPay) < 500)) {
-            showAlert('Error', 'Minimum investment amount for unlimited plans is ₹500.', 'warning');
-            return;
-        }
-
-        if (!amountToPay || isNaN(amountToPay) || Number(amountToPay) <= 0) {
-            showAlert('Invalid Amount', 'Please enter a valid payment amount.', 'warning');
-            return;
+        if (isPlanUnlimited(selectedPlanForOffline)) {
+            const numAmount = Number(amountToPay);
+            if (!amountToPay || isNaN(amountToPay) || numAmount < 500 || numAmount > 100000) {
+                showAlert('Error', 'Investment amount for unlimited plans must be between ₹500 and ₹1,00,000.', 'warning');
+                return;
+            }
+        } else {
+            if (!amountToPay || isNaN(amountToPay) || Number(amountToPay) <= 0) {
+                showAlert('Invalid Amount', 'Please enter a valid payment amount.', 'warning');
+                return;
+            }
         }
 
         setSubmittingOffline(true);
@@ -1246,7 +1249,7 @@ const AnalyticsTab = ({ user }) => {
 
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.inputLabel}>Enter Amount</Text>
-                                    <View style={styles.inputWrapper}>
+                                    <View style={[styles.inputWrapper, !isPlanUnlimited(selectedPlanForOffline) && styles.inputWrapperDisabled]}>
                                         <Text style={styles.currencyPrefix}>₹</Text>
                                         <TextInput
                                             style={styles.flexInput}
@@ -1255,24 +1258,27 @@ const AnalyticsTab = ({ user }) => {
                                             onChangeText={setCustomAmount}
                                             keyboardType="numeric"
                                             placeholderTextColor="#999"
-                                            editable={true}
+                                            editable={isPlanUnlimited(selectedPlanForOffline)}
                                         />
+                                        {!isPlanUnlimited(selectedPlanForOffline) && (
+                                            <Icon name="lock" size={12} color="#9CA3AF" style={{ marginRight: 4 }} />
+                                        )}
                                     </View>
                                     <Text style={styles.inputHint}>
                                         {isPlanUnlimited(selectedPlanForOffline) 
-                                            ? 'Enter investment amount (Minimum ₹500).' 
-                                            : 'Enter any amount you wish to pay towards this plan.'}
+                                            ? 'Enter investment amount (₹500 - ₹1,00,000).' 
+                                            : 'This is a fixed installment amount for your plan.'}
                                     </Text>
                                     {isPlanUnlimited(selectedPlanForOffline) && (
                                         <Text style={{ 
                                             fontSize: 12, 
-                                            color: (customAmount && Number(customAmount) < 500) ? '#dc3545' : '#b45309', 
+                                            color: (customAmount && (Number(customAmount) < 500 || Number(customAmount) > 100000)) ? '#dc3545' : '#b45309', 
                                             marginTop: 6, 
                                             fontWeight: '600' 
                                         }}>
-                                            {(customAmount && Number(customAmount) < 500) 
-                                                ? '⚠️ Minimum investment amount is ₹500.' 
-                                                : 'Note: Minimum investment amount is ₹500.'
+                                            {(customAmount && (Number(customAmount) < 500 || Number(customAmount) > 100000)) 
+                                                ? '⚠️ Amount must be between ₹500 and ₹1,00,000.' 
+                                                : 'Note: Amount must be between ₹500 and ₹1,00,000.'
                                             }
                                         </Text>
                                     )}
@@ -1301,7 +1307,7 @@ const AnalyticsTab = ({ user }) => {
                             {(() => {
                                 const isPayDisabled = submittingOffline || 
                                     (isPlanUnlimited(selectedPlanForOffline) 
-                                        ? (!customAmount || isNaN(customAmount) || Number(customAmount) < 500)
+                                        ? (!customAmount || isNaN(customAmount) || Number(customAmount) < 500 || Number(customAmount) > 100000)
                                         : (!customAmount || isNaN(customAmount) || Number(customAmount) <= 0));
                                 return (
                                     <TouchableOpacity

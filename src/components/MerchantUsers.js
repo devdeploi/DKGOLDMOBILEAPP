@@ -155,16 +155,44 @@ const MerchantUsers = ({ user }) => {
         setSubmittingSettlement(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            await axios.post(`${APIURL}/chit-plans/${selectedWithdrawalRequest.plan._id}/request-settlement-otp`, {
+                userId: selectedWithdrawalRequest.user._id
+            }, config);
+
+            // Hide main modal and show OTP modal
+            setSettlementModalVisible(false);
+            setSettlementOtpModalVisible(true);
+            setOtpResendTimer(60);
+            showCustomAlert("OTP Sent", "An OTP has been sent to the customer's mobile number.", "success");
+        } catch (error) {
+            console.error("Failed to send OTP", error);
+            showCustomAlert("Error", error.response?.data?.message || "Failed to send OTP", "error");
+        } finally {
+            setSubmittingSettlement(false);
+        }
+    };
+
+    const verifyAndSettle = async () => {
+        if (!settlementOtp || settlementOtp.length !== 6) {
+            showCustomAlert("Error", "Please enter a valid 6-digit OTP", "error");
+            return;
+        }
+
+        setSubmittingOtp(true);
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
             await axios.post(`${APIURL}/chit-plans/${selectedWithdrawalRequest.plan._id}/settle`, {
                 userId: selectedWithdrawalRequest.user._id,
                 subscriptionId: selectedWithdrawalRequest._id || selectedWithdrawalRequest.subscriberId,
                 amount: settlementForm.amount,
                 settlementType: settlementForm.type,
                 transactionId: settlementForm.transactionId,
-                note: settlementForm.note
+                note: settlementForm.note,
+                otp: settlementOtp
             }, config);
 
-            setSettlementModalVisible(false);
+            setSettlementOtpModalVisible(false);
+            setSettlementOtp('');
             await fetchData();
 
             showCustomAlert("Success", "Settlement processed successfully", "success", [
@@ -178,9 +206,9 @@ const MerchantUsers = ({ user }) => {
             ]);
         } catch (error) {
             console.error("Settlement failed", error);
-            showCustomAlert("Error", "Failed to process settlement", "error");
+            showCustomAlert("Error", error.response?.data?.message || "Failed to process settlement", "error");
         } finally {
-            setSubmittingSettlement(false);
+            setSubmittingOtp(false);
         }
     };
 
@@ -211,6 +239,32 @@ const MerchantUsers = ({ user }) => {
         setSubmittingDelivery(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            // Request OTP for delivery/partial settlement
+            await axios.post(`${APIURL}/chit-plans/${selectedForDelivery.plan._id}/request-settlement-otp`, {
+                userId: selectedForDelivery.user._id
+            }, config);
+
+            setDeliveryModalVisible(false);
+            setDeliveryOtpModalVisible(true);
+            setOtpResendTimer(60);
+            showCustomAlert("OTP Sent", "An OTP has been sent to the customer's mobile number.", "success");
+        } catch (error) {
+            console.error("Failed to send Delivery OTP", error);
+            showCustomAlert("Error", error.response?.data?.message || "Failed to send OTP", "error");
+        } finally {
+            setSubmittingDelivery(false);
+        }
+    };
+
+    const verifyAndDeliver = async () => {
+        if (!deliveryOtp || deliveryOtp.length !== 6) {
+            showCustomAlert("Error", "Please enter a valid 6-digit OTP", "error");
+            return;
+        }
+
+        setSubmittingDeliveryOtp(true);
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
             const body = {
                 userId: selectedForDelivery.user._id,
                 subscriptionId: selectedForDelivery._id || selectedForDelivery.subscriberId,
@@ -220,12 +274,14 @@ const MerchantUsers = ({ user }) => {
                 amount: deliveryForm.amount,
                 paymentIds: deliveryForm.paymentIds,
                 transactionId: deliveryForm.transactionId,
-                notes: deliveryForm.notes
+                notes: deliveryForm.notes,
+                otp: deliveryOtp
             };
 
             await axios.post(`${APIURL}/chit-plans/${selectedForDelivery.plan._id}/deliver`, body, config);
 
-            setDeliveryModalVisible(false);
+            setDeliveryOtpModalVisible(false);
+            setDeliveryOtp('');
             await fetchData();
 
             showCustomAlert("Success", deliveryForm.isPartial ? "Partial delivery recorded" : "Marked as fully delivered", "success", [
@@ -238,8 +294,10 @@ const MerchantUsers = ({ user }) => {
                                 deliveredDate: new Date()
                             });
                         } else {
-                            // Full delivery uses standard receipt or settlement?
-                            // For now let's just show success
+                            generateDeliveryReceipt(selectedForDelivery, {
+                                ...deliveryForm,
+                                deliveredDate: new Date()
+                            });
                         }
                     }
                 },
@@ -249,7 +307,7 @@ const MerchantUsers = ({ user }) => {
             console.error("Delivery failed", error);
             showCustomAlert("Error", error.response?.data?.message || "Failed to process delivery", "error");
         } finally {
-            setSubmittingDelivery(false);
+            setSubmittingDeliveryOtp(false);
         }
     };
 
@@ -431,6 +489,9 @@ const MerchantUsers = ({ user }) => {
         type: 'Cash'
     });
     const [submittingSettlement, setSubmittingSettlement] = useState(false);
+    const [settlementOtpModalVisible, setSettlementOtpModalVisible] = useState(false);
+    const [settlementOtp, setSettlementOtp] = useState('');
+    const [submittingOtp, setSubmittingOtp] = useState(false);
 
     // Delivery State
     const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
@@ -447,6 +508,9 @@ const MerchantUsers = ({ user }) => {
     const [undeliveredPayments, setUndeliveredPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
     const [submittingDelivery, setSubmittingDelivery] = useState(false);
+    const [deliveryOtpModalVisible, setDeliveryOtpModalVisible] = useState(false);
+    const [deliveryOtp, setDeliveryOtp] = useState('');
+    const [submittingDeliveryOtp, setSubmittingDeliveryOtp] = useState(false);
 
     // Proof State
     const [previewProofUrl, setPreviewProofUrl] = useState(null);
@@ -471,6 +535,44 @@ const MerchantUsers = ({ user }) => {
     // null = not checked, { checking: true }, { available: true }, { available: false, ...details }
     const [accNoValidating, setAccNoValidating] = useState(false);
     const accNoDebounceTimer = React.useRef(null);
+
+    const [otpResendTimer, setOtpResendTimer] = useState(0);
+
+    useEffect(() => {
+        let interval;
+        if (otpResendTimer > 0) {
+            interval = setInterval(() => {
+                setOtpResendTimer(prev => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [otpResendTimer]);
+
+    const handleResendOtp = async (type) => {
+        let planId, userId;
+        if (type === 'settlement' && selectedWithdrawalRequest) {
+            planId = selectedWithdrawalRequest.plan._id;
+            userId = selectedWithdrawalRequest.user._id;
+        } else if (type === 'delivery' && selectedForDelivery) {
+            planId = selectedForDelivery.plan._id;
+            userId = selectedForDelivery.user._id;
+        } else {
+            return;
+        }
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+            await axios.post(`${APIURL}/chit-plans/${planId}/request-settlement-otp`, {
+                userId: userId
+            }, config);
+
+            setOtpResendTimer(60);
+            showCustomAlert("OTP Sent", "A new OTP has been sent to the customer's mobile number.", "success");
+        } catch (error) {
+            console.error("Failed to resend OTP", error);
+            showCustomAlert("Error", error.response?.data?.message || "Failed to resend OTP", "error");
+        }
+    };
 
     // --- PDF Generation Logic ---
 
@@ -1235,6 +1337,10 @@ const MerchantUsers = ({ user }) => {
     };
 
     const handleDeletePayment = (paymentId) => {
+        if (user?.isStaff) {
+            showCustomAlert("Permission Denied", "Staff members are not allowed to delete payments.", "error");
+            return;
+        }
         showCustomAlert(
             "Delete Payment?",
             "This will permanently remove this payment record and reverse the subscriber's totals.",
@@ -3061,12 +3167,14 @@ const MerchantUsers = ({ user }) => {
                                                     </TouchableOpacity>
                                                 )}
                                                 {/* Delete payment button */}
-                                                <TouchableOpacity
-                                                    onPress={() => handleDeletePayment(item._id)}
-                                                    style={{ padding: 4 }}
-                                                >
-                                                    <Icon name="trash-alt" size={14} color="#DC2626" />
-                                                </TouchableOpacity>
+                                                {!user?.isStaff && (
+                                                    <TouchableOpacity
+                                                        onPress={() => handleDeletePayment(item._id)}
+                                                        style={{ padding: 4 }}
+                                                    >
+                                                        <Icon name="trash-alt" size={14} color="#DC2626" />
+                                                    </TouchableOpacity>
+                                                )}
                                             </View>
                                         </View>
                                     </View>
@@ -3162,6 +3270,75 @@ const MerchantUsers = ({ user }) => {
                                 )}
                             </TouchableOpacity>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* OTP Verification Modal for Settlement */}
+            <Modal
+                transparent={true}
+                visible={settlementOtpModalVisible}
+                animationType="fade"
+                onRequestClose={() => {
+                    setSettlementOtpModalVisible(false);
+                    setSettlementOtp('');
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { padding: 24, borderRadius: 16 }]}>
+                        <View style={{ alignItems: 'center', marginBottom: 15 }}>
+                            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#f0f4f8', justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
+                                <Icon name="lock" size={28} color={COLORS?.primary} />
+                            </View>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: COLORS?.dark }}>Verify OTP</Text>
+                        </View>
+                        
+                        <Text style={{ textAlign: 'center', marginBottom: 25, color: '#666', fontSize: 14, lineHeight: 20 }}>
+                            Please enter the 6-digit OTP sent to <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedWithdrawalRequest?.user?.name}</Text>'s mobile number to confirm the settlement.
+                        </Text>
+                        
+                        <TextInput
+                            style={[styles.textInput, { fontSize: 28, textAlign: 'center', letterSpacing: 8, paddingVertical: 15, borderRadius: 12, backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#e0e0e0', color: COLORS?.primary, fontWeight: 'bold' }]}
+                            value={settlementOtp}
+                            onChangeText={setSettlementOtp}
+                            keyboardType="numeric"
+                            maxLength={6}
+                            placeholder="------"
+                            placeholderTextColor="#ccc"
+                        />
+
+                        <TouchableOpacity 
+                            style={{ marginTop: 15, alignItems: 'center' }} 
+                            onPress={() => handleResendOtp('settlement')}
+                            disabled={otpResendTimer > 0}
+                        >
+                            <Text style={{ color: otpResendTimer > 0 ? '#aaa' : COLORS?.primary, fontWeight: 'bold', fontSize: 14 }}>
+                                {otpResendTimer > 0 ? `Resend OTP in ${otpResendTimer}s` : 'Resend OTP'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 25 }}>
+                            <TouchableOpacity
+                                style={{ flex: 1, marginRight: 12, backgroundColor: '#f5f5f5', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+                                onPress={() => {
+                                    setSettlementOtpModalVisible(false);
+                                    setSettlementOtp('');
+                                }}
+                            >
+                                <Text style={{ color: '#666', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={{ flex: 1, backgroundColor: COLORS?.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS?.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+                                onPress={verifyAndSettle}
+                                disabled={submittingOtp}
+                            >
+                                {submittingOtp ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Verify & Settle</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -3319,6 +3496,75 @@ const MerchantUsers = ({ user }) => {
                                 )}
                             </TouchableOpacity>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* OTP Verification Modal for Delivery/Partial Release */}
+            <Modal
+                transparent={true}
+                visible={deliveryOtpModalVisible}
+                animationType="fade"
+                onRequestClose={() => {
+                    setDeliveryOtpModalVisible(false);
+                    setDeliveryOtp('');
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { padding: 24, borderRadius: 16 }]}>
+                        <View style={{ alignItems: 'center', marginBottom: 15 }}>
+                            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#f0f4f8', justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
+                                <Icon name="lock" size={28} color={COLORS?.primary} />
+                            </View>
+                            <Text style={{ fontSize: 20, fontWeight: 'bold', color: COLORS?.dark }}>Verify OTP</Text>
+                        </View>
+                        
+                        <Text style={{ textAlign: 'center', marginBottom: 25, color: '#666', fontSize: 14, lineHeight: 20 }}>
+                            Please enter the 6-digit OTP sent to <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedForDelivery?.user?.name}</Text>'s mobile number to confirm the {deliveryForm.isPartial ? 'partial release' : 'delivery'}.
+                        </Text>
+                        
+                        <TextInput
+                            style={[styles.textInput, { fontSize: 28, textAlign: 'center', letterSpacing: 8, paddingVertical: 15, borderRadius: 12, backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#e0e0e0', color: COLORS?.primary, fontWeight: 'bold' }]}
+                            value={deliveryOtp}
+                            onChangeText={setDeliveryOtp}
+                            keyboardType="numeric"
+                            maxLength={6}
+                            placeholder="------"
+                            placeholderTextColor="#ccc"
+                        />
+
+                        <TouchableOpacity 
+                            style={{ marginTop: 15, alignItems: 'center' }} 
+                            onPress={() => handleResendOtp('delivery')}
+                            disabled={otpResendTimer > 0}
+                        >
+                            <Text style={{ color: otpResendTimer > 0 ? '#aaa' : COLORS?.primary, fontWeight: 'bold', fontSize: 14 }}>
+                                {otpResendTimer > 0 ? `Resend OTP in ${otpResendTimer}s` : 'Resend OTP'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 25 }}>
+                            <TouchableOpacity
+                                style={{ flex: 1, marginRight: 12, backgroundColor: '#f5f5f5', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+                                onPress={() => {
+                                    setDeliveryOtpModalVisible(false);
+                                    setDeliveryOtp('');
+                                }}
+                            >
+                                <Text style={{ color: '#666', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={{ flex: 1, backgroundColor: COLORS?.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS?.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+                                onPress={verifyAndDeliver}
+                                disabled={submittingDeliveryOtp}
+                            >
+                                {submittingDeliveryOtp ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Verify & Confirm</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
