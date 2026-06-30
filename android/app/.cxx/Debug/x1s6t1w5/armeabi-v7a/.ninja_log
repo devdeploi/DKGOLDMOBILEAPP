@@ -1,13 +1,13 @@
 # ninja log v5
 7	2030	1782279783238151362	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/EventEmitters.cpp.o	6a365ac9d8d55842
 3159	6989	1782279788199996815	RNCSlider_autolinked_build/CMakeFiles/react_codegen_RNCSlider.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-community/slider/android/build/generated/source/codegen/jni/react/renderer/components/RNCSlider/ComponentDescriptors.cpp.o	c1e9d001c1760e19
-3155	5836	1782279787042807319	RNCSlider_autolinked_build/CMakeFiles/react_codegen_RNCSlider.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-community/slider/common/cpp/react/renderer/components/RNCSlider/RNCSliderMeasurementsManager.cpp.o	285dc06ad867185d
-11496	14054	1782279795266287680	RNRazorpayCheckoutSpec_autolinked_build/CMakeFiles/react_codegen_RNRazorpayCheckoutSpec.dir/react/renderer/components/RNRazorpayCheckoutSpec/ShadowNodes.cpp.o	6cf5a4f4c6ffb609
+7	3155	1782279784366901819	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/Props.cpp.o	ffb032c967913a9
 12327	15178	1782279796391636061	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/ComponentDescriptors.cpp.o	20fb32e80732aa5e
 9877	12705	1782279793916933211	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ComponentDescriptors.cpp.o	83b656f9c6766108
+11496	14054	1782279795266287680	RNRazorpayCheckoutSpec_autolinked_build/CMakeFiles/react_codegen_RNRazorpayCheckoutSpec.dir/react/renderer/components/RNRazorpayCheckoutSpec/ShadowNodes.cpp.o	6cf5a4f4c6ffb609
 2031	6960	1782279788123698733	RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/Props.cpp.o	a8b304859e73629c
 10637	13315	1782279794530237990	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ShadowNodes.cpp.o	235049e025d0acd0
-7	3155	1782279784366901819	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/Props.cpp.o	ffb032c967913a9
+3155	5836	1782279787042807319	RNCSlider_autolinked_build/CMakeFiles/react_codegen_RNCSlider.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/@react-native-community/slider/common/cpp/react/renderer/components/RNCSlider/RNCSliderMeasurementsManager.cpp.o	285dc06ad867185d
 18367	21720	1782279802924853358	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-svg/common/cpp/react/renderer/components/rnsvg/RNSVGShadowNodes.cpp.o	372e5ef8e7e88c3
 7211	8816	1782279790032152455	RNGoogleSignInCGen_autolinked_build/CMakeFiles/react_codegen_RNGoogleSignInCGen.dir/react/renderer/components/RNGoogleSignInCGen/States.cpp.o	a24846d1e23ad6c2
 13315	15029	1782279796244272586	rnreanimated_autolinked_build/CMakeFiles/react_codegen_rnreanimated.dir/react/renderer/components/rnreanimated/States.cpp.o	bee0a563c65ef5c9
@@ -43,7 +43,7 @@
 6	3165	1782279784377823348	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/ComponentDescriptors.cpp.o	e4ac05d591b7d282
 8	3431	1782279784643096704	RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ComponentDescriptors.cpp.o	cec5bea68559d16f
 14032	17425	1782279798636114328	safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-safe-area-context/common/cpp/react/renderer/components/safeareacontext/RNCSafeAreaViewState.cpp.o	411f1e29ced3b92c
-1	30	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/armeabi-v7a/CMakeFiles/cmake.verify_globs	5c55196e73541f7
+0	12	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/armeabi-v7a/CMakeFiles/cmake.verify_globs	5c55196e73541f7
 20866	23508	1782279804715576271	RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/RNVectorIconsSpec-generated.cpp.o	8060847b8069310a
 5837	8462	1782279789665006689	RNGoogleSignInCGen_autolinked_build/CMakeFiles/react_codegen_RNGoogleSignInCGen.dir/RNGoogleSignInCGen-generated.cpp.o	fc4dadb3997d3716
 8425	10204	1782279791419633281	HtmlToPdfSpec_autolinked_build/CMakeFiles/react_codegen_HtmlToPdfSpec.dir/react/renderer/components/HtmlToPdfSpec/EventEmitters.cpp.o	61b848bbe466b03c
@@ -92,6 +92,6 @@
 12196	13689	1782279794904929087	RNRazorpayCheckoutSpec_autolinked_build/CMakeFiles/react_codegen_RNRazorpayCheckoutSpec.dir/react/renderer/components/RNRazorpayCheckoutSpec/States.cpp.o	c01923b05ae520fe
 23526	25264	1782279806480673191	rnworklets_autolinked_build/CMakeFiles/react_codegen_rnworklets.dir/react/renderer/components/rnworklets/ShadowNodes.cpp.o	573cd29c27452666
 23542	25183	1782279806396017843	rnworklets_autolinked_build/CMakeFiles/react_codegen_rnworklets.dir/rnworklets-generated.cpp.o	bbf01f9ecf9d75a5
-73	584	1782368652150249633	build.ninja	c7a20b72016001d
+73	584	1782738822118041333	build.ninja	c7a20b72016001d
 0	53	0	clean	19032e23f5748419
-1	14	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/armeabi-v7a/CMakeFiles/cmake.verify_globs	5c55196e73541f7
+1	21	0	/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/armeabi-v7a/CMakeFiles/cmake.verify_globs	5c55196e73541f7

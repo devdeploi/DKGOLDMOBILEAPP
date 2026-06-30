@@ -529,6 +529,7 @@ const MerchantUsers = ({ user }) => {
         acc_no: ''
     });
     const [updatingUser, setUpdatingUser] = useState(false);
+    const [editErrors, setEditErrors] = useState({});
 
     // acc_no inline validation
     const [accNoValidation, setAccNoValidation] = useState(null);
@@ -585,6 +586,7 @@ const MerchantUsers = ({ user }) => {
             acc_no: selectedUserForModal.acc_no || ''
         });
         setAccNoValidation(null);
+        setEditErrors({});
         setIsEditingUser(true);
     };
 
@@ -620,10 +622,16 @@ const MerchantUsers = ({ user }) => {
     };
 
     const handleUpdateUser = async () => {
-        if (!editForm.name) {
-            showCustomAlert("Error", "Name is required", "error");
+        const errors = {};
+        if (!editForm.name || !editForm.name.trim()) errors.name = 'This field is required';
+        if (!editForm.acc_no || !editForm.acc_no.trim()) errors.acc_no = 'This field is required';
+
+        if (Object.keys(errors).length > 0) {
+            setEditErrors(errors);
             return;
         }
+        
+        setEditErrors({});
         // Block save if acc_no has a known conflict
         if (accNoValidation && !accNoValidation.available) {
             showCustomAlert(
@@ -3602,44 +3610,48 @@ const MerchantUsers = ({ user }) => {
                             <ScrollView showsVerticalScrollIndicator={false}>
                                 {isEditingUser ? (
                                     <View style={{ padding: 10 }}>
-                                        <Text style={styles.inputLabel}>Full Name</Text>
+                                        <Text style={styles.inputLabel}>Full Name *</Text>
                                         <TextInput
-                                            style={styles.modalInput}
+                                            style={[styles.modalInput, editErrors.name && { borderColor: 'red', borderWidth: 1 }]}
                                             value={editForm.name}
-                                            onChangeText={(txt) => setEditForm({ ...editForm, name: txt })}
+                                            onChangeText={(txt) => { setEditForm({ ...editForm, name: txt }); setEditErrors(prev => ({ ...prev, name: null })); }}
                                             placeholder="Enter full name"
                                         />
+                                        {editErrors.name && <Text style={{ color: 'red', fontSize: 12, marginTop: -10, marginBottom: 10 }}>{editErrors.name}</Text>}
 
                                         <Text style={styles.inputLabel}>Email Address</Text>
                                         <TextInput
-                                            style={styles.modalInput}
+                                            style={[styles.modalInput, editErrors.email && { borderColor: 'red', borderWidth: 1 }]}
                                             value={editForm.email}
-                                            onChangeText={(txt) => setEditForm({ ...editForm, email: txt })}
+                                            onChangeText={(txt) => { setEditForm({ ...editForm, email: txt }); setEditErrors(prev => ({ ...prev, email: null })); }}
                                             placeholder="Enter email address"
                                             keyboardType="email-address"
                                             autoCapitalize="none"
                                         />
+                                        {editErrors.email && <Text style={{ color: 'red', fontSize: 12, marginTop: -10, marginBottom: 10 }}>{editErrors.email}</Text>}
 
                                         <Text style={styles.inputLabel}>PAN Number</Text>
                                         <TextInput
-                                            style={styles.modalInput}
+                                            style={[styles.modalInput, editErrors.panCard && { borderColor: 'red', borderWidth: 1 }]}
                                             value={editForm.panCard}
-                                            onChangeText={(txt) => setEditForm({ ...editForm, panCard: txt })}
+                                            onChangeText={(txt) => { setEditForm({ ...editForm, panCard: txt }); setEditErrors(prev => ({ ...prev, panCard: null })); }}
                                             placeholder="Enter PAN number"
                                             autoCapitalize="characters"
                                         />
+                                        {editErrors.panCard && <Text style={{ color: 'red', fontSize: 12, marginTop: -10, marginBottom: 10 }}>{editErrors.panCard}</Text>}
 
                                         <Text style={styles.inputLabel}>Address</Text>
                                         <TextInput
-                                            style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
+                                            style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }, editErrors.address && { borderColor: 'red', borderWidth: 1 }]}
                                             value={editForm.address}
-                                            onChangeText={(txt) => setEditForm({ ...editForm, address: txt })}
+                                            onChangeText={(txt) => { setEditForm({ ...editForm, address: txt }); setEditErrors(prev => ({ ...prev, address: null })); }}
                                             placeholder="Enter address"
                                             multiline={true}
                                         />
+                                        {editErrors.address && <Text style={{ color: 'red', fontSize: 12, marginTop: -10, marginBottom: 10 }}>{editErrors.address}</Text>}
 
                                         {/* Account Number field */}
-                                        <Text style={styles.inputLabel}>Account Number (Acc No)</Text>
+                                        <Text style={styles.inputLabel}>Account Number (Acc No) *</Text>
                                         <View style={{
                                             flexDirection: 'row',
                                             alignItems: 'center',
@@ -3659,6 +3671,7 @@ const MerchantUsers = ({ user }) => {
                                                 value={editForm.acc_no}
                                                 onChangeText={(txt) => {
                                                     setEditForm({ ...editForm, acc_no: txt });
+                                                    setEditErrors(prev => ({ ...prev, acc_no: null }));
                                                     validateAccNoField(txt);
                                                 }}
                                                 placeholder="Enter account number"
@@ -3677,6 +3690,7 @@ const MerchantUsers = ({ user }) => {
                                                 <Icon name="exclamation-circle" size={16} color="#D97706" style={{ marginLeft: 8 }} />
                                             )}
                                         </View>
+                                        {editErrors.acc_no && <Text style={{ color: 'red', fontSize: 12, marginTop: -4, marginBottom: 10 }}>{editErrors.acc_no}</Text>}
 
                                         {/* Validation feedback banner */}
                                         {accNoValidation && !accNoValidation.available && (

@@ -45,6 +45,7 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
     const [refreshing, setRefreshing] = useState(false);
     const [activeInput] = useState(new Animated.Value(0));
     const [alertMsg, setAlertMsg] = useState({ visible: false, type: '', text: '' });
+    const [editErrors, setEditErrors] = useState({});
 
     const handleRefresh = async () => {
         if (onRefresh) {
@@ -55,18 +56,19 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
     };
 
     const handleSave = async () => {
-        if (!name.trim()) {
-            setAlertMsg({ visible: true, type: 'error', text: 'Name cannot be empty.' });
+        const errors = {};
+        if (!name || !name.trim()) errors.name = 'This field is required';
+        
+        if (email && email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            errors.email = 'Please enter a valid email address.';
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setEditErrors(errors);
             return;
         }
-        if (phone.trim().length !== 10) {
-            setAlertMsg({ visible: true, type: 'error', text: 'Phone number must be 10 digits.' });
-            return;
-        }
-        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-            setAlertMsg({ visible: true, type: 'error', text: 'Please enter a valid email address.' });
-            return;
-        }
+        
+        setEditErrors({});
         setLoading(true);
         setAlertMsg({ visible: false, type: '', text: '' });
         try {
@@ -198,13 +200,14 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                         {isEditing ? (
                             <View style={styles.formContainer}>
                                 <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Full Name</Text>
+                                    <Text style={styles.label}>Full Name *</Text>
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, editErrors.name && { borderColor: 'red', borderWidth: 1 }]}
                                         value={name}
-                                        onChangeText={setName}
+                                        onChangeText={(txt) => { setName(txt); setEditErrors(prev => ({ ...prev, name: null })); }}
                                         placeholderTextColor="#aaa"
                                     />
+                                    {editErrors.name && <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>{editErrors.name}</Text>}
                                 </View>
                                 <View style={styles.inputContainer}>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, marginLeft: 4 }}>
@@ -214,14 +217,15 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                         </View>
                                     </View>
                                     <TextInput
-                                        style={[styles.input, email && { borderColor: THEME.border }]}
+                                        style={[styles.input, editErrors.email && { borderColor: 'red', borderWidth: 1 }]}
                                         value={email}
-                                        onChangeText={(t) => { setEmail(t); setAlertMsg({ visible: false, type: '', text: '' }); }}
+                                        onChangeText={(t) => { setEmail(t); setAlertMsg({ visible: false, type: '', text: '' }); setEditErrors(prev => ({ ...prev, email: null })); }}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
                                         placeholder="e.g. yourname@email.com"
                                         placeholderTextColor="#aaa"
                                     />
+                                    {editErrors.email && <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>{editErrors.email}</Text>}
                                     {alertMsg.visible && (
                                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, marginLeft: 4 }}>
                                             <Icon name="exclamation-circle" size={12} color={THEME.danger} />
@@ -243,26 +247,28 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                                     <Text style={{ fontSize: 10, color: '#999', marginTop: 4 }}>Your registered phone number cannot be changed.</Text>
                                 </View>
                                 <View style={styles.inputContainer}>
-                                    <Text style={styles.label}>Address</Text>
+                                    <Text style={styles.label}>Address (Optional)</Text>
                                     <TextInput
-                                        style={[styles.input, styles.textArea]}
+                                        style={[styles.input, styles.textArea, editErrors.address && { borderColor: 'red', borderWidth: 1 }]}
                                         value={address}
-                                        onChangeText={setAddress}
+                                        onChangeText={(txt) => { setAddress(txt); setEditErrors(prev => ({ ...prev, address: null })); }}
                                         multiline
                                         numberOfLines={3}
                                         />
+                                    {editErrors.address && <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>{editErrors.address}</Text>}
                                 </View>
 
                                 <View style={styles.inputContainer}>
                                     <Text style={styles.label}>PAN Card (Optional)</Text>
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, editErrors.panCard && { borderColor: 'red', borderWidth: 1 }]}
                                         value={panCard}
-                                        onChangeText={setPanCard}
+                                        onChangeText={(txt) => { setPanCard(txt); setEditErrors(prev => ({ ...prev, panCard: null })); }}
                                         placeholder="Enter PAN Number"
                                         placeholderTextColor="#aaa"
                                         autoCapitalize="characters"
                                     />
+                                    {editErrors.panCard && <Text style={{ color: 'red', fontSize: 12, marginTop: 4 }}>{editErrors.panCard}</Text>}
                                 </View>
 
                                 <View style={styles.actionButtons}>
