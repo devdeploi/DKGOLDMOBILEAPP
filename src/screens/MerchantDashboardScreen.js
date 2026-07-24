@@ -28,6 +28,7 @@ import MerchantPlans from '../components/MerchantPlans';
 import MerchantUsers from '../components/MerchantUsers';
 import UnsubscribedUsersList from '../components/UnsubscribedUsersList';
 import MerchantProfile from '../components/MerchantProfile';
+import SetGoldRates from '../components/SetGoldRates';
 import AdManager from '../components/AdManager';
 import GoldTab from '../components/dashboard/GoldTab';
 import CustomAlert from '../components/CustomAlert';
@@ -111,6 +112,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
 
     const merchantTabs = [
         { id: 'overview', icon: 'chart-pie', label: 'Overview' },
+        { id: 'gold', icon: 'coins', label: 'Live Rates' },
         { id: 'plans', icon: 'clipboard-list', label: 'My Plans' },
         { id: 'subscribers', icon: 'users', label: 'Subscribers' },
         { id: 'new-users', icon: 'user-plus', label: 'New Users' },
@@ -188,11 +190,13 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
         }
     }, [user]);
 
-    const fetchDashboardStats = useCallback(async () => {
+    const fetchDashboardStats = useCallback(async (dateStr = null) => {
         if (!user) return;
         try {
             const token = user.token;
-            const { data } = await axios.get(`${APIURL}/merchants/stats`, {
+            let url = `${APIURL}/merchants/stats`;
+            if (dateStr) url += `?date=${dateStr}`;
+            const { data } = await axios.get(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -246,7 +250,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
         }
     }, [activeTab]);
 
-    const handleUpdateProfile = async (updatedData) => {
+    const handleUpdateProfile = async (updatedData, customMessage = null) => {
         try {
             setUpdatingProfile(true);
             const token = user.token;
@@ -264,6 +268,8 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 upiNumber: updatedData.upiNumber,
                 gstin: updatedData.gstin,
                 pancard: updatedData.pancard,
+                goldRate9k: updatedData.goldRate9k,
+                goldRate14k: updatedData.goldRate14k,
                 goldRate18k: updatedData.goldRate18k,
                 goldRate22k: updatedData.goldRate22k,
                 goldRate24k: updatedData.goldRate24k,
@@ -283,7 +289,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
 
             setProfileData(safeData);
             setIsEditingProfile(false);
-            setAlertConfig({ visible: true, title: 'Success', message: 'Profile updated successfully', type: 'success' });
+            setAlertConfig({ visible: true, title: 'Success', message: customMessage || 'Profile updated successfully', type: 'success' });
 
             // Refresh the main user state to reflect changes in Live Rates
             if (onUserUpdate) onUserUpdate(safeData);
@@ -313,6 +319,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                             plans={plans}
                             refreshing={loadingPlans}
                             onRefresh={handleRefresh}
+                            fetchDashboardStats={fetchDashboardStats}
                         />
                     </View>
                 );
@@ -334,6 +341,17 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                 return <UnsubscribedUsersList user={stabilizedUser} />;
             case 'ads':
                 return <AdManager user={stabilizedUser} />;
+            case 'set-rates':
+                return (
+                    <SetGoldRates
+                        user={user}
+                        profileData={profileData}
+                        setProfileData={setProfileData}
+                        handleUpdateProfile={handleUpdateProfile}
+                        updatingProfile={updatingProfile}
+                        onRefresh={fetchProfile}
+                    />
+                );
             case 'profile':
                 return (
                     <MerchantProfile
@@ -366,10 +384,15 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                         >
                             <Icon name="bars" size={18} color="#915200" />
                         </TouchableOpacity>
-                        <Image source={require('../assets/logodk.png')} style={styles.logo} />
+                    </View>
+                    
+                    <View style={styles.centerLogoContainer}>
+                        <Image source={require('../assets/DKTITLE.png')} style={styles.centerLogo} />
                     </View>
 
-                    <Image source={require('../assets/DKTITLE.png')} style={styles.centerLogo} />
+                    <View style={styles.headerRow}>
+                        <Image source={require('../assets/logodk.png')} style={styles.logo} />
+                    </View>
                 </View>
 
                 {/* Content */}
@@ -424,13 +447,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                             <Text style={styles.sidebarRole}>Merchant Portal</Text>
                         </View>
                         <View style={styles.sidebarMenu}>
-                            <TouchableOpacity
-                                style={[styles.sidebarMenuItem, activeTab === 'gold' && styles.sidebarActiveMenuItem]}
-                                onPress={() => { setActiveTab('gold'); closeSidebar(); }}
-                            >
-                                <Icon name="coins" size={18} color={activeTab === 'gold' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
-                                <Text style={[styles.sidebarMenuText, activeTab === 'gold' && styles.sidebarActiveMenuText]}>Live Rates</Text>
-                            </TouchableOpacity>
+
                             {!user?.isStaff && (
                                 <TouchableOpacity
                                     style={[styles.sidebarMenuItem, activeTab === 'ads' && styles.sidebarActiveMenuItem]}
@@ -440,6 +457,13 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                                     <Text style={[styles.sidebarMenuText, activeTab === 'ads' && styles.sidebarActiveMenuText]}>My Ads</Text>
                                 </TouchableOpacity>
                             )}
+                            <TouchableOpacity
+                                style={[styles.sidebarMenuItem, activeTab === 'set-rates' && styles.sidebarActiveMenuItem]}
+                                onPress={() => { setActiveTab('set-rates'); closeSidebar(); }}
+                            >
+                                <Icon name="coins" size={18} color={activeTab === 'set-rates' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
+                                <Text style={[styles.sidebarMenuText, activeTab === 'set-rates' && styles.sidebarActiveMenuText]}>Set Gold Rates</Text>
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.sidebarMenuItem, activeTab === 'profile' && styles.sidebarActiveMenuItem]}
                                 onPress={() => { setActiveTab('profile'); closeSidebar(); }}

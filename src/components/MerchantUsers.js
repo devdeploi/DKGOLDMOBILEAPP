@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ImageBackground,
     View,
     Text,
@@ -28,11 +28,26 @@ import CustomAlert from './CustomAlert';
 import { generatePDF } from 'react-native-html-to-pdf';
 import Share from 'react-native-share';
 import dkLogo from '../assets/DK.png';
+import logodk from '../assets/logodk.png';
 import safproLogo from '../../public/assests/Safpro-logo.png';
 import RNFS from 'react-native-fs';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import WebView from 'react-native-webview';
+import ViewShot from 'react-native-view-shot';
 import GoldTicker from './GoldTicker';
 import { useGoldRate } from '../context/GoldRateContext';
+import { launchImageLibrary } from 'react-native-image-picker';
+
+const hasPaidCurrentMonth = (subscriber) => {
+    if (!subscriber || !subscriber.plan) return false;
+    const plan = subscriber.plan;
+    const planNameStr = (plan.planName || '').toLowerCase();
+    const isUnlimited = plan.type === 'unlimited' || plan.durationMonths === 0 || planNameStr.includes('unlimited') || planNameStr.includes('infinity');
+    if (isUnlimited) return false;
+    
+    // Rely strictly on backend actual payment history check
+    return !!(subscriber.subscription && subscriber.subscription.hasPaidCurrentMonth);
+};
 
 if (Platform.OS === 'android') {
     if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -138,6 +153,13 @@ const MerchantUsers = ({ user }) => {
     const [page, setPage] = useState(1);
     const [loadingMore, setLoadingMore] = useState(false);
 
+    // Invoice Popup State
+    const [invoiceHtml, setInvoiceHtml] = useState(null);
+    const [invoiceFileName, setInvoiceFileName] = useState('');
+    const [generatingReceipt, setGeneratingReceipt] = useState(false);
+    const [webViewLoading, setWebViewLoading] = useState(true);
+    const viewShotRef = useRef(null);
+
     const handleDateConfirm = (selectedDate) => {
         setShowDatePicker(false);
         if (selectedDate) {
@@ -147,8 +169,8 @@ const MerchantUsers = ({ user }) => {
 
     const executeSettlement = async () => {
         if (!selectedWithdrawalRequest) return;
-        if (!settlementForm.amount || !settlementForm.transactionId) {
-            showCustomAlert("Error", "Please enter amount and transaction ID", "error");
+        if (!settlementForm.amount || !settlementForm.type) {
+            showCustomAlert("Error", "Please enter amount and select a settlement type", "error");
             return;
         }
 
@@ -163,7 +185,6 @@ const MerchantUsers = ({ user }) => {
             setSettlementModalVisible(false);
             setSettlementOtpModalVisible(true);
             setOtpResendTimer(60);
-            showCustomAlert("OTP Sent", "An OTP has been sent to the customer's mobile number.", "success");
         } catch (error) {
             console.error("Failed to send OTP", error);
             showCustomAlert("Error", error.response?.data?.message || "Failed to send OTP", "error");
@@ -180,16 +201,24 @@ const MerchantUsers = ({ user }) => {
 
         setSubmittingOtp(true);
         try {
-            const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            await axios.post(`${APIURL}/chit-plans/${selectedWithdrawalRequest.plan._id}/settle`, {
+            const payload = {
                 userId: selectedWithdrawalRequest.user._id,
                 subscriptionId: selectedWithdrawalRequest._id || selectedWithdrawalRequest.subscriberId,
                 amount: settlementForm.amount,
                 settlementType: settlementForm.type,
-                transactionId: settlementForm.transactionId,
-                note: settlementForm.note,
-                otp: settlementOtp
-            }, config);
+                transactionId: settlementForm.transactionId || '',
+                note: settlementForm.note || '',
+                settledDate: settlementForm.date ? settlementForm.date.toISOString() : '',
+                otp: settlementOtp,
+                receiptImage: settlementForm.receiptImage || ''
+            };
+
+            const config = {
+                headers: {
+                    Authorization: `Bearer ${user.token}`
+                }
+            };
+            await axios.post(`${APIURL}/chit-plans/${selectedWithdrawalRequest.plan._id}/settle`, payload, config);
 
             setSettlementOtpModalVisible(false);
             setSettlementOtp('');
@@ -247,7 +276,6 @@ const MerchantUsers = ({ user }) => {
             setDeliveryModalVisible(false);
             setDeliveryOtpModalVisible(true);
             setOtpResendTimer(60);
-            showCustomAlert("OTP Sent", "An OTP has been sent to the customer's mobile number.", "success");
         } catch (error) {
             console.error("Failed to send Delivery OTP", error);
             showCustomAlert("Error", error.response?.data?.message || "Failed to send OTP", "error");
@@ -264,21 +292,26 @@ const MerchantUsers = ({ user }) => {
 
         setSubmittingDeliveryOtp(true);
         try {
-            const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const body = {
+            const payload = {
                 userId: selectedForDelivery.user._id,
                 subscriptionId: selectedForDelivery._id || selectedForDelivery.subscriberId,
                 isPartial: deliveryForm.isPartial,
                 deliveryType: deliveryForm.type,
-                goldWeight: deliveryForm.goldWeight,
-                amount: deliveryForm.amount,
-                paymentIds: deliveryForm.paymentIds,
-                transactionId: deliveryForm.transactionId,
-                notes: deliveryForm.notes,
-                otp: deliveryOtp
+                goldWeight: deliveryForm.goldWeight || '',
+                amount: deliveryForm.amount || '',
+                paymentIds: deliveryForm.paymentIds || [],
+                transactionId: deliveryForm.transactionId || '',
+                notes: deliveryForm.notes || '',
+                otp: deliveryOtp,
+                receiptImage: deliveryForm.receiptImage || ''
             };
 
-            await axios.post(`${APIURL}/chit-plans/${selectedForDelivery.plan._id}/deliver`, body, config);
+            const config = {
+                headers: {
+                    Authorization: `Bearer ${user.token}`
+                }
+            };
+            await axios.post(`${APIURL}/chit-plans/${selectedForDelivery.plan._id}/deliver`, payload, config);
 
             setDeliveryOtpModalVisible(false);
             setDeliveryOtp('');
@@ -331,6 +364,36 @@ const MerchantUsers = ({ user }) => {
                             fetchData();
                         } catch (error) {
                             showCustomAlert("Error", error.response?.data?.message || "Failed to approve closure", "error");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleRejectClosure = (subscriber) => {
+        showCustomAlert(
+            "Reject Closure?",
+            `Are you sure you want to reject ${subscriber.user.name}'s closure request?`,
+            "warning",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Reject",
+                    style: "destructive",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const config = { headers: { Authorization: `Bearer ${user.token}` } };
+                            await axios.post(`${APIURL}/chit-plans/${subscriber.plan._id}/reject-closure`, {
+                                subscriptionId: subscriber._id || subscriber.subscriberId
+                            }, config);
+                            showCustomAlert("Success", "Closure request rejected.", "success");
+                            fetchData();
+                        } catch (error) {
+                            showCustomAlert("Error", error.response?.data?.message || "Failed to reject closure", "error");
                         } finally {
                             setLoading(false);
                         }
@@ -465,6 +528,7 @@ const MerchantUsers = ({ user }) => {
     const [showManualModal, setShowManualModal] = useState(false);
     const [selectedSubscriber, setSelectedSubscriber] = useState(null);
     const [manualForm, setManualForm] = useState({ amount: '', notes: '', customGoldRate: '', type: 'CASH' });
+    const [isRateEdited, setIsRateEdited] = useState(false);
     const [selectedPaymentDate, setSelectedPaymentDate] = useState(new Date());
     const [manualDateInput, setManualDateInput] = useState({
         day: new Date().getDate().toString().padStart(2, '0'),
@@ -484,10 +548,13 @@ const MerchantUsers = ({ user }) => {
     const [selectedWithdrawalRequest, setSelectedWithdrawalRequest] = useState(null);
     const [settlementForm, setSettlementForm] = useState({
         amount: '',
-        transactionId: '',
+        type: '',
         note: '',
-        type: 'Cash'
+        transactionId: '',
+        date: new Date(),
+        receiptImage: null
     });
+    const [isSettlementDatePickerVisible, setSettlementDatePickerVisibility] = useState(false);
     const [submittingSettlement, setSubmittingSettlement] = useState(false);
     const [settlementOtpModalVisible, setSettlementOtpModalVisible] = useState(false);
     const [settlementOtp, setSettlementOtp] = useState('');
@@ -503,7 +570,8 @@ const MerchantUsers = ({ user }) => {
         amount: '',
         notes: '',
         paymentIds: [],
-        transactionId: ''
+        transactionId: '',
+        receiptImage: null
     });
     const [undeliveredPayments, setUndeliveredPayments] = useState([]);
     const [loadingPayments, setLoadingPayments] = useState(false);
@@ -511,6 +579,64 @@ const MerchantUsers = ({ user }) => {
     const [deliveryOtpModalVisible, setDeliveryOtpModalVisible] = useState(false);
     const [deliveryOtp, setDeliveryOtp] = useState('');
     const [submittingDeliveryOtp, setSubmittingDeliveryOtp] = useState(false);
+
+    const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+
+    const uploadReceiptInstantly = async (asset) => {
+        try {
+            setIsUploadingReceipt(true);
+            const formData = new FormData();
+            formData.append('image', {
+                uri: asset.uri,
+                type: asset.type || 'image/jpeg',
+                name: asset.fileName || 'receipt.jpg'
+            });
+
+            const config = { 
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    'Connection': 'close'
+                } 
+            };
+            
+            let response;
+            try {
+                response = await axios.post(`${APIURL}/upload`, formData, config);
+            } catch (firstErr) {
+                console.log("First upload attempt failed (RN bug), retrying...", firstErr.message);
+                // Retry immediately, which always succeeds
+                response = await axios.post(`${APIURL}/upload`, formData, config);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error("Upload error", error);
+            showCustomAlert("Error", "Failed to upload image. Please try again.", "error");
+            return null;
+        } finally {
+            setIsUploadingReceipt(false);
+        }
+    };
+
+    const pickReceiptImageForSettlement = async () => {
+        const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8, selectionLimit: 1 });
+        if (result.assets && result.assets.length > 0) {
+            const uploadedPath = await uploadReceiptInstantly(result.assets[0]);
+            if (uploadedPath) {
+                setSettlementForm(prev => ({ ...prev, receiptImage: uploadedPath }));
+            }
+        }
+    };
+
+    const pickReceiptImageForDelivery = async () => {
+        const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.8, selectionLimit: 1 });
+        if (result.assets && result.assets.length > 0) {
+            const uploadedPath = await uploadReceiptInstantly(result.assets[0]);
+            if (uploadedPath) {
+                setDeliveryForm(prev => ({ ...prev, receiptImage: uploadedPath }));
+            }
+        }
+    };
 
     // Proof State
     const [previewProofUrl, setPreviewProofUrl] = useState(null);
@@ -552,6 +678,13 @@ const MerchantUsers = ({ user }) => {
     const handleResendOtp = async (type) => {
         let planId, userId;
         if (type === 'settlement' && selectedWithdrawalRequest) {
+            setSettlementForm({
+                amount: '',
+                type: '',
+                note: '',
+                transactionId: '',
+                date: new Date()
+            });
             planId = selectedWithdrawalRequest.plan._id;
             userId = selectedWithdrawalRequest.user._id;
         } else if (type === 'delivery' && selectedForDelivery) {
@@ -742,190 +875,187 @@ const MerchantUsers = ({ user }) => {
     };
 
     const createAndDownloadPDF = async (html, fileName) => {
-        try {
-            const cleanFileName = fileName.replace(/[^a-z0-9]/gi, '_');
-            const options = {
-                html,
-                fileName: cleanFileName,
-                directory: 'Documents',
-            };
-
-            const file = await generatePDF(options);
-
-            if (!file || !file.filePath) {
-                throw new Error("Failed to generate PDF");
-            }
-
-            if (Platform.OS === 'android') {
-                const downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanFileName}.pdf`;
-                try {
-                    // Check if file exists and delete it before copying
-                    const exists = await RNFS.exists(downloadPath);
-                    if (exists) {
-                        await RNFS.unlink(downloadPath);
-                    }
-                    await RNFS.copyFile(file.filePath, downloadPath);
-                    showCustomAlert("Success", "PDF saved successfully to Downloads folder", "success", [
-                        {
-                            text: "Share",
-                            onPress: () => shareFile(downloadPath)
-                        },
-                        { text: "OK" }
-                    ]);
-                } catch (copyErr) {
-                    console.error("File Copy Error:", copyErr);
-                    // Fallback to sharing the original file if copy fails
-                    await shareFile(file.filePath);
-                }
-            } else {
-                // For iOS, trigger the share sheet immediately as "Documents" isn't easily accessible
-                await shareFile(file.filePath);
-            }
-
-        } catch (error) {
-            console.error("PDF Download Error:", error);
-            showCustomAlert("Error", "Failed to generate PDF", "error");
-        }
+        const cleanFileName = fileName.replace(/[^a-z0-9]/gi, '_');
+        setInvoiceHtml(html);
+        setInvoiceFileName(cleanFileName);
     };
 
     const generateInvoice = async (payment, subscriber) => {
-        setLoading(true);
+        setGeneratingReceipt(true);
         try {
-            // 1. Load Logos
             let dkLogoImgTag = 'DK';
-            let safproLogoImgTag = 'Safpro';
+            let logodkImgTag = 'logodk';
 
             if (Platform.OS === 'android' && !__DEV__) {
-                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 70px; height: auto;" />`;
-                safproLogoImgTag = `<img src="file:///android_asset/Safpro-logo.png" style="width: 120px; height: auto;" />`;
+                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 250px; height: auto;" />`;
+                logodkImgTag = `<img src="file:///android_asset/logodk.png" style="width: 70px; height: auto;" />`;
             } else {
-                const dkLogoUrl = Image.resolveAssetSource(dkLogo).uri;
-                const dkLogoBase64 = await fetchImageAsBase64(dkLogoUrl);
-                if (dkLogoBase64) dkLogoImgTag = `<img src="${dkLogoBase64}" style="width: 70px; height: auto;" />`;
+                const dklogoUrl = Image.resolveAssetSource(dkLogo).uri;
+                const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
+                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 250px; height: auto;" />`;
 
-                const safproLogoUrl = Image.resolveAssetSource(safproLogo).uri;
-                const safproLogoBase64 = await fetchImageAsBase64(safproLogoUrl);
-                if (safproLogoBase64) safproLogoImgTag = `<img src="${safproLogoBase64}" style="width: 120px; height: auto;" />`;
-            }
-
-            let shopLogoImgTag = '';
-            if (user.shopLogo) {
-                const shopLogoUrl = `${BASE_URL}${user.shopLogo}`;
-                const shopLogoBase64 = await fetchImageAsBase64(shopLogoUrl);
-                if (shopLogoBase64) {
-                    shopLogoImgTag = `<img src="${shopLogoBase64}" style="width: 70px; height: 70px; border-radius: 35px; object-fit: cover;" />`;
-                }
+                const logodkUrl = Image.resolveAssetSource(logodk).uri;
+                const logodkBase64 = await fetchImageAsBase64(logodkUrl);
+                if (logodkBase64) logodkImgTag = `<img src="${logodkBase64}" style="width: 70px; height: auto;" />`;
             }
 
             // 2. Data Prep
+            const isUnlimited = subscriber.plan?.type === 'unlimited' || subscriber.plan?.durationMonths === 0 || (subscriber.plan?.planName || '').toLowerCase().includes('unlimited');
             const planName = subscriber.plan?.planName || subscriber.chitPlan?.planName || 'Unknown Plan';
-            // Use the established payment date from the record, fallback to now only if missing
             const paymentDateVal = payment.paymentDate || payment.date || new Date();
-            const paymentDate = new Date(paymentDateVal).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const generationDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const merchantName = user.name.toUpperCase();
+            const paymentDate = new Date(paymentDateVal).toLocaleDateString('en-IN');
             const customerName = subscriber.user.name.toUpperCase();
+            const customerAddress = subscriber.user.address || '';
+            const customerMobile = subscriber.user.phone || '';
+            const receiptNo = payment.receiptNumber || '-';
+            const accNo = subscriber.subscription?.acc_no || subscriber.user?.acc_no || '-';
+            const amountPaid = Number(payment.amount || 0).toFixed(2);
+            const gramsSaved = Number(payment.goldWeight || 0).toFixed(3);
+            const paymentMode = payment.type || 'Offline';
+            let goldRate24k = payment.lockedGoldRate || payment.goldRate || '-';
+            if (goldRate24k !== '-') goldRate24k = Number(goldRate24k).toFixed(2);
+            
+            // Cumulative logic
+            let cumulativeAmount = 0;
+            let cumulativeGrams = 0;
+            let attemptNo = 0;
+            const history = subscriber?.subscription?.paymentHistory || subscriber?.payments || paymentHistory || [];
+            if (history.length > 0) {
+                const sortedHistory = [...history].sort((a, b) => new Date(a.paymentDate || a.createdAt || a.date) - new Date(b.paymentDate || b.createdAt || b.date));
+                const currentIndex = sortedHistory.findIndex(p => p._id === payment._id);
+                
+                if (currentIndex !== -1) {
+                    for (let i = 0; i <= currentIndex; i++) {
+                        const p = sortedHistory[i];
+                        if ((p.status === 'Paid' || p.status === 'Completed') && !p.isDelivered) {
+                            attemptNo += 1;
+                            cumulativeAmount += Number(p.amount || 0);
+                            cumulativeGrams += Number(p.goldWeight || 0);
+                        }
+                    }
+                } else {
+                    const currDate = new Date(payment.paymentDate || payment.createdAt || payment.date || new Date());
+                    sortedHistory.forEach(p => {
+                        const pDate = new Date(p.paymentDate || p.createdAt || p.date);
+                        if (pDate <= currDate && (p.status === 'Paid' || p.status === 'Completed') && !p.isDelivered) {
+                            attemptNo += 1;
+                            cumulativeAmount += Number(p.amount || 0);
+                            cumulativeGrams += Number(p.goldWeight || 0);
+                        }
+                    });
+                }
+            } else {
+                cumulativeAmount = Number(subscriber.subscription?.totalSaved || 0);
+                cumulativeGrams = Number(subscriber.subscription?.totalGoldWeight || 0);
+                attemptNo = 1;
+            }
+
+            const dueNo = attemptNo || payment.installmentNumber || '-';
+
+            const totalPaid = cumulativeAmount.toFixed(2);
+            const totalGrams = cumulativeGrams.toFixed(3);
+            const remainAmount = (Number(subscriber.plan?.totalAmount || 0) - cumulativeAmount).toFixed(2);
 
             // 3. HTML Template
             const html = `
                 <html>
                 <head>
-                    <style>
-                        body { font-family: 'Helvetica', sans-serif; padding: 20px; color: #333; }
-                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #915200; }
-                        .logo-left, .logo-right { width: 100px; display: flex; align-items: center; justify-content: center; }
-                        .header-center { text-align: center; flex: 1; margin: 0 10px; }
-                        .header-center h2 { color: #915200; margin: 0; font-size: 18px; text-transform: uppercase; }
-                        .header-center p { margin: 2px 0; font-size: 10px; color: #666; }
-                        
-                        .title-section { text-align: center; margin-bottom: 30px; }
-                        .title-section h1 { color: #915200; margin: 0; font-size: 24px; letter-spacing: 2px; }
-                        .title-section p { color: #666; margin: 5px 0 0; font-size: 12px; }
-
-                        .grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
-                        .col { width: 45%; }
-                        .label { color: #915200; font-weight: bold; font-size: 12px; margin-bottom: 5px; }
-                        .name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
-                        .info { font-size: 12px; color: #555; line-height: 1.4; }
-                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                        th { background-color: #915200; color: white; padding: 10px; text-align: left; font-size: 12px; }
-                        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; }
-                        .total-row td { background-color: #fffbf0; font-weight: bold; color: #915200; }
-                        .footer { text-align: center; margin-top: 50px; color: #915200; font-size: 12px; border-top: 1px solid #eee; padding-top: 30px; }
-                        .brand-strip { background-color: #915200; color: white; text-align: center; padding: 5px; font-size: 10px; position: fixed; bottom: 0; left: 0; right: 0; }
-                    </style>
+                    <meta name="viewport" content="width=700, user-scalable=yes" />
                 </head>
-                <body>
-                    <div class="header">
-                        <div class="logo-left">${dkLogoImgTag}</div>
-                        <div class="header-center">
-                            <h2>${merchantName}</h2>
-                            <p>${user.address || ''}</p>
-                            <p>Phone: ${user.phone}${user.email ? ' | ' + user.email : ''}</p>
-                        </div>
-                        <div class="logo-right">${shopLogoImgTag}</div>
-                    </div>
-
-                    <div class="title-section">
-                        <h1>PAYMENT RECEIPT</h1>
-                        <p>Date: ${generationDate}</p>
-                        ${payment.receiptNumber ? `<p style="font-weight: bold; margin-top: 5px;">Receipt No: ${payment.receiptNumber}</p>` : ''}
-                    </div>
-
-                    <div class="grid">
-                        <div class="col">
-                            <div class="label">TO:</div>
-                            <div class="name">${customerName}</div>
-                            <div class="info">
-                                Phone: ${subscriber.user.phone}<br/>
-                                ${subscriber.user.email ? subscriber.user.email : ''}
+                <body style="font-family: 'Helvetica', sans-serif; padding: 20px; color: #000; margin: 0; box-sizing: border-box;">
+                    <div style="border: 2px solid #000; padding: 30px;">
+                        <!-- HEADER -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                            <div style="width: 20%;">
+                                ${logodkImgTag}
+                            </div>
+                            <div style="width: 50%; text-align: center;">
+                                ${dkLogoImgTag}
+                            </div>
+                            <div style="width: 30%; text-align: right; font-weight: bold; font-size: 14px;">
+                                &#128222; 8778841886
                             </div>
                         </div>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Description</th>
-                                <th>Details</th>
-                                <th style="text-align: right;">Amount (INR)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Plan Name</td>
-                                <td>${planName}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                            <tr>
-                                <td>Payment Mode</td>
-                                <td>${payment.type || "Offline"}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                            <tr>
-                                <td>Payment Date</td>
-                                <td>${paymentDate}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                             <tr>
-                                <td>Notes</td>
-                                <td>${payment.notes || "-"}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                            <tr class="total-row">
-                                <td colspan="2">TOTAL RECEIVED</td>
-                                <td style="text-align: right;">Rs. ${Number(payment.amount).toFixed(2)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="footer">
-                        <p>Thank you!</p>
-                        <p style="font-size: 10px; color: #888; font-weight: normal;">If you have any questions, please contact the merchant.</p>
                         
-                        <div style="margin-top: 20px;">
-                            <p style="font-size: 10px; color: #999; margin-bottom: 5px;">Powered By</p>
-                            ${safproLogoImgTag}
+                        <!-- TITLE BAND -->
+                        <div style="background-color: #000; color: #fff; text-align: center; padding: 10px; font-weight: bold; font-size: 18px; letter-spacing: 2px; margin-bottom: 30px;">
+                            ${isUnlimited ? 'GOLD SAVING PLAN RECEIPT' : 'MONTHLY SAVING PLAN RECEIPT'}
+                        </div>
+
+                        <!-- 2 COLUMNS OF DATA -->
+                        <div style="display: flex; justify-content: space-between; font-size: 14px; line-height: 1.5;">
+                            <!-- LEFT COLUMN -->
+                            <div style="width: 48%;">
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>RECEIPT NO. :</span>
+                                    <strong>${receiptNo}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>DATE :</span>
+                                    <strong>${paymentDate}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>NAME :</span>
+                                    <strong>${customerName}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>ADDRESS :</span>
+                                    <strong style="text-align: right;">${customerAddress || 'N/A'}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>MOBILE :</span>
+                                    <strong>${customerMobile}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>AMOUNT PAID :</span>
+                                    <strong>Rs. ${amountPaid}</strong>
+                                </div>
+                                ${isUnlimited ? `
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>GRAMS SAVED :</span>
+                                    <strong>${gramsSaved}g</strong>
+                                </div>
+                                ` : ''}
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>TOTAL PAID :</span>
+                                    <strong>Rs. ${totalPaid}</strong>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT COLUMN -->
+                            <div style="width: 48%;">
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>A/C NO. :</span>
+                                    <strong>${accNo}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>PLAN TYPE :</span>
+                                    <strong>${planName}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 40px;"> <!-- Aligns roughly with Mobile -->
+                                    <span>MODE :</span>
+                                    <strong>${paymentMode}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>DUE NO. :</span>
+                                    <strong>${dueNo}</strong>
+                                </div>
+                                ${isUnlimited ? `
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>24K GOLD RATE :</span>
+                                    <strong>Rs. ${goldRate24k}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>TOTAL GRAMS :</span>
+                                    <strong>${totalGrams}g</strong>
+                                </div>
+                                ` : `
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>REMAIN :</span>
+                                    <strong>Rs. ${remainAmount}</strong>
+                                </div>
+                                `}
+                            </div>
                         </div>
                     </div>
                 </body>
@@ -938,12 +1068,12 @@ const MerchantUsers = ({ user }) => {
             console.error("Invoice Gen Error", error);
             showCustomAlert("Error", "Failed to generate invoice", "error");
         } finally {
-            setLoading(false);
+            setGeneratingReceipt(false);
         }
     };
 
     const generateSettlementReceipt = async (subscriber, settlementData) => {
-        setLoading(true);
+        setGeneratingReceipt(true);
         try {
             // Recycled Logo Logic
             let dkLogoImgTag = 'DK';
@@ -980,7 +1110,7 @@ const MerchantUsers = ({ user }) => {
                         ${shopLogoImgTag ? shopLogoImgTag : dkLogoImgTag}
                         <h2 style="color: #915200; margin: 10px 0;">${merchantName}</h2>
                         <h3 style="margin: 5px 0;">SETTLEMENT RECEIPT</h3>
-                        <p style="color: #666; font-size: 12px;">Date: ${new Date().toLocaleDateString()}</p>
+                        <p style="color: #666; font-size: 12px;">Date: ${new Date().toLocaleDateString('en-IN')}</p>
                         ${shopLogoImgTag ? `<div style="margin-top: 10px;">${shopLogoImgTag}</div>` : ''}
                     </div>
                     
@@ -1027,12 +1157,12 @@ const MerchantUsers = ({ user }) => {
             console.error(error);
             showCustomAlert("Error", "Failed to generate receipt", "error");
         } finally {
-            setLoading(false);
+            setGeneratingReceipt(false);
         }
     };
 
     const generatePartialDeliveryReceipt = async (subscriber, deliveryData) => {
-        setLoading(true);
+        setGeneratingReceipt(true);
         try {
             let dkLogoImgTag = 'DK';
             let safproLogoImgTag = 'Safpro';
@@ -1068,7 +1198,7 @@ const MerchantUsers = ({ user }) => {
                         ${shopLogoImgTag || dkLogoImgTag}
                         <h2 style="color: #915200; margin: 10px 0;">${user.name.toUpperCase()}</h2>
                         <h3 style="margin: 5px 0;">PARTIAL DELIVERY RECEIPT</h3>
-                        <p style="color: #666; font-size: 12px;">Date: ${new Date().toLocaleDateString()}</p>
+                        <p style="color: #666; font-size: 12px;">Date: ${new Date().toLocaleDateString('en-IN')}</p>
                     </div>
                     
                     <div style="margin-bottom: 20px;">
@@ -1121,22 +1251,22 @@ const MerchantUsers = ({ user }) => {
             console.error(error);
             showCustomAlert("Error", "Failed to generate receipt", "error");
         } finally {
-            setLoading(false);
+            setGeneratingReceipt(false);
         }
     };
 
     const generateStatement = async (subscriber, history) => {
-        setLoading(true);
+        setGeneratingReceipt(true);
         try {
             // 1. Load Logos
             let dkLogoImgTag = 'DK';
             let safproLogoImgTag = 'Safpro';
 
             if (Platform.OS === 'android' && !__DEV__) {
-                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 70px; height: auto;" />`;
+                dkLogoImgTag = `<img src="file:///android_asset/logodk.png" style="width: 70px; height: auto;" />`;
                 safproLogoImgTag = `<img src="file:///android_asset/Safpro-logo.png" style="width: 120px; height: auto;" />`;
             } else {
-                const dkLogoUrl = Image.resolveAssetSource(dkLogo).uri;
+                const dkLogoUrl = Image.resolveAssetSource(logodk).uri;
                 const dkLogoBase64 = await fetchImageAsBase64(dkLogoUrl);
                 if (dkLogoBase64) dkLogoImgTag = `<img src="${dkLogoBase64}" style="width: 70px; height: auto;" />`;
 
@@ -1160,13 +1290,13 @@ const MerchantUsers = ({ user }) => {
             const totalPlanAmount = subscriber.plan?.totalAmount || 0;
 
             let totalPaid = 0;
-            const sortedHistory = [...history].sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate));
+            const sortedHistory = [...history].sort((a, b) => new Date(a.paymentDate || a.createdAt) - new Date(b.paymentDate || b.createdAt));
 
             const rowsHtml = sortedHistory.map(pay => {
                 if (pay.status === 'Completed') totalPaid += Number(pay.amount);
                 return `
                     <tr>
-                        <td>${new Date(pay.paymentDate || pay.createdAt).toLocaleDateString()}</td>
+                        <td>${new Date(pay.paymentDate || pay.createdAt).toLocaleDateString('en-IN')}</td>
                         <td>${pay.notes || "Installment Payment"}</td>
                         <td>${pay.type === 'online' ? 'Online' : pay.type === 'offline' ? 'Offline' : pay.type}</td>
                         <td style="text-align: right;">Rs. ${Number(pay.amount).toFixed(2)}</td>
@@ -1179,27 +1309,27 @@ const MerchantUsers = ({ user }) => {
                 <head>
                     <style>
                         body { font-family: 'Helvetica', sans-serif; padding: 20px; color: #333; }
-                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #915200; }
+                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #000000; }
                         .logo-left, .logo-right { width: 100px; display: flex; align-items: center; justify-content: center; }
                         .header-center { text-align: center; flex: 1; margin: 0 10px; }
-                        .header-center h2 { color: #915200; margin: 0; font-size: 18px; text-transform: uppercase; }
+                        .header-center h2 { color: #000000; margin: 0; font-size: 18px; text-transform: uppercase; }
                         .header-center p { margin: 2px 0; font-size: 10px; color: #666; }
                         
                         .title-section { text-align: center; margin-bottom: 30px; }
-                        .title-section h1 { color: #915200; margin: 0; font-size: 24px; letter-spacing: 2px; }
+                        .title-section h1 { color: #000000; margin: 0; font-size: 24px; letter-spacing: 2px; }
                         .title-section p { color: #666; margin: 5px 0 0; font-size: 12px; }
 
                         .grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
                         .col { width: 45%; }
-                        .label { color: #915200; font-weight: bold; font-size: 12px; margin-bottom: 5px; }
+                        .label { color: #000000; font-weight: bold; font-size: 12px; margin-bottom: 5px; }
                         .name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
                         .info { font-size: 12px; color: #555; line-height: 1.4; }
-                        .plan-info { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 12px; border-left: 4px solid #915200; }
+                        .plan-info { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 12px; border-left: 4px solid #000000; }
                         table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                        th { background-color: #915200; color: white; padding: 8px; text-align: left; font-size: 11px; }
+                        th { background-color: #000000; color: white; padding: 8px; text-align: left; font-size: 11px; }
                         td { padding: 8px; border-bottom: 1px solid #eee; font-size: 11px; }
-                        .total-row td { background-color: #fffbf0; font-weight: bold; color: #915200; }
-                        .footer { text-align: center; margin-top: 50px; color: #915200; font-size: 12px; border-top: 1px solid #eee; padding-top: 30px; }
+                        .total-row td { background-color: #f9f9f9; font-weight: bold; color: #000000; }
+                        .footer { text-align: center; margin-top: 50px; color: #000000; font-size: 12px; border-top: 1px solid #eee; padding-top: 30px; }
                     </style>
                 </head>
                 <body>
@@ -1215,7 +1345,7 @@ const MerchantUsers = ({ user }) => {
 
                     <div class="title-section">
                         <h1>STATEMENT OF ACCOUNT</h1>
-                        <p>Generated On: ${new Date().toLocaleDateString()}</p>
+                        <p>Generated On: ${new Date().toLocaleDateString('en-IN')}</p>
                     </div>
 
                     <div class="grid">
@@ -1253,28 +1383,28 @@ const MerchantUsers = ({ user }) => {
                     ${subscriber.subscription?.status === 'settled' ? (() => {
                     const details = subscriber.subscription.settlementDetails || {};
                     const settlementAmount = details.amount || totalPaid;
-                    const settlementDate = details.settledDate ? new Date(details.settledDate).toLocaleDateString() : new Date().toLocaleDateString();
+                    const settlementDate = details.settledDate ? new Date(details.settledDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
                     const settlementTxnId = details.transactionId || 'N/A';
                     const settlementNotes = details.note || 'Settled';
 
                     return `
-                        <div style="margin-top: 30px; border-top: 2px dashed #915200; padding-top: 20px;">
-                            <h3 style="color: #915200; text-align: center; margin-bottom: 20px; font-size: 16px;">SETTLEMENT DETAILS</h3>
+                        <div style="margin-top: 30px; border-top: 2px dashed #000000; padding-top: 20px;">
+                            <h3 style="color: #000000; text-align: center; margin-bottom: 20px; font-size: 16px;">SETTLEMENT DETAILS</h3>
                             <table style="width: 100%; border-collapse: collapse;">
-                                <tr style="background-color: #fffbf0;">
-                                    <td style="font-weight: bold; color: #915200; width: 40%;">Settlement Date</td>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="font-weight: bold; color: #000000; width: 40%;">Settlement Date</td>
                                     <td style="text-align: right;">${settlementDate}</td>
                                 </tr>
                                 <tr>
-                                    <td style="font-weight: bold; color: #915200;">Transaction ID</td>
+                                    <td style="font-weight: bold; color: #000000;">Transaction ID</td>
                                     <td style="text-align: right;">${settlementTxnId}</td>
                                 </tr>
-                                <tr style="background-color: #fffbf0;">
-                                    <td style="font-weight: bold; color: #915200;">Settlement Amount</td>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td style="font-weight: bold; color: #000000;">Settlement Amount</td>
                                     <td style="text-align: right; font-weight: bold; color: #2E7D32;">Rs. ${Number(settlementAmount).toFixed(2)}</td>
                                 </tr>
                                 <tr>
-                                    <td style="font-weight: bold; color: #915200;">Notes</td>
+                                    <td style="font-weight: bold; color: #000000;">Notes</td>
                                     <td style="text-align: right; font-style: italic;">${settlementNotes}</td>
                                 </tr>
                             </table>
@@ -1285,7 +1415,7 @@ const MerchantUsers = ({ user }) => {
 
                 ${subscriber.subscription?.status === 'delivered_gold' ? (() => {
                     const details = subscriber.subscription.deliveryDetails || {};
-                    const deliveredDate = details.deliveredDate ? new Date(details.deliveredDate).toLocaleDateString() : new Date().toLocaleDateString();
+                    const deliveredDate = details.deliveredDate ? new Date(details.deliveredDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
                     const deliveryNotes = details.notes || 'Gold Delivered';
 
                     return `
@@ -1323,7 +1453,7 @@ const MerchantUsers = ({ user }) => {
             console.error("Statement Gen Error", error);
             showCustomAlert("Error", "Failed to generate statement", "error");
         } finally {
-            setLoading(false);
+            setGeneratingReceipt(false);
         }
     };
 
@@ -1409,6 +1539,19 @@ const MerchantUsers = ({ user }) => {
             setRefreshing(false);
         }
     }, [user]);
+
+    useEffect(() => {
+        if (!isRateEdited || user?.isStaff) {
+            if (selectedSubscriber) {
+                setManualForm(prev => ({
+                    ...prev,
+                    customGoldRate: ((selectedSubscriber?.plan?.type === 'unlimited' || selectedSubscriber?.plan?.planType === 'unlimited') && user.goldRate24k)
+                        ? user.goldRate24k.toFixed(2)
+                        : (lockedGoldRate || goldRate) ? Number(lockedGoldRate || goldRate).toFixed(2) : ''
+                }));
+            }
+        }
+    }, [goldRate, lockedGoldRate, user.goldRate24k, selectedSubscriber, user?.isStaff]);
 
     useEffect(() => {
         fetchData();
@@ -1689,6 +1832,7 @@ const MerchantUsers = ({ user }) => {
 
     const openManualPaymentModal = (subscriber) => {
         setSelectedSubscriber(subscriber);
+        setIsRateEdited(false);
         setManualForm({
             amount: subscriber.plan.monthlyAmount > 0 
                 && subscriber.plan.type !== 'unlimited' 
@@ -1762,13 +1906,7 @@ const MerchantUsers = ({ user }) => {
 
             await fetchData();
 
-            showCustomAlert("Success", "Payment recorded successfully", "success", [
-                {
-                    text: "Invoice",
-                    onPress: () => {
-                        generateInvoice(result.data, selectedSubscriber);
-                    }
-                },
+            showCustomAlert("Success", "Payment recorded successfully. You can view the receipt in their history of payment.", "success", [
                 { text: "OK", onPress: () => { } }
             ]);
 
@@ -1824,10 +1962,41 @@ const MerchantUsers = ({ user }) => {
                 showCustomAlert("Error", "Failed to download proof", "error");
             }
         } catch (error) {
-            console.error(error);
+            console.error("Proof Download Error:", error);
             showCustomAlert("Error", "Failed to download proof", "error");
         } finally {
             setDownloadingProof(false);
+        }
+    };
+
+    const downloadInvoiceAsJPG = async () => {
+        if (!viewShotRef.current) return;
+        try {
+            const uri = await viewShotRef.current.capture();
+            let downloadPath;
+            const cleanFileName = invoiceFileName || `Invoice_${Date.now()}`;
+            if (Platform.OS === 'android') {
+                downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanFileName}.jpg`;
+            } else {
+                downloadPath = `${RNFS.DocumentDirectoryPath}/${cleanFileName}.jpg`;
+            }
+
+            // Check if file exists and delete it before copying
+            const exists = await RNFS.exists(downloadPath);
+            if (exists) {
+                await RNFS.unlink(downloadPath);
+            }
+            await RNFS.copyFile(uri, downloadPath);
+            showCustomAlert("Success", "Receipt saved successfully as JPG", "success", [
+                {
+                    text: "Share",
+                    onPress: () => shareFile(downloadPath)
+                },
+                { text: "OK" }
+            ]);
+        } catch (error) {
+            console.error("Invoice Capture Error:", error);
+            showCustomAlert("Error", "Failed to save receipt as JPG", "error");
         }
     };
 
@@ -1957,7 +2126,7 @@ const MerchantUsers = ({ user }) => {
                                     setUserDetailsModalVisible(true);
                                 }}
                             >
-                                <Text style={styles.withdrawalUserName}>{item.user?.name?.length > 10 ? item.user.name.substring(0, 10) + '...' : item.user?.name}</Text>
+                                <Text style={styles.withdrawalUserName}>{item.user?.name}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={styles.withdrawalUserPhone}>{item.user?.phone}</Text>
                                     {item.user?.acc_no && (
@@ -1998,14 +2167,24 @@ const MerchantUsers = ({ user }) => {
                 {/* Action Button */}
                 <View style={{ marginTop: 15 }}>
                     {item.subscription.status === 'requested_closure' ? (
-                        <TouchableOpacity
-                            style={[styles.settleButton, { backgroundColor: COLORS?.warning }]}
-                            activeOpacity={0.9}
-                            onPress={() => handleApproveClosure(item)}
-                        >
-                            <Text style={styles.settleButtonText}>Approve Closure</Text>
-                            <Icon name="check-circle" size={12} color="#fff" />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity
+                                style={[styles.settleButton, { backgroundColor: COLORS?.warning, flex: 1 }]}
+                                activeOpacity={0.9}
+                                onPress={() => handleApproveClosure(item)}
+                            >
+                                <Text style={styles.settleButtonText}>Approve</Text>
+                                <Icon name="check-circle" size={12} color="#fff" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.settleButton, { backgroundColor: '#ef4444', flex: 1 }]}
+                                activeOpacity={0.9}
+                                onPress={() => handleRejectClosure(item)}
+                            >
+                                <Text style={styles.settleButtonText}>Reject</Text>
+                                <Icon name="times-circle" size={12} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
                     ) : item.plan.returnType === 'Cash' ? (
                         <TouchableOpacity
                             style={styles.settleButton}
@@ -2093,7 +2272,7 @@ const MerchantUsers = ({ user }) => {
                                 setUserDetailsModalVisible(true);
                             }}
                         >
-                            <Text style={styles.userName}>{item.user.name?.length > 10 ? item.user.name.substring(0, 10) + '...' : item.user.name}</Text>
+                            <Text style={styles.userName}>{item.user.name}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Text style={styles.userPhone}>{item.user.phone}</Text>
                                 {item.user.acc_no && (
@@ -2103,10 +2282,10 @@ const MerchantUsers = ({ user }) => {
                                     </View>
                                 )}
                             </View>
+                            <View style={[styles.planBadge, { alignSelf: 'flex-start', marginTop: 6 }]}>
+                                <Text style={styles.planBadgeText}>{item.plan.planName}</Text>
+                            </View>
                         </TouchableOpacity>
-                    </View>
-                    <View style={styles.planBadge}>
-                        <Text style={styles.planBadgeText}>{item.plan.planName}</Text>
                     </View>
                 </View>
 
@@ -2162,12 +2341,6 @@ const MerchantUsers = ({ user }) => {
                                 {effectiveStatus === 'delivered_gold' ? 'DELIVERED GOLD' : (effectiveStatus ? effectiveStatus.toUpperCase() : 'ACTIVE')}
                             </Text>
                         </View>
-                        {effectiveStatus === 'settled' && (
-                            <View style={[styles.statusTag, { backgroundColor: '#E8F5E9', marginTop: 5, alignSelf: 'flex-start' }]}>
-                                <Icon name="check-circle" size={12} color="#2E7D32" />
-                                <Text style={styles.statusOkText}>Plan Settled</Text>
-                            </View>
-                        )}
 
 
                     </View>
@@ -2185,66 +2358,99 @@ const MerchantUsers = ({ user }) => {
                                 <Icon name="check-circle" size={12} color="#2E7D32" />
                                 <Text style={styles.statusOkText}>Up-to-Date</Text>
                             </View>
-                        ) : <View />
+                        ) : (
+                            <View style={{ alignSelf: 'flex-start' }}>
+                                {/* <View style={[styles.statusTag, { backgroundColor: '#E8F5E9' }]}>
+                                    <Icon name="check-circle" size={12} color="#2E7D32" />
+                                    <Text style={styles.statusOkText}>Plan Settled</Text>
+                                </View> */}
+                                {item.subscription.settlementDetails?.settledDate && (
+                                    <Text style={{ fontSize: 12, fontWeight: 500, color: COLORS?.secondary, marginTop: 4 }}>
+                                      Settled On: {new Date(item.subscription.settlementDetails.settledDate).toLocaleDateString('en-IN')}
+                                    </Text>
+                                )}
+                            </View>
+                        )
                     )}
 
-                    <View style={{ flexDirection: 'row', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4 }}>
+                        {item.subscription?.settlementDetails?.receiptImage && (
+                            <TouchableOpacity
+                                style={styles.chipBtn}
+                                onPress={() => viewProof(item.subscription.settlementDetails.receiptImage)}
+                            >
+                                <Icon name="receipt" size={11} color="#2E7D32" />
+                                <Text style={[styles.chipBtnText, { color: '#2E7D32' }]}>Settlement Receipt</Text>
+                            </TouchableOpacity>
+                        )}
+                        {item.subscription?.deliveryDetails?.receiptImage && (
+                            <TouchableOpacity
+                                style={styles.chipBtn}
+                                onPress={() => viewProof(item.subscription.deliveryDetails.receiptImage)}
+                            >
+                                <Icon name="receipt" size={11} color="#2E7D32" />
+                                <Text style={[styles.chipBtnText, { color: '#2E7D32' }]}>Delivery Receipt</Text>
+                            </TouchableOpacity>
+                        )}
+                        {item.subscription?.deliveryHistory?.filter(d => d.receiptImage).map((delivery, index) => (
+                            <TouchableOpacity
+                                key={`delivery-receipt-${index}`}
+                                style={styles.chipBtn}
+                                onPress={() => viewProof(delivery.receiptImage)}
+                            >
+                                <Icon name="receipt" size={11} color="#2E7D32" />
+                                <Text style={[styles.chipBtnText, { color: '#2E7D32' }]}>Receipt {index + 1}</Text>
+                            </TouchableOpacity>
+                        ))}
                         <TouchableOpacity
-                            style={styles.viewHistoryButton}
+                            style={styles.chipBtn}
                             onPress={() => openHistoryModal(item)}
                         >
-                            <Icon name="history" size={12} color={COLORS?.secondary} />
-                            <Text style={styles.viewHistoryText}>History</Text>
+                            <Icon name="history" size={11} color={COLORS?.secondary} />
+                            <Text style={styles.chipBtnText}>History</Text>
                         </TouchableOpacity>
 
                         {effectiveStatus === 'requested_closure' ? (
                             <TouchableOpacity
-                                style={[styles.payOfflineButton, { backgroundColor: COLORS?.warning, borderColor: COLORS?.warning }]}
+                                style={[styles.actionBtn, { backgroundColor: COLORS?.warning }]}
                                 onPress={() => handleApproveClosure(item)}
                             >
-                                <Icon name="check-circle" size={12} color="#fff" style={{ marginRight: 4 }} />
-                                <Text style={[styles.payOfflineText, { color: '#fff' }]}>Approve Closure</Text>
+                                <Icon name="check-circle" size={11} color="#fff" style={{ marginRight: 3 }} />
+                                <Text style={styles.actionBtnText}>Approve Closure</Text>
                             </TouchableOpacity>
                         ) : (effectiveStatus === 'completed' || effectiveStatus === 'closed' || effectiveStatus === 'requested_withdrawal') ? (
                             item.plan.returnType?.toLowerCase() === 'gold' ? (
                                 <TouchableOpacity
-                                    style={[styles.payOfflineButton, { backgroundColor: '#ffd700', borderColor: '#DAA520', flexDirection: 'row', alignItems: 'center' }]}
+                                    style={[styles.actionBtn, { backgroundColor: '#ffd700' }]}
                                     onPress={() => handleDeliverGold(item)}
                                 >
-                                    <Text style={[styles.payOfflineText, { color: '#fff' }]}>Deliver Gold</Text>
+                                    <Text style={[styles.actionBtnText, { color: '#333' }]}>Deliver Gold</Text>
                                 </TouchableOpacity>
                             ) : (
                                 <TouchableOpacity
-                                    style={[styles.payOfflineButton, { backgroundColor: COLORS?.success, borderColor: COLORS?.success }]}
+                                    style={[styles.actionBtn, { backgroundColor: COLORS?.success }]}
                                     onPress={() => {
                                         setSelectedWithdrawalRequest(item);
                                         setSettlementForm({ amount: item.subscription.totalAmountPaid.toString(), transactionId: '', note: '' });
                                         setSettlementModalVisible(true);
                                     }}
                                 >
-                                    <Text style={[styles.payOfflineText, { color: '#fff' }]}>Settle Cash</Text>
+                                    <Text style={styles.actionBtnText}>Settle Cash</Text>
                                 </TouchableOpacity>
                             )
                         ) : (
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 5, flex: 1 }}>
+                            <>
                                 {effectiveStatus === 'active' && (
                                     <TouchableOpacity
-                                        style={[styles.payOfflineButton, { backgroundColor: '#FEE2E2', borderColor: '#FEE2E2' }]}
+                                        style={[styles.actionBtn, { backgroundColor: '#FEE2E2', borderColor: '#FFCDD2' }]}
                                         onPress={() => handleDirectClose(item)}
                                     >
-                                        <Icon name="times-circle" size={12} color="#D32F2F" />
+                                        <Icon name="times-circle" size={11} color="#D32F2F" />
                                     </TouchableOpacity>
                                 )}
-                                {/* Settle/Deliver button always visible for Cash or Unlimited plans not yet settled */}
                                 {canSettle && (
                                     <TouchableOpacity
-                                        style={[
-                                            styles.payOfflineButton, 
-                                            { 
-                                                backgroundColor: item.plan.returnType === 'Gold' ? '#ffd700' : COLORS?.success, 
-                                                borderColor: item.plan.returnType === 'Gold' ? '#DAA520' : COLORS?.success 
-                                            }
-                                        ]}
+                                        style={[styles.actionBtn, { backgroundColor: item.plan.returnType === 'Gold' ? '#ffd700' : COLORS?.success }]}
                                         onPress={() => {
                                             if (item.plan.returnType === 'Gold') {
                                                 handleDeliverGold(item);
@@ -2255,29 +2461,34 @@ const MerchantUsers = ({ user }) => {
                                             }
                                         }}
                                     >
-                                        <Text style={[styles.payOfflineText, { color: item.plan.returnType === 'Gold' ? '#000' : '#fff' }]}>
+                                        <Text style={[styles.actionBtnText, { color: item.plan.returnType === 'Gold' ? '#333' : '#fff' }]}>
                                             {item.plan.returnType === 'Gold' ? 'Gold' : 'Settle'}
                                         </Text>
                                     </TouchableOpacity>
                                 )}
                                 <TouchableOpacity
                                     style={[
-                                        styles.payOfflineButton,
+                                        styles.actionBtn,
+                                        { borderColor: COLORS?.primary, backgroundColor: '#fff' },
                                         (((!isUnlimited && remainingBalance <= 0) ||
-                                            ['settled', 'delivered_gold'].includes(effectiveStatus)) && { opacity: 0.5 })
+                                            hasPaidCurrentMonth(item) ||
+                                            ['settled', 'delivered_gold'].includes(effectiveStatus)) && { opacity: 0.45 })
                                     ]}
-                                        onPress={() => openManualPaymentModal(item)}
-                                        disabled={((!isUnlimited && remainingBalance <= 0) ||
-                                            ['settled', 'delivered_gold'].includes(effectiveStatus))}
-                                    >
-                                        <Text style={styles.payOfflineText}>
-                                            {effectiveStatus === 'settled' ? 'Settled' :
-                                                effectiveStatus === 'delivered_gold' ? 'Delivered' : 'Record'}
-                                        </Text>
+                                    onPress={() => openManualPaymentModal(item)}
+                                    disabled={((!isUnlimited && remainingBalance <= 0) ||
+                                        hasPaidCurrentMonth(item) ||
+                                        ['settled', 'delivered_gold'].includes(effectiveStatus))}
+                                >
+                                    <Text style={[styles.actionBtnText, { color: COLORS?.primary }]}>
+                                        {effectiveStatus === 'settled' ? 'Settled' :
+                                            effectiveStatus === 'delivered_gold' ? 'Delivered' :
+                                            hasPaidCurrentMonth(item) ? 'Paid' : 'Record'}
+                                    </Text>
                                 </TouchableOpacity>
-                            </View>
+                            </>
                         )}
                     </View>
+
                 </View>
 
                 {/* Visual Indicator for Expand */}
@@ -2961,7 +3172,11 @@ const MerchantUsers = ({ user }) => {
                                         <TextInput
                                             style={[styles.textInput, { backgroundColor: '#fff', borderColor: '#FCD34D', marginBottom: 10 }]}
                                             value={manualForm.customGoldRate}
-                                            onChangeText={t => setManualForm(prev => ({ ...prev, customGoldRate: t }))}
+                                            editable={!user?.isStaff}
+                                            onChangeText={t => {
+                                                setIsRateEdited(true);
+                                                setManualForm(prev => ({ ...prev, customGoldRate: t }));
+                                            }}
                                             keyboardType="numeric"
                                             placeholder="Enter gold rate applied..."
                                         />
@@ -3174,6 +3389,11 @@ const MerchantUsers = ({ user }) => {
                                                         <Icon name="file-invoice" size={14} color={COLORS?.primary} />
                                                     </TouchableOpacity>
                                                 )}
+                                                {item.isDelivered && selectedSubscriber?.subscription?.deliveryHistory?.find(d => d.paymentIds?.includes(item._id) && d.receiptImage) && (
+                                                    <TouchableOpacity onPress={() => viewProof(selectedSubscriber.subscription.deliveryHistory.find(d => d.paymentIds?.includes(item._id)).receiptImage)} style={{ padding: 4 }}>
+                                                        <Icon name="receipt" size={14} color="#2E7D32" />
+                                                    </TouchableOpacity>
+                                                )}
                                                 {/* Delete payment button */}
                                                 {!user?.isStaff && (
                                                     <TouchableOpacity
@@ -3187,6 +3407,48 @@ const MerchantUsers = ({ user }) => {
                                         </View>
                                     </View>
                                 )}
+                                ListFooterComponent={
+                                    selectedSubscriber?.subscription?.deliveryHistory?.length > 0 ? (
+                                        <View style={{ marginTop: 20 }}>
+                                            <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 10 }]}>Delivery History</Text>
+                                            {selectedSubscriber.subscription.deliveryHistory.map((delivery, index) => (
+                                                <View key={index} style={styles.historyItem}>
+                                                    <View style={styles.historyLeft}>
+                                                        <Text style={styles.historyDate}>{formatDisplayDate(delivery.deliveredDate || delivery.createdAt)}</Text>
+                                                        <Text style={[styles.historyType, { color: '#B45309' }]}>
+                                                            Gold Delivery
+                                                        </Text>
+                                                        {delivery.notes && (
+                                                            <Text style={{ fontSize: 10, color: '#666', marginTop: 2 }}>{delivery.notes}</Text>
+                                                        )}
+                                                    </View>
+                                                    <View style={styles.historyRight}>
+                                                        {delivery.amount > 0 && (
+                                                            <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: 'bold' }}>
+                                                                - ₹{delivery.amount}
+                                                            </Text>
+                                                        )}
+                                                        {delivery.goldWeight > 0 && (
+                                                            <Text style={{ fontSize: 12, color: '#92400e', fontWeight: 'bold' }}>
+                                                                - {delivery.goldWeight.toFixed(3)}g Gold
+                                                            </Text>
+                                                        )}
+                                                        
+                                                        {delivery.receiptImage && (
+                                                            <TouchableOpacity
+                                                                style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end' }}
+                                                                onPress={() => viewProof(delivery.receiptImage)}
+                                                            >
+                                                                <Icon name="receipt" size={10} color="#D97706" style={{ marginRight: 4 }} />
+                                                                <Text style={{ color: '#D97706', fontSize: 10, fontWeight: 'bold', textDecorationLine: 'underline' }}>View Receipt</Text>
+                                                            </TouchableOpacity>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    ) : null
+                                }
                             />
                         )}
                     </View>
@@ -3215,16 +3477,9 @@ const MerchantUsers = ({ user }) => {
                                 <Text style={{ color: COLORS?.secondary, fontSize: 13, marginTop: 4 }}>Total Paid: <Text style={{ fontWeight: 'bold', color: COLORS?.primary }}>₹{selectedWithdrawalRequest?.subscription?.totalAmountPaid || 0}</Text></Text>
                             </View>
 
-                            {/* Display Withdrawal Details for Merchant */}
-                            {selectedWithdrawalRequest?.subscription?.withdrawalRequest && (
-                                <View style={{ backgroundColor: '#f0f4f8', padding: 10, borderRadius: 8, marginBottom: 20 }}>
-                                    <Text style={{ fontWeight: 'bold', color: COLORS?.dark, marginBottom: 5 }}>Bank Details:</Text>
-                                    <Text style={{ fontSize: 13, color: '#333' }}>Name: {selectedWithdrawalRequest.user.name}</Text>
-                                    <Text style={{ fontSize: 13, color: '#333' }}>Bank: {selectedWithdrawalRequest.subscription.withdrawalRequest.bankName || 'N/A'}</Text>
-                                    <Text style={{ fontSize: 13, color: '#333' }}>A/C No: {selectedWithdrawalRequest.subscription.withdrawalRequest.accountNumber}</Text>
-                                    <Text style={{ fontSize: 13, color: '#333' }}>IFSC: {selectedWithdrawalRequest.subscription.withdrawalRequest.ifsc}</Text>
-                                </View>
-                            )}
+                            {/* Bank details removed */}
+
+                            
 
                             <Text style={styles.inputLabel}>Amount Settled (₹)</Text>
                             <TextInput
@@ -3250,26 +3505,63 @@ const MerchantUsers = ({ user }) => {
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.inputLabel}>Transaction ID / Reference</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={settlementForm.transactionId}
-                                onChangeText={t => setSettlementForm({ ...settlementForm, transactionId: t })}
+                            <Text style={styles.inputLabel}>Notes</Text>
+                            <View style={{ flexDirection: 'row', marginBottom: 20, flexWrap: 'wrap' }}>
+                                <TouchableOpacity
+                                    style={[styles.filterChip, { marginRight: 10, marginBottom: 10 }, settlementForm.note === 'Cash Refund' && styles.filterChipActive]}
+                                    onPress={() => setSettlementForm({ ...settlementForm, note: 'Cash Refund' })}
+                                >
+                                    <Text style={[styles.filterChipText, settlementForm.note === 'Cash Refund' && styles.filterChipTextActive]}>Cash Refund</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.filterChip, { marginBottom: 10 }, settlementForm.note === 'Gold Jewellery Purchased' && styles.filterChipActive]}
+                                    onPress={() => setSettlementForm({ ...settlementForm, note: 'Gold Jewellery Purchased' })}
+                                >
+                                    <Text style={[styles.filterChipText, settlementForm.note === 'Gold Jewellery Purchased' && styles.filterChipTextActive]}>Gold Jewellery Purchased</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.inputLabel}>Settlement Date</Text>
+                            <TouchableOpacity 
+                                style={[styles.textInput, { justifyContent: 'center', marginBottom: 15 }]} 
+                                onPress={() => setSettlementDatePickerVisibility(true)}
+                            >
+                                <Text>{(settlementForm.date || new Date()).toLocaleDateString('en-IN')}</Text>
+                            </TouchableOpacity>
+
+                            <DateTimePickerModal
+                                isVisible={isSettlementDatePickerVisible}
+                                mode="date"
+                                onConfirm={(selectedDate) => {
+                                    setSettlementDatePickerVisibility(false);
+                                    setSettlementForm({ ...settlementForm, date: selectedDate });
+                                }}
+                                onCancel={() => setSettlementDatePickerVisibility(false)}
+                                maximumDate={new Date()}
                             />
 
-                            <Text style={styles.inputLabel}>Notes</Text>
-                            <TextInput
-                                style={[styles.textInput, { height: 60, textAlignVertical: 'top' }]}
-                                value={settlementForm.note}
-                                onChangeText={t => setSettlementForm({ ...settlementForm, note: t })}
-                                multiline
-                                placeholder="Bank transfer details..."
-                            />
+                            <Text style={styles.inputLabel}>Upload Receipt *</Text>
+                            <TouchableOpacity style={[styles.textInput, { justifyContent: 'center', marginBottom: 15, alignItems: 'center' }]} onPress={pickReceiptImageForSettlement} disabled={isUploadingReceipt}>
+                                {isUploadingReceipt ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <ActivityIndicator color={COLORS?.primary} size="small" style={{ marginRight: 8 }} />
+                                        <Text style={{ color: '#999' }}>Uploading...</Text>
+                                    </View>
+                                ) : settlementForm.receiptImage ? (
+                                    <Text style={{ color: COLORS?.primary, fontWeight: 'bold' }}>Image Uploaded Successfully</Text>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Icon name="image" size={16} color="#999" style={{ marginRight: 8 }} />
+                                        <Text style={{ color: '#999' }}>Choose an image...</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
 
                             <TouchableOpacity
-                                style={styles.submitButton}
+                                style={[styles.submitButton, (!settlementForm.type || !settlementForm.amount || !settlementForm.receiptImage) && { opacity: 0.5 }]}
                                 onPress={executeSettlement}
-                                disabled={submittingSettlement}
+                                disabled={submittingSettlement || !settlementForm.type || !settlementForm.amount || !settlementForm.receiptImage}
                             >
                                 {submittingSettlement ? (
                                     <ActivityIndicator color="#fff" />
@@ -3302,7 +3594,7 @@ const MerchantUsers = ({ user }) => {
                         </View>
                         
                         <Text style={{ textAlign: 'center', marginBottom: 25, color: '#666', fontSize: 14, lineHeight: 20 }}>
-                            Please enter the 6-digit OTP sent to <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedWithdrawalRequest?.user?.name}</Text>'s mobile number to confirm the settlement.
+                            Please enter the 6-digit OTP sent to <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedWithdrawalRequest?.user?.name}</Text>'s mobile number <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedWithdrawalRequest?.user?.phone ? selectedWithdrawalRequest.user.phone.substring(0, 5) + 'xxxxx' : ''}</Text> to confirm the settlement.
                         </Text>
                         
                         <TextInput
@@ -3475,27 +3767,43 @@ const MerchantUsers = ({ user }) => {
                                 </View>
                             )}
 
-                            <Text style={styles.inputLabel}>Transaction/Ref ID (Optional)</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={deliveryForm.transactionId}
-                                onChangeText={t => setDeliveryForm({ ...deliveryForm, transactionId: t })}
-                                placeholder="Ref #"
-                            />
+                            <Text style={styles.inputLabel}>Notes</Text>
+                            <View style={{ flexDirection: 'row', marginBottom: 20, flexWrap: 'wrap' }}>
+                                <TouchableOpacity
+                                    style={[styles.filterChip, { marginRight: 10, marginBottom: 10 }, deliveryForm.notes === 'Cash Refund' && styles.filterChipActive]}
+                                    onPress={() => setDeliveryForm({ ...deliveryForm, notes: 'Cash Refund' })}
+                                >
+                                    <Text style={[styles.filterChipText, deliveryForm.notes === 'Cash Refund' && styles.filterChipTextActive]}>Cash Refund</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.filterChip, { marginBottom: 10 }, deliveryForm.notes === 'Gold Jewellery Purchased' && styles.filterChipActive]}
+                                    onPress={() => setDeliveryForm({ ...deliveryForm, notes: 'Gold Jewellery Purchased' })}
+                                >
+                                    <Text style={[styles.filterChipText, deliveryForm.notes === 'Gold Jewellery Purchased' && styles.filterChipTextActive]}>Gold Jewellery Purchased</Text>
+                                </TouchableOpacity>
+                            </View>
 
-                            <Text style={styles.inputLabel}>Delivery Notes</Text>
-                            <TextInput
-                                style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
-                                value={deliveryForm.notes}
-                                onChangeText={t => setDeliveryForm({ ...deliveryForm, notes: t })}
-                                multiline
-                                placeholder="E.g. Delivered 10g Gold Chain, Invoice #123..."
-                            />
+                            <Text style={styles.inputLabel}>Upload Receipt *</Text>
+                            <TouchableOpacity style={[styles.textInput, { justifyContent: 'center', marginBottom: 15, alignItems: 'center' }]} onPress={pickReceiptImageForDelivery} disabled={isUploadingReceipt}>
+                                {isUploadingReceipt ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <ActivityIndicator color={COLORS?.primary} size="small" style={{ marginRight: 8 }} />
+                                        <Text style={{ color: '#999' }}>Uploading...</Text>
+                                    </View>
+                                ) : deliveryForm.receiptImage ? (
+                                    <Text style={{ color: COLORS?.primary, fontWeight: 'bold' }}>Image Uploaded Successfully</Text>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Icon name="image" size={16} color="#999" style={{ marginRight: 8 }} />
+                                        <Text style={{ color: '#999' }}>Choose an image...</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.submitButton, { backgroundColor: '#d4af37' }]}
+                                style={[styles.submitButton, { backgroundColor: '#d4af37' }, !deliveryForm.receiptImage && { opacity: 0.5 }]}
                                 onPress={executeDelivery}
-                                disabled={submittingDelivery}
+                                disabled={submittingDelivery || !deliveryForm.receiptImage}
                             >
                                 {submittingDelivery ? (
                                     <ActivityIndicator color="#fff" />
@@ -3528,7 +3836,7 @@ const MerchantUsers = ({ user }) => {
                         </View>
                         
                         <Text style={{ textAlign: 'center', marginBottom: 25, color: '#666', fontSize: 14, lineHeight: 20 }}>
-                            Please enter the 6-digit OTP sent to <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedForDelivery?.user?.name}</Text>'s mobile number to confirm the {deliveryForm.isPartial ? 'partial release' : 'delivery'}.
+                            Please enter the 6-digit OTP sent to <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedForDelivery?.user?.name}</Text>'s mobile number <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedForDelivery?.user?.phone ? selectedForDelivery.user.phone.substring(0, 5) + 'xxxxx' : ''}</Text> to confirm the {deliveryForm.isPartial ? 'partial release' : 'delivery'}.
                         </Text>
                         
                         <TextInput
@@ -3910,6 +4218,72 @@ const MerchantUsers = ({ user }) => {
                         )}
                     </TouchableOpacity>
                 </View>
+                </Modal>
+            {/* Generating Receipt Modal */}
+            <Modal transparent={true} visible={generatingReceipt} animationType="fade">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={{ backgroundColor: 'white', padding: 25, borderRadius: 15, alignItems: 'center', elevation: 5 }}>
+                        <ActivityIndicator size="large" color="#915200" />
+                        <Text style={{ marginTop: 15, fontWeight: 'bold', fontSize: 16, color: '#915200' }}>Generating Receipt...</Text>
+                        <Text style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Please wait a moment</Text>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Invoice Popup Modal */}
+            <Modal
+                visible={!!invoiceHtml}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setInvoiceHtml(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { padding: 0, height: '80%', overflow: 'hidden' }]}>
+                        <View style={[styles.modalHeader, { padding: 16, backgroundColor: '#f5f5f5', borderBottomWidth: 1, borderColor: '#eee', marginBottom: 0 }]}>
+                            <Text style={styles.modalTitle}>Receipt</Text>
+                            <TouchableOpacity onPress={() => setInvoiceHtml(null)}>
+                                <Icon name="times" size={20} color={COLORS?.dark} />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <View style={{ flex: 1, position: 'relative' }}>
+                            <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }} style={{ flex: 1 }}>
+                                <WebView
+                                    originWhitelist={['*']}
+                                    source={{ html: invoiceHtml }}
+                                    style={{ flex: 1 }}
+                                    showsVerticalScrollIndicator={false}
+                                    allowFileAccess={true}
+                                    allowUniversalAccessFromFileURLs={true}
+                                    allowFileAccessFromFileURLs={true}
+                                    onLoadStart={() => setWebViewLoading(true)}
+                                    onLoadEnd={() => setWebViewLoading(false)}
+                                />
+                            </ViewShot>
+                            {webViewLoading && (
+                                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center' }}>
+                                    <ActivityIndicator size="large" color="#915200" />
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={{ padding: 16, borderTopWidth: 1, borderColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: '#f0f0f0', flex: 1 }]}
+                                onPress={() => setInvoiceHtml(null)}
+                            >
+                                <Text style={{ color: COLORS?.dark, fontWeight: 'bold' }}>Close</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: COLORS?.primary, flex: 1, flexDirection: 'row', gap: 8 }]}
+                                onPress={downloadInvoiceAsJPG}
+                            >
+                                <Icon name="download" size={16} color="#fff" />
+                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save JPG</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
             </Modal>
         </ImageBackground>
     );
@@ -4105,11 +4479,41 @@ const styles = StyleSheet.create({
     viewHistoryButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         paddingVertical: 6,
         backgroundColor: '#f5f5f5',
         borderRadius: 6,
-        marginRight: 8,
+        marginRight: 0,
+    },
+    chipBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: '#E8F5E9',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A5D6A7',
+    },
+    chipBtnText: {
+        fontSize: 11,
+        color: COLORS?.secondary,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    actionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    actionBtnText: {
+        fontSize: 12,
+        color: '#fff',
+        fontWeight: 'bold',
     },
     viewHistoryText: {
         fontSize: 12,

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ImageBackground, View, Text, StyleSheet, Image, Animated, Modal, TouchableOpacity, Linking, Platform, BackHandler, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, Animated, Modal, TouchableOpacity, Linking, Platform, BackHandler, ActivityIndicator } from 'react-native';
 import { COLORS } from '../styles/theme';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { APIURL } from '../constants/api';
 import packageJson from '../../package.json';
+import Video from 'react-native-video';
 
 const IntroScreen = ({ onFinish }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -126,18 +127,15 @@ const IntroScreen = ({ onFinish }) => {
             duration: 1000,
             useNativeDriver: true,
         }).start();
+    };
 
-        // Timer to finish
-        const timer = setTimeout(() => {
-            // Fade out
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 500,
-                useNativeDriver: true,
-            }).start(onFinish);
-        }, 3000);
-
-        return () => clearTimeout(timer);
+    const handleVideoEnd = () => {
+        if (updateType === 'mandatory' && showUpdateModal) {
+            return;
+        }
+        if (onFinish) {
+            onFinish();
+        }
     };
 
     const handleUpdate = () => {
@@ -171,20 +169,16 @@ const IntroScreen = ({ onFinish }) => {
     };
 
     return (
-        <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
-            <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-                <View style={styles.logoContainer}>
-                    <Image
-                        source={require('../assets/DK_white.png')}
-                        style={styles.logo}
-                    />
-                </View>
+        <View style={styles.container}>
+            <Video
+                source={require('../assets/DKGOLD.mp4')}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                onEnd={handleVideoEnd}
+                repeat={false}
+            />
 
-                <View style={styles.poweredByContainer}>
-                    <Text style={styles.poweredBy}>Developed by</Text>
-                    <Text style={styles.poweredBy}>SAFPRO TECHNOLOGY SOLUTIONS</Text>
-                </View>
-            </Animated.View>
+
 
             <Modal visible={showUpdateModal} transparent animationType="none">
                 <View style={styles.modalOverlay}>
@@ -250,13 +244,8 @@ const IntroScreen = ({ onFinish }) => {
                 </View>
             </Modal>
 
-            {checkingUpdate && (
-                <View style={styles.checkingContainer}>
-                    <Image source={require('../assets/DK.png')} style={styles.checkingLogo} />
-                    <Text style={styles.checkingText}>Checking for updates...</Text>
-                </View>
-            )}
-        </ImageBackground>
+
+        </View>
     );
 };
 
@@ -276,9 +265,22 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    logo: {
+    logoBox: {
         width: 180,
-        height: 120,
+        height: 180,
+        backgroundColor: '#92400E',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 20,
+        shadowColor: '#1e1e14',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+    logo: {
+        width: 200,
+        height: 100,
         resizeMode: 'contain',
     },
     poweredByContainer: {
@@ -286,17 +288,21 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         marginBottom: 20,
     },
-    poweredBy: {
-        fontSize: 10,
-        color: '#ffffff',
-        fontWeight: 'bold',
-        letterSpacing: 1,
+    poweredByLabel: {
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.8)',
+        letterSpacing: 1.2,
+        marginBottom: 4,
+    },
+    poweredByBrand: {
+        fontSize: 16,
+        color: '#d4af37', // Gold accent
+        fontWeight: '900',
+        letterSpacing: 2,
         textTransform: 'uppercase',
-        fontStyle: 'italic',
-        marginBottom: 5,
-        textShadowColor: 'rgba(0, 0, 0, 0.4)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+        textShadowColor: 'rgba(0, 0, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
     safproLogo: {
         width: 100,

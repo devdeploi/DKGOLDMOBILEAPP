@@ -266,7 +266,7 @@ const UserDashboardScreen = ({ user: initialUser, onLogout, onSelectMerchant, on
             case 'analytics':
                 return <AnalyticsTab user={user} />;
             case 'profile':
-                return <ProfileTab user={user} onUpdate={handleUpdateProfile} onUpdateImage={updateProfileImage} onLogout={handleLogoutPress} onRefresh={fetchUser} onSwitchProfile={onSwitchProfile} />;
+                return <ProfileTab user={user} merchants={merchants} onUpdate={handleUpdateProfile} onUpdateImage={updateProfileImage} onLogout={handleLogoutPress} onRefresh={fetchUser} onSwitchProfile={onSwitchProfile} />;
             default:
                 return null;
         }
@@ -278,8 +278,8 @@ const UserDashboardScreen = ({ user: initialUser, onLogout, onSelectMerchant, on
     const userTabs = [
         { id: 'dashboard', icon: 'home', label: 'Overview' },
         { id: 'gold', icon: 'coins', label: 'Live Rates' },
-        { id: 'merchants', icon: 'store', label: 'DK Gold' },
-        { id: 'analytics', icon: 'chart-line', label: 'Subscriptions' },
+        { id: 'merchants', icon: 'store', label: 'Plans' },
+        { id: 'analytics', icon: 'chart-line', label: 'Pay Now' },
         { id: 'profile', icon: 'user', label: 'Profile', profileImage: user?.profileImage },
     ];
 

@@ -315,6 +315,8 @@ function App() {
                     data.merchants[0];
           
           setGlobalMerchantRates({
+             goldRate9k: m.goldRate9k,
+             goldRate14k: m.goldRate14k,
              goldRate18k: m.goldRate18k,
              goldRate22k: m.goldRate22k,
              goldRate24k: m.goldRate24k,
@@ -329,6 +331,8 @@ function App() {
   const merchantRatesObj = useMemo(() => {
     if (user?.role === 'merchant') {
        return { 
+         goldRate9k: user.goldRate9k,
+         goldRate14k: user.goldRate14k,
          goldRate18k: user.goldRate18k, 
          goldRate22k: user.goldRate22k, 
          goldRate24k: user.goldRate24k,
@@ -336,7 +340,7 @@ function App() {
        };
     }
     return globalMerchantRates;
-  }, [user?.role, user?.goldRate18k, user?.goldRate22k, user?.goldRate24k, user?.silverRate, globalMerchantRates]);
+  }, [user?.role, user?.goldRate9k, user?.goldRate14k, user?.goldRate18k, user?.goldRate22k, user?.goldRate24k, user?.silverRate, globalMerchantRates]);
 
   return (
     <SafeAreaProvider>

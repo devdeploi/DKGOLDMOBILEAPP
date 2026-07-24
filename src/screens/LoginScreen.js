@@ -654,6 +654,12 @@ const LoginScreen = ({ onLogin, onRegisterClick }) => {
                         (Use 'merchant@test.com' for Merchant, else User)
                     </Text> */}
                     </View>
+                    
+                    {/* Developed By Tag */}
+                    <View style={styles.developedByContainer}>
+                        <Text style={styles.developedByText}>Developed by</Text>
+                        <Text style={styles.developedByBrand}>Safpro Technology Solutions</Text>
+                    </View>
                 </ScrollView>
             </SafeAreaView>
             <CustomAlert
@@ -829,6 +835,23 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 2,
+    },
+    developedByContainer: {
+        marginTop: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingBottom: 20,
+    },
+    developedByText: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.7)',
+    },
+    developedByBrand: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: 'rgba(255, 255, 255, 0.95)',
+        letterSpacing: 0.5,
+        marginTop: 4,
     },
 });
 

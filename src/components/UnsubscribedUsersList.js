@@ -12,7 +12,8 @@ import {
     RefreshControl,
     KeyboardAvoidingView,
     Platform,
-    ImageBackground
+    ImageBackground,
+    Linking
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -61,6 +62,7 @@ const UnsubscribedUsersList = ({ user }) => {
         email: '',
         address: ''
     });
+    const [isRateEdited, setIsRateEdited] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
 
     const [showSubscribeModal, setShowSubscribeModal] = useState(false);
@@ -143,6 +145,18 @@ const UnsubscribedUsersList = ({ user }) => {
         fetchAccNoPreview();
     }, [subscribeForm.planId, selectedUser]);
 
+    useEffect(() => {
+        if (!isRateEdited || user?.isStaff) {
+            const plan = plans.find(p => p._id === subscribeForm.planId);
+            if (plan) {
+                setSubscribeForm(prev => ({
+                    ...prev,
+                    customGoldRate: (plan.type === 'unlimited' ? (user.goldRate24k || goldRate || 0) : (goldRate || 0)).toFixed(2)
+                }));
+            }
+        }
+    }, [goldRate, user.goldRate24k, subscribeForm.planId, user?.isStaff]);
+
     const onRefresh = () => {
         setRefreshing(true);
         setPage(1);
@@ -160,6 +174,7 @@ const UnsubscribedUsersList = ({ user }) => {
     const handleOpenSubscribe = (u) => {
         setSelectedUser(u);
         setAccNoPreview(null); // Reset preview; will load via useEffect when planId is set
+        setIsRateEdited(false);
         setSubscribeForm({
             planId: plans.length > 0 ? plans[0]._id : '',
             amount: '',
@@ -277,6 +292,12 @@ const UnsubscribedUsersList = ({ user }) => {
                     </View>
                 </View>
                 <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                        style={styles.callBtn}
+                        onPress={() => Linking.openURL(`tel:${item.phone}`)}
+                    >
+                        <Icon name="phone-alt" size={12} color="#1890ff" />
+                    </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.deleteBtn}
                         onPress={() => handleDeleteUser(item)}
@@ -473,7 +494,11 @@ const UnsubscribedUsersList = ({ user }) => {
                                             placeholder="Rate"
                                             keyboardType="numeric"
                                             value={subscribeForm.customGoldRate}
-                                            onChangeText={(text) => setSubscribeForm({ ...subscribeForm, customGoldRate: text })}
+                                            editable={!user?.isStaff}
+                                            onChangeText={(text) => {
+                                                setIsRateEdited(true);
+                                                setSubscribeForm({ ...subscribeForm, customGoldRate: text });
+                                            }}
                                         />
                                     </View>
                                 </View>
@@ -792,6 +817,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#ffcdd2',
+    },
+    callBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#e6f7ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#91d5ff',
     },
     assignBtn: {
         borderRadius: 10,

@@ -110,17 +110,28 @@ const SkeletonPlanCard = () => {
     );
 };
 
-const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) => {
-    // ── Debug: log props on every render ──────────────────────────────────────
-    console.log('[MerchantPlans] render → loadingPlans:', loadingPlans,
-        '| plans type:', typeof plans,
-        '| plans value:', plans,
-        '| plans length:', plans?.length,
-        '| user:', user?._id || user?.id);
+const MerchantPlans = ({ user, loadingPlans, plans: propPlans, onPlanCreated, onRefresh }) => {
+    const plans = useMemo(() => {
+        if (!propPlans || !Array.isArray(propPlans)) return [];
+        return [...propPlans].sort((a, b) => {
+            const nameA = (a.planName || a.name || '').trim().toLowerCase();
+            const nameB = (b.planName || b.name || '').trim().toLowerCase();
+            
+            const isPlanA = nameA.startsWith('plan');
+            const isPlanB = nameB.startsWith('plan');
+
+            if (isPlanA && !isPlanB) return -1;
+            if (!isPlanA && isPlanB) return 1;
+
+            return nameA.localeCompare(nameB);
+        });
+    }, [propPlans]);
+
+
     // ─────────────────────────────────────────────────────────────────────────
 
     // Pagination State
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 10;
     const [displayedPlans, setDisplayedPlans] = useState([]);
     const [loadingMore, setLoadingMore] = useState(false);
 
@@ -314,7 +325,7 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                 monthlyAmount: monthlyAmount,
                 durationMonths: newPlan.isUnlimited ? 0 : duration,
                 description: newPlan.description,
-                returnType: newPlan.isUnlimited ? 'Gold' : newPlan.returnType,
+                returnType: newPlan.returnType,
                 type: newPlan.isUnlimited ? 'unlimited' : 'fixed',
                 merchant: user._id || user.id
             };
@@ -375,7 +386,7 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
         setNewPlan({
             name: plan.planName,
             amount: (plan.totalAmount ?? '').toString(),
-            duration: plan.durationMonths ?? 11,
+            duration: plan.durationMonths > 0 ? plan.durationMonths : 11,
             description: plan.description || '',
             returnType: plan.returnType || 'Cash',
             isUnlimited: plan.type === 'unlimited'
@@ -640,15 +651,11 @@ const MerchantPlans = ({ user, loadingPlans, plans, onPlanCreated, onRefresh }) 
                                         onChangeText={(text) => setNewPlan({ ...newPlan, name: text })}
                                     />
 
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15, backgroundColor: '#f0f9ff', padding: 10, borderRadius: 8 }}>
-                                        <Text style={{ fontWeight: 'bold', color: COLORS?.primary }}>Unlimited Savings Plan?</Text>
-                                        <Switch
-                                            value={newPlan.isUnlimited}
-                                            onValueChange={(val) => setNewPlan({ ...newPlan, isUnlimited: val, returnType: val ? 'Gold' : newPlan.returnType })}
-                                            trackColor={{ false: "#767577", true: COLORS?.primary }}
-                                            thumbColor={newPlan.isUnlimited ? "#f4f3f4" : "#f4f3f4"}
-                                        />
-                                    </View>
+                                    {newPlan.isUnlimited && (
+                                        <Text style={{ fontWeight: 'bold', color: COLORS?.primary, marginBottom: 15, padding: 10, backgroundColor: '#f0f9ff', borderRadius: 8 }}>
+                                            Editing Unlimited Savings Plan
+                                        </Text>
+                                    )}
 
                                     <Text style={styles.label}>{newPlan.isUnlimited ? 'Minimum Investment (₹)' : 'Total Amount (₹)'}</Text>
                                     <TextInput

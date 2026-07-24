@@ -56,6 +56,8 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86_64/RNShareSpec_autolinked_build/cmake_install.cmake")
   include("/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86_64/rnsvg_autolinked_build/cmake_install.cmake")
   include("/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86_64/RNVectorIconsSpec_autolinked_build/cmake_install.cmake")
+  include("/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86_64/rnviewshot_autolinked_build/cmake_install.cmake")
+  include("/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86_64/RNCWebViewSpec_autolinked_build/cmake_install.cmake")
   include("/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86_64/rnworklets_autolinked_build/cmake_install.cmake")
 
 endif()

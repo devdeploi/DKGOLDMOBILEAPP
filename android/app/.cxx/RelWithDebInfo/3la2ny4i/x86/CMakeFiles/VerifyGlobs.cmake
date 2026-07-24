@@ -353,6 +353,54 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86/CMakeFiles/cmake.verify_globs")
 endif()
 
+# react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/rnviewshot-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/react/renderer/components/rnviewshot/*.cpp")
+set(OLD_GLOB
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/react/renderer/components/rnviewshot/ComponentDescriptors.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/react/renderer/components/rnviewshot/EventEmitters.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/react/renderer/components/rnviewshot/Props.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/react/renderer/components/rnviewshot/ShadowNodes.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/react/renderer/components/rnviewshot/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/RNCWebViewSpec-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/react/renderer/components/RNCWebViewSpec/*.cpp")
+set(OLD_GLOB
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/react/renderer/components/RNCWebViewSpec/ComponentDescriptors.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/react/renderer/components/RNCWebViewSpec/EventEmitters.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/react/renderer/components/RNCWebViewSpec/Props.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/react/renderer/components/RNCWebViewSpec/ShadowNodes.cpp"
+  "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/react/renderer/components/RNCWebViewSpec/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at /Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-worklets/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-worklets/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB

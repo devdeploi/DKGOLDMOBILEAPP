@@ -34,7 +34,7 @@ const THEME = {
     danger: '#d32f2f'
 };
 
-const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwitchProfile }) => {
+const ProfileTab = ({ user, merchants, onUpdate, onUpdateImage, onLogout, onRefresh, onSwitchProfile }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(user.name);
     const [email, setEmail] = useState(user.email || ''); // Add email state
@@ -353,9 +353,6 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                             </View>
                         )}
                     </View>
-
-                    {/* Logout Button Removed as requested */}
-
                     {/* Switch Profile Card */}
                     {onSwitchProfile && (
                         <TouchableOpacity
@@ -381,6 +378,57 @@ const ProfileTab = ({ user, onUpdate, onUpdateImage, onLogout, onRefresh, onSwit
                             </View>
                         </TouchableOpacity>
                     )}
+
+                    {/* Merchant Info / Contact Us */}
+                    {merchants && merchants.length > 0 && (
+                        <View style={[styles.card, { backgroundColor: '#fcf8eb', borderColor: THEME.border }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                                <View style={[styles.iconBox, { backgroundColor: THEME.primaryLight, width: 48, height: 48, borderRadius: 24 }]}>
+                                    <Icon name="store" size={20} color={THEME.primaryDark} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 12, color: THEME.primaryDark, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 }}>Your Merchant</Text>
+                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: THEME.text, marginTop: 2 }}>{merchants[0].name}</Text>
+                                </View>
+                            </View>
+                            
+                            <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#f0f0f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 }}>
+                                <View style={[styles.detailRow, { marginBottom: 16 }]}>
+                                    <View style={[styles.iconBox, { width: 36, height: 36, backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#f0f0f0' }]}>
+                                        <Icon name="phone-alt" size={14} color={THEME.primaryDark} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.detailLabel}>Contact Number</Text>
+                                        <Text style={[styles.detailValue, { fontSize: 14 }]}>{merchants[0].phone || 'Not provided'}</Text>
+                                    </View>
+                                </View>
+                                
+                                <View style={[styles.detailRow, { marginBottom: 16 }]}>
+                                    <View style={[styles.iconBox, { width: 36, height: 36, backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#f0f0f0' }]}>
+                                        <Icon name="envelope" size={14} color={THEME.primaryDark} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.detailLabel}>Email Address</Text>
+                                        <Text style={[styles.detailValue, { fontSize: 14 }]}>{merchants[0].email || 'Not provided'}</Text>
+                                    </View>
+                                </View>
+                                
+                                <View style={styles.detailRow}>
+                                    <View style={[styles.iconBox, { width: 36, height: 36, backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#f0f0f0' }]}>
+                                        <Icon name="map-marker-alt" size={14} color={THEME.primaryDark} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.detailLabel}>Location Address</Text>
+                                        <Text style={[styles.detailValue, { fontSize: 14 }]}>{merchants[0].address || 'Not provided'}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Logout Button Removed as requested */}
+
+                    
 
                     <View style={{ height: 40 }} />
                 </ScrollView>

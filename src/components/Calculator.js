@@ -7,10 +7,10 @@ import { useGoldRate } from '../context/GoldRateContext';
 const Calculator = ({ liveGoldRate }) => {
     const { goldRates } = useGoldRate();
     
-    // Get 22K Selling price from context
+    // Get 24K Selling price from context
     const getInitialRate = () => {
-        const rate22k = goldRates.rows.find(r => r.id === '22k_inr')?.sellRate;
-        return rate22k || liveGoldRate || 6500;
+        const rate24k = goldRates.rows.find(r => r.id === '24k_inr')?.sellRate;
+        return rate24k || liveGoldRate || 6500;
     };
 
     // --- Forecast State ---
@@ -21,8 +21,8 @@ const Calculator = ({ liveGoldRate }) => {
     const [currentRate, setCurrentRate] = useState(getInitialRate().toFixed(0));
 
     useEffect(() => {
-        const rate22k = goldRates.rows.find(r => r.id === '22k_inr')?.sellRate;
-        const rateToUse = rate22k || liveGoldRate;
+        const rate24k = goldRates.rows.find(r => r.id === '24k_inr')?.sellRate;
+        const rateToUse = rate24k || liveGoldRate;
         if (rateToUse) {
             setCurrentRate(parseFloat(rateToUse).toFixed(0));
         }
@@ -59,7 +59,7 @@ const Calculator = ({ liveGoldRate }) => {
             {/* Live Rate Display */}
             <View style={styles.rateCard}>
                 <View>
-                    <Text style={styles.rateLabel}>Live Gold Rate (22K)</Text>
+                    <Text style={styles.rateLabel}>Live Gold Rate (24K)</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={styles.currency}>₹</Text>
                         <Text style={styles.rateInput}>{currentRate}</Text>

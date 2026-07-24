@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     StyleSheet,
@@ -7,9 +7,32 @@ import {
     ActivityIndicator,
     ImageBackground,
     TouchableOpacity,
-    TextInput
+    TextInput,
+    Modal
 } from 'react-native';
 import { useGoldRate } from '../../context/GoldRateContext';
+
+const LivePriceText = ({ value, style, prefix = '', isInteger = false }) => {
+    const prevValueRef = useRef(value);
+    const [color, setColor] = useState('#000');
+
+    useEffect(() => {
+        if (value > prevValueRef.current) {
+            setColor('#16a34a'); // green for up
+        } else if (value < prevValueRef.current) {
+            setColor('#dc2626'); // red for down
+        }
+        prevValueRef.current = value;
+    }, [value]);
+
+    const displayValue = isInteger ? Math.round(value) : (value || 0).toFixed(2);
+
+    return (
+        <Text style={[style, { color }]}>
+            {prefix}{displayValue}
+        </Text>
+    );
+};
 
 const GoldTab = () => {
     const { goldRates } = useGoldRate();
@@ -17,6 +40,7 @@ const GoldTab = () => {
     const [weightGrams, setWeightGrams] = useState('');
     const [makingPct, setMakingPct] = useState('');
     const [calcResult, setCalcResult] = useState(null);
+    const [calcModalVisible, setCalcModalVisible] = useState(false);
 
     if (goldRates.loading) {
         return (
@@ -36,27 +60,33 @@ const GoldTab = () => {
 
     const retail22 = goldRates.rows.find(r => r.id === '22k_inr') || {};
     const retail18 = goldRates.rows.find(r => r.id === '18k_inr') || {};
+    const retail14 = goldRates.rows.find(r => r.id === '14k_inr') || {};
+    const retail9 = goldRates.rows.find(r => r.id === '9k_inr') || {};
 
-    // Calculate missing carats
     const base24 = goldInr.sellRate || 0;
-    const rate14 = Math.round(base24 * (14/24));
-    const rate9 = Math.round(base24 * (9/24));
+    const calc14 = Math.round(base24 * (14/24));
+    const calc9 = Math.round(base24 * (9/24));
+    
+    const finalRate14 = retail14.sellRate || calc14;
+    const finalRate9 = retail9.sellRate || calc9;
 
     const handleCalculate = () => {
         let rate = 0;
         if (selectedCarat === '22k') rate = retail22.sellRate || 0;
         if (selectedCarat === '18k') rate = retail18.sellRate || 0;
+        if (selectedCarat === '14k') rate = finalRate14 || 0;
+        if (selectedCarat === '9k') rate = finalRate9 || 0;
 
         const w = parseFloat(weightGrams) || 0;
         const mcPct = parseFloat(makingPct) || 0;
         
         const goldAmount = w * rate;
         const makingCharges = goldAmount * (mcPct / 100);
-        const hallmarking = 40;
-        const packing = 100;
-        const subtotal = goldAmount + makingCharges + hallmarking + packing;
-        const gst = subtotal * 0.03;
-        const finalAmount = subtotal + gst;
+        const hallmarking = 55;
+        const subtotal = goldAmount + makingCharges + hallmarking;
+        const gstGold = goldAmount * 0.03;
+        const gstMaking = makingCharges * 0.05;
+        const finalAmount = subtotal + gstGold + gstMaking;
         
         setCalcResult({
             rate,
@@ -65,8 +95,8 @@ const GoldTab = () => {
             goldAmount,
             makingCharges,
             hallmarking,
-            packing,
-            gst,
+            gstGold,
+            gstMaking,
             finalAmount
         });
     };
@@ -90,26 +120,26 @@ const GoldTab = () => {
                 <View style={styles.topBoxesRow}>
                     <View style={styles.summaryBox}>
                         <Text style={styles.summaryBoxLabel}>GOLD($) 24K 999</Text>
-                        <Text style={styles.summaryBoxValue}>{(goldUsd.sellRate || 0).toFixed(2)}</Text>
+                        <LivePriceText value={goldUsd.sellRate || 0} style={styles.summaryBoxValue} />
                         <View style={styles.summaryBoxHL}>
-                            <Text style={styles.hlText}>H:{(goldUsd.high || 0).toFixed(2)}</Text>
-                            <Text style={styles.hlText}>L:{(goldUsd.low || 0).toFixed(2)}</Text>
+                            <Text style={[styles.hlText, { color: '#16a34a' }]}>H:{(goldUsd.high || 0).toFixed(2)}</Text>
+                            <Text style={[styles.hlText, { color: '#dc2626' }]}>L:{(goldUsd.low || 0).toFixed(2)}</Text>
                         </View>
                     </View>
                     <View style={styles.summaryBox}>
                         <Text style={styles.summaryBoxLabel}>SILVER($) 24K 999</Text>
-                        <Text style={styles.summaryBoxValue}>{(silverUsd.sellRate || 0).toFixed(2)}</Text>
+                        <LivePriceText value={silverUsd.sellRate || 0} style={styles.summaryBoxValue} />
                         <View style={styles.summaryBoxHL}>
-                            <Text style={styles.hlText}>H:{(silverUsd.high || 0).toFixed(2)}</Text>
-                            <Text style={styles.hlText}>L:{(silverUsd.low || 0).toFixed(2)}</Text>
+                            <Text style={[styles.hlText, { color: '#16a34a' }]}>H:{(silverUsd.high || 0).toFixed(2)}</Text>
+                            <Text style={[styles.hlText, { color: '#dc2626' }]}>L:{(silverUsd.low || 0).toFixed(2)}</Text>
                         </View>
                     </View>
                     <View style={styles.summaryBox}>
                         <Text style={styles.summaryBoxLabel}>INR (₹)</Text>
-                        <Text style={styles.summaryBoxValue}>{(usdInr.sellRate || 0).toFixed(2)}</Text>
+                        <LivePriceText value={usdInr.sellRate || 0} style={styles.summaryBoxValue} />
                         <View style={styles.summaryBoxHL}>
-                            <Text style={styles.hlText}>H:{(usdInr.high || 0).toFixed(2)}</Text>
-                            <Text style={styles.hlText}>L:{(usdInr.low || 0).toFixed(2)}</Text>
+                            <Text style={[styles.hlText, { color: '#16a34a' }]}>H:{(usdInr.high || 0).toFixed(2)}</Text>
+                            <Text style={[styles.hlText, { color: '#dc2626' }]}>L:{(usdInr.low || 0).toFixed(2)}</Text>
                         </View>
                     </View>
                 </View>
@@ -125,20 +155,20 @@ const GoldTab = () => {
                     {/* Gold Row */}
                     <View style={[styles.tableRow, { backgroundColor: '#fff' }]}>
                         <Text style={[styles.tdDesc, {flex: 2}]}>GOLD(₹) 24K 999</Text>
-                        <Text style={[styles.tdValue, {flex: 1, textAlign: 'center'}]}>{(goldInr.sellRate || 0).toFixed(2)}</Text>
+                        <LivePriceText value={goldInr.sellRate || 0} style={[styles.tdValue, {flex: 1, textAlign: 'center'}]} />
                         <View style={{flex: 1, alignItems: 'flex-end'}}>
-                            <Text style={styles.tdHL}>{(goldInr.high || 0).toFixed(2)}</Text>
-                            <Text style={styles.tdHL}>{(goldInr.low || 0).toFixed(2)}</Text>
+                            <Text style={[styles.tdHL, { color: '#16a34a' }]}>{(goldInr.high || 0).toFixed(2)}</Text>
+                            <Text style={[styles.tdHL, { color: '#dc2626' }]}>{(goldInr.low || 0).toFixed(2)}</Text>
                         </View>
                     </View>
 
                     {/* Silver Row */}
                     <View style={[styles.tableRow, { backgroundColor: '#fcfcfc' }]}>
                         <Text style={[styles.tdDesc, {flex: 2}]}>SILVER(₹) 24K 999</Text>
-                        <Text style={[styles.tdValue, {flex: 1, textAlign: 'center'}]}>{(silverInr.sellRate || 0).toFixed(2)}</Text>
+                        <LivePriceText value={silverInr.sellRate || 0} style={[styles.tdValue, {flex: 1, textAlign: 'center'}]} />
                         <View style={{flex: 1, alignItems: 'flex-end'}}>
-                            <Text style={styles.tdHL}>{(silverInr.high || 0).toFixed(2)}</Text>
-                            <Text style={styles.tdHL}>{(silverInr.low || 0).toFixed(2)}</Text>
+                            <Text style={[styles.tdHL, { color: '#16a34a' }]}>{(silverInr.high || 0).toFixed(2)}</Text>
+                            <Text style={[styles.tdHL, { color: '#dc2626' }]}>{(silverInr.low || 0).toFixed(2)}</Text>
                         </View>
                     </View>
                 </View>
@@ -148,94 +178,123 @@ const GoldTab = () => {
                     <Text style={styles.mjdtaTitle}>RETAIL RATES</Text>
                     <View style={styles.mjdtaRow}>
                         <Text style={styles.mjdtaLabel}>GOLD 22K 916 - 1GM</Text>
-                        <Text style={styles.mjdtaValue}>(₹) {Math.round(retail22.sellRate || 0)}</Text>
+                        <LivePriceText value={retail22.sellRate || 0} style={styles.mjdtaValue} prefix="(₹) " isInteger={true} />
                     </View>
                     <View style={styles.mjdtaRow}>
                         <Text style={styles.mjdtaLabel}>GOLD 18K 750 - 1GM</Text>
-                        <Text style={styles.mjdtaValue}>(₹) {Math.round(retail18.sellRate || 0)}</Text>
+                        <LivePriceText value={retail18.sellRate || 0} style={styles.mjdtaValue} prefix="(₹) " isInteger={true} />
                     </View>
                     <View style={styles.mjdtaRow}>
                         <Text style={styles.mjdtaLabel}>SILVER - 1GM</Text>
-                        <Text style={styles.mjdtaValue}>(₹) {Math.round(silverInr.sellRate || 0)}</Text>
+                        <LivePriceText value={silverInr.sellRate || 0} style={styles.mjdtaValue} prefix="(₹) " isInteger={true} />
                     </View>
                     <Text style={styles.mjdtaFooter}>3% GST Applicable</Text>
                 </View>
 
-                {/* Calculator */}
-                <View style={styles.calcContainer}>
-                    <View style={styles.calcHeader}>
-                        <Text style={styles.calcHeaderText}>Jewel Price Calculator</Text>
-                    </View>
-                    <View style={styles.calcBody}>
-                        
-                        <View style={styles.calcBtnsRow}>
-                            <TouchableOpacity style={[styles.calcCaratBtn, selectedCarat === '22k' && styles.calcCaratBtnActive]} onPress={() => setSelectedCarat('22k')}>
-                                <Text style={[styles.calcCaratBtnTitle, selectedCarat === '22k' && styles.calcCaratBtnTitleActive]}>22K916</Text>
-                                <Text style={[styles.calcCaratBtnVal, selectedCarat === '22k' && styles.calcCaratBtnValActive]}>{Math.round(retail22.sellRate || 0)}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.calcCaratBtn, selectedCarat === '18k' && styles.calcCaratBtnActive]} onPress={() => setSelectedCarat('18k')}>
-                                <Text style={[styles.calcCaratBtnTitle, selectedCarat === '18k' && styles.calcCaratBtnTitleActive]}>18K750</Text>
-                                <Text style={[styles.calcCaratBtnVal, selectedCarat === '18k' && styles.calcCaratBtnValActive]}>{Math.round(retail18.sellRate || 0)}</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.calcInputsRow}>
-                            <View style={{flex: 1}}>
-                                <Text style={styles.calcInputLabel}>Weight in grams</Text>
-                                <TextInput style={styles.calcInput} keyboardType="numeric" value={weightGrams} onChangeText={setWeightGrams} />
-                            </View>
-                            <View style={{flex: 1}}>
-                                <Text style={styles.calcInputLabel}>Making Charges (%)</Text>
-                                <TextInput style={styles.calcInput} keyboardType="numeric" value={makingPct} onChangeText={setMakingPct} />
-                            </View>
-                        </View>
-
-                        <View style={styles.calcActionsRow}>
-                            <TouchableOpacity style={styles.calcActionBtn} onPress={handleCalculate}>
-                                <Text style={styles.calcActionBtnText}>Calculate Price</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.calcActionBtn} onPress={handleReset}>
-                                <Text style={styles.calcActionBtnText}>Reset</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {calcResult !== null && (
-                            <View style={styles.calcResultBox}>
-                                <Text style={styles.calcResultTitle}>COST ESTIMATE</Text>
-                                <View style={styles.calcResultRow}>
-                                    <Text style={styles.calcResultKey}>Gold Weight</Text>
-                                    <Text style={styles.calcResultVal}>{calcResult.goldWeight} g</Text>
-                                </View>
-                                <View style={styles.calcResultRow}>
-                                    <Text style={styles.calcResultKey}>Gold Value</Text>
-                                    <Text style={styles.calcResultVal}>₹{Math.round(calcResult.goldAmount).toLocaleString('en-IN')}</Text>
-                                </View>
-                                <View style={styles.calcResultRow}>
-                                    <Text style={styles.calcResultKey}>Making ({calcResult.makingPct}%)</Text>
-                                    <Text style={styles.calcResultVal}>₹{Math.round(calcResult.makingCharges).toLocaleString('en-IN')}</Text>
-                                </View>
-                                <View style={styles.calcResultRow}>
-                                    <Text style={styles.calcResultKey}>Hallmarking</Text>
-                                    <Text style={styles.calcResultVal}>₹40</Text>
-                                </View>
-                                <View style={styles.calcResultRow}>
-                                    <Text style={styles.calcResultKey}>Packing</Text>
-                                    <Text style={styles.calcResultVal}>₹100</Text>
-                                </View>
-                                <View style={styles.calcResultRow}>
-                                    <Text style={styles.calcResultKey}>GST (3%)</Text>
-                                    <Text style={styles.calcResultVal}>₹{Math.round(calcResult.gst).toLocaleString('en-IN')}</Text>
-                                </View>
-                                <View style={[styles.calcResultRow, { borderTopWidth: 1, borderTopColor: '#000', paddingTop: 5, marginTop: 5 }]}>
-                                    <Text style={[styles.calcResultKey, { fontWeight: 'bold' }]}>TOTAL PAYABLE</Text>
-                                    <Text style={[styles.calcResultVal, { fontWeight: 'bold', fontSize: 16 }]}>₹{Math.round(calcResult.finalAmount).toLocaleString('en-IN')}</Text>
-                                </View>
-                            </View>
-                        )}
-                    </View>
-                </View>
+                {/* Calculator Button */}
+                <TouchableOpacity 
+                    style={styles.openCalcBtn} 
+                    onPress={() => setCalcModalVisible(true)}
+                >
+                    <Text style={styles.openCalcBtnText}>Open Jewel Price Calculator</Text>
+                </TouchableOpacity>
 
             </ScrollView>
+
+            {/* Calculator Modal */}
+            <Modal
+                visible={calcModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setCalcModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.calcContainer}>
+                        <View style={styles.calcHeader}>
+                            <Text style={styles.calcHeaderText}>Jewel Price Calculator</Text>
+                            <TouchableOpacity onPress={() => setCalcModalVisible(false)}>
+                                <Text style={{color: '#fef178', fontSize: 20, fontWeight: 'bold'}}>×</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.calcBody}>
+                            
+                            <View style={styles.calcBtnsRow}>
+                                <TouchableOpacity style={[styles.calcCaratBtn, selectedCarat === '22k' && styles.calcCaratBtnActive]} onPress={() => setSelectedCarat('22k')}>
+                                    <Text style={[styles.calcCaratBtnTitle, selectedCarat === '22k' && styles.calcCaratBtnTitleActive]}>22K916</Text>
+                                    <Text style={[styles.calcCaratBtnVal, selectedCarat === '22k' && styles.calcCaratBtnValActive]}>{Math.round(retail22.sellRate || 0)}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.calcCaratBtn, selectedCarat === '18k' && styles.calcCaratBtnActive]} onPress={() => setSelectedCarat('18k')}>
+                                    <Text style={[styles.calcCaratBtnTitle, selectedCarat === '18k' && styles.calcCaratBtnTitleActive]}>18K750</Text>
+                                    <Text style={[styles.calcCaratBtnVal, selectedCarat === '18k' && styles.calcCaratBtnValActive]}>{Math.round(retail18.sellRate || 0)}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.calcCaratBtn, selectedCarat === '14k' && styles.calcCaratBtnActive]} onPress={() => setSelectedCarat('14k')}>
+                                    <Text style={[styles.calcCaratBtnTitle, selectedCarat === '14k' && styles.calcCaratBtnTitleActive]}>14K585</Text>
+                                    <Text style={[styles.calcCaratBtnVal, selectedCarat === '14k' && styles.calcCaratBtnValActive]}>{Math.round(finalRate14)}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.calcCaratBtn, selectedCarat === '9k' && styles.calcCaratBtnActive]} onPress={() => setSelectedCarat('9k')}>
+                                    <Text style={[styles.calcCaratBtnTitle, selectedCarat === '9k' && styles.calcCaratBtnTitleActive]}>9K375</Text>
+                                    <Text style={[styles.calcCaratBtnVal, selectedCarat === '9k' && styles.calcCaratBtnValActive]}>{Math.round(finalRate9)}</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.calcInputsRow}>
+                                <View style={{flex: 1}}>
+                                    <Text style={styles.calcInputLabel}>Weight in grams</Text>
+                                    <TextInput style={styles.calcInput} keyboardType="numeric" value={weightGrams} onChangeText={setWeightGrams} />
+                                </View>
+                                <View style={{flex: 1}}>
+                                    <Text style={styles.calcInputLabel}>Making Charges (%)</Text>
+                                    <TextInput style={styles.calcInput} keyboardType="numeric" value={makingPct} onChangeText={setMakingPct} />
+                                </View>
+                            </View>
+
+                            <View style={styles.calcActionsRow}>
+                                <TouchableOpacity style={styles.calcActionBtn} onPress={handleCalculate}>
+                                    <Text style={styles.calcActionBtnText}>Calculate Price</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.calcActionBtn} onPress={handleReset}>
+                                    <Text style={styles.calcActionBtnText}>Reset</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {calcResult !== null && (
+                                <View style={styles.calcResultBox}>
+                                    <Text style={styles.calcResultTitle}>COST ESTIMATE</Text>
+                                    <View style={styles.calcResultRow}>
+                                        <Text style={styles.calcResultKey}>Gold Weight</Text>
+                                        <Text style={styles.calcResultVal}>{calcResult.goldWeight} g</Text>
+                                    </View>
+                                    <View style={styles.calcResultRow}>
+                                        <Text style={styles.calcResultKey}>Gold Value</Text>
+                                        <Text style={styles.calcResultVal}>₹{Math.round(calcResult.goldAmount).toLocaleString('en-IN')}</Text>
+                                    </View>
+                                    <View style={styles.calcResultRow}>
+                                        <Text style={styles.calcResultKey}>Making ({calcResult.makingPct}%)</Text>
+                                        <Text style={styles.calcResultVal}>₹{Math.round(calcResult.makingCharges).toLocaleString('en-IN')}</Text>
+                                    </View>
+                                    <View style={styles.calcResultRow}>
+                                        <Text style={styles.calcResultKey}>Hallmarking</Text>
+                                        <Text style={styles.calcResultVal}>₹{Math.round(calcResult.hallmarking).toLocaleString('en-IN')}</Text>
+                                    </View>
+                                    <View style={styles.calcResultRow}>
+                                        <Text style={styles.calcResultKey}>GST on Gold (3%)</Text>
+                                        <Text style={styles.calcResultVal}>₹{Math.round(calcResult.gstGold).toLocaleString('en-IN')}</Text>
+                                    </View>
+                                    <View style={styles.calcResultRow}>
+                                        <Text style={styles.calcResultKey}>GST on Making (5%)</Text>
+                                        <Text style={styles.calcResultVal}>₹{Math.round(calcResult.gstMaking).toLocaleString('en-IN')}</Text>
+                                    </View>
+                                    <View style={[styles.calcResultRow, { borderTopWidth: 1, borderTopColor: '#000', paddingTop: 5, marginTop: 5 }]}>
+                                        <Text style={[styles.calcResultKey, { fontWeight: 'bold' }]}>TOTAL PAYABLE</Text>
+                                        <Text style={[styles.calcResultVal, { fontWeight: 'bold', fontSize: 16 }]}>₹{Math.round(calcResult.finalAmount).toLocaleString('en-IN')}</Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
         </ImageBackground>
     );
 };
@@ -399,6 +458,9 @@ const styles = StyleSheet.create({
     calcHeader: {
         backgroundColor: '#592c14',
         padding: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
     },
     calcHeaderText: {
         color: '#fef178',
@@ -504,6 +566,25 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: 'bold',
         color: '#000'
+    },
+    openCalcBtn: {
+        backgroundColor: '#592c14',
+        padding: 15,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 10,
+        marginBottom: 20
+    },
+    openCalcBtnText: {
+        color: '#fef178',
+        fontWeight: 'bold',
+        fontSize: 16
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20
     }
 });
 

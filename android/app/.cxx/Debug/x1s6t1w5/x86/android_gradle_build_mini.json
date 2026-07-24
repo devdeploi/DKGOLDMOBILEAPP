@@ -12,6 +12,8 @@
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-share/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-worklets/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
   ],
@@ -40,6 +42,11 @@
         "/Users/apple/.gradle/caches/9.0.0/transforms/7ea84db5beb48d0e40563410ea5e2f79/transformed/react-android-0.83.1-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
       ]
     },
+    "react_codegen_rnviewshot::@0ba03d237e60b9258a87": {
+      "artifactName": "react_codegen_rnviewshot",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
     "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d": {
       "artifactName": "react_codegen_RNVectorIconsSpec",
       "abi": "x86",
@@ -57,6 +64,11 @@
     },
     "react_codegen_HtmlToPdfSpec::@b8e1cdd07144a1c1daf8": {
       "artifactName": "react_codegen_HtmlToPdfSpec",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c": {
+      "artifactName": "react_codegen_RNCWebViewSpec",
       "abi": "x86",
       "runtimeFiles": []
     },

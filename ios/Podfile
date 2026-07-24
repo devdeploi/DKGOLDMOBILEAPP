@@ -30,6 +30,10 @@ target 'JewelMobileApp' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+        config.build_settings['CLANG_ENABLE_EXPLICIT_MODULES'] = 'NO'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+        config.build_settings.delete('EXCLUDED_ARCHS[sdk=iphonesimulator*]')
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = ''
       end
 
       if target.name == 'React-jsitooling'

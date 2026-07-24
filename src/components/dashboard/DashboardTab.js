@@ -10,6 +10,7 @@ import Slider from '@react-native-community/slider';
 import AdBanner from '../AdBanner';
 import Calculator from '../Calculator';
 import { useGoldRate } from '../../context/GoldRateContext';
+import CustomAlert from '../CustomAlert';
 
 
 const { width } = Dimensions.get('window');
@@ -24,6 +25,11 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
     const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
     const [passwordInput, setPasswordInput] = useState('');
     const [verifyingPassword, setVerifyingPassword] = useState(false);
+    const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info' });
+
+    const showAlert = (title, message, type = 'info') => {
+        setAlertConfig({ visible: true, title, message, type });
+    };
 
     const handleVerifyPassword = async () => {
         if (!passwordInput) return;
@@ -37,7 +43,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                 setPasswordInput('');
             }
         } catch (error) {
-            Alert.alert('Error', 'Incorrect password. Please try again.');
+            showAlert('Error', 'Incorrect password. Please try again.', 'error');
         } finally {
             setVerifyingPassword(false);
         }
@@ -91,8 +97,8 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
             let hasUnlimitedPlan = false;
             let totalActualGoldWeight = 0;
 
-            // Filter active plans only (exclude delivered and settled)
-            const activePlans = plans.filter(p => !p.status || p.status === 'active' || p.status === 'pending');
+            // Filter active and completed plans only (exclude delivered, settled, closed)
+            const activePlans = plans.filter(p => !p.status || p.status === 'active' || p.status === 'completed');
 
             activePlans.forEach(plan => {
                 totalSaved += (plan.totalSaved || 0) - (plan.deliveredAmount || 0);
@@ -235,8 +241,8 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                     <View style={styles.newPlanCard}>
                                         <View style={styles.newPlanCardContent}>
                                             <View style={styles.newPlanCardLeft}>
-                                                <Text style={styles.newPlanWelcomeText}>Welcome, {user.name}</Text>
-                                                <Text style={styles.newPlanPhoneText}>{user.phone}</Text>
+                                                {/* <Text style={styles.newPlanWelcomeText}>Welcome, {user.name}</Text> */}
+                                                <Text style={styles.newPlanWelcomeText}>{user.phone}</Text>
 
                                                 <View style={styles.newPlanDetailRow}>
                                                     <Text style={styles.newPlanLabel}>My Plan</Text>
@@ -309,21 +315,63 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                 {/* Key Stats Cards */}
                 <View style={styles.statGrid}>
                     <View style={[styles.statCard, { backgroundColor: COLORS?.primary }]}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Icon name="piggy-bank" size={20} color="#fff" style={{ opacity: 0.8 }} />
-                            <Text style={[styles.statLabel, { color: '#fff' }]}>Total Saved</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={[styles.statLabel, { color: '#fff', textAlign: 'center' }]}>Total Saved</Text>
                         </View>
-                        <Text style={[styles.statValue, { color: '#fff' }]}>{isDataVisible ? `₹ ${stats.totalSaved.toLocaleString()}` : '****'}</Text>
-                        <Text style={{ color: '#fff', fontSize: 10, opacity: 0.8 }}>Output: {isDataVisible ? `~₹${stats.totalGoal.toLocaleString()}` : '****'}</Text>
+                        <View style={{ gap: 8 }}>
+                            {recentActivity.map((plan, idx) => {
+                                const isUnlimited = plan.durationMonths === 0 || plan.returnType === 'gold' || (plan.planName && plan.planName.toLowerCase().includes('unlimited'));
+                                const savedAmount = (plan.totalSaved || 0) - (plan.deliveredAmount || 0);
+                                const savedGold = (plan.totalGoldWeight || 0) - (plan.deliveredGoldWeight || 0);
+
+                                return (
+                                    <View key={`saved-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: idx === recentActivity.length - 1 ? 0 : 1, borderBottomColor: 'rgba(255,255,255,0.2)', paddingBottom: idx === recentActivity.length - 1 ? 0 : 6 }}>
+                                        <View style={{ flex: 1, paddingRight: 5 }}>
+                                            <Text style={{ color: '#fff', fontSize: 11, fontWeight: 'bold' }} numberOfLines={1}>{plan.planName}</Text>
+                                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9 }}>A/c: {plan.acc_no || 'N/A'}</Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>{isDataVisible ? `₹ ${savedAmount.toLocaleString()}` : '****'}</Text>
+                                            {isUnlimited && (
+                                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9 }}>{isDataVisible ? `${savedGold.toFixed(3)}g` : '****'}</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                            {recentActivity.length === 0 && (
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontStyle: 'italic' }}>No active plans</Text>
+                            )}
+                        </View>
                     </View>
 
                     <View style={styles.statCard}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Icon name="calendar-check" size={20} color={COLORS?.primary} />
-                            <Text style={styles.statLabel}>Monthly Due</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={[styles.statLabel, { textAlign: 'center' }]}>Monthly Due</Text>
                         </View>
-                        <Text style={[styles.statValue, { color: COLORS?.dark }]}>{isDataVisible ? `₹ ${stats.monthlyCommitment.toLocaleString()}` : '****'}</Text>
-                        <Text style={{ color: COLORS?.secondary, fontSize: 10 }}>Across {stats.activeChits} Plans</Text>
+                        <View style={{ gap: 8 }}>
+                            {recentActivity.map((plan, idx) => {
+                                const isUnlimited = plan.durationMonths === 0 || plan.returnType === 'gold' || (plan.planName && plan.planName.toLowerCase().includes('unlimited'));
+                                const monthlyDue = plan.monthlyAmount || 0;
+
+                                return (
+                                    <View key={`due-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: idx === recentActivity.length - 1 ? 0 : 1, borderBottomColor: '#eee', paddingBottom: idx === recentActivity.length - 1 ? 0 : 6 }}>
+                                        <View style={{ flex: 1, paddingRight: 5 }}>
+                                            <Text style={{ color: COLORS?.dark, fontSize: 11, fontWeight: 'bold' }} numberOfLines={1}>{plan.planName}</Text>
+                                            <Text style={{ color: COLORS?.secondary, fontSize: 9 }}>A/c: {plan.acc_no || 'N/A'}</Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={{ color: COLORS?.primary, fontSize: 12, fontWeight: 'bold' }}>
+                                                {isUnlimited ? 'Flexible' : (isDataVisible ? `₹ ${monthlyDue.toLocaleString()}` : '****')}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                            {recentActivity.length === 0 && (
+                                <Text style={{ color: COLORS?.secondary, fontSize: 11, fontStyle: 'italic' }}>No active plans</Text>
+                            )}
+                        </View>
                     </View>
                 </View>
                 {/* SIP Calculator - Interactive Card */}
@@ -493,6 +541,14 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                     </View>
                 </View>
             </Modal>
+
+            <CustomAlert
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+            />
         </ImageBackground>
     );
 };

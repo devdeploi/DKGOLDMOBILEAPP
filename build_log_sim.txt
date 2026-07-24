@@ -1,0 +1,11 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace ios/JewelMobileApp.xcworkspace -scheme JewelMobileApp -configuration Debug -destination id=89BAD125-91E3-4B91-8239-15F5FB36EC61 build
+
+2026-07-23 12:45:35.579 xcodebuild[19155:140039] Writing error result bundle to /var/folders/nz/x6hz_j5166v6gnb69lc1f9nr0000gn/T/ResultBundle_2026-23-07_12-45-0035.xcresult
+xcodebuild: error: Unable to find a destination matching the provided destination specifier:
+		{ id:89BAD125-91E3-4B91-8239-15F5FB36EC61 }
+
+	Available destinations for the "JewelMobileApp" scheme:
+		{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:00008103-0012695E2123001E, name:My Mac }
+		{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
+		{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }

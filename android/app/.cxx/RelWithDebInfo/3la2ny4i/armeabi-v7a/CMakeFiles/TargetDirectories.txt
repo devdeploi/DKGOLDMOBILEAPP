@@ -37,6 +37,12 @@
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/RNVectorIconsSpec_autolinked_build/CMakeFiles/edit_cache.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/RNVectorIconsSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/rnviewshot_autolinked_build/CMakeFiles/react_codegen_rnviewshot.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/rnviewshot_autolinked_build/CMakeFiles/edit_cache.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/rnviewshot_autolinked_build/CMakeFiles/rebuild_cache.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/RNCWebViewSpec_autolinked_build/CMakeFiles/react_codegen_RNCWebViewSpec.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/RNCWebViewSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/RNCWebViewSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/rnworklets_autolinked_build/CMakeFiles/react_codegen_rnworklets.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/rnworklets_autolinked_build/CMakeFiles/edit_cache.dir
 /Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/RelWithDebInfo/3la2ny4i/armeabi-v7a/rnworklets_autolinked_build/CMakeFiles/rebuild_cache.dir

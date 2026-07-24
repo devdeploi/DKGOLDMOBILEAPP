@@ -12,6 +12,8 @@
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-share/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-view-shot/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native-worklets/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
   ],
@@ -59,6 +61,11 @@
         "/Users/apple/.gradle/caches/9.0.0/transforms/7ea84db5beb48d0e40563410ea5e2f79/transformed/react-android-0.83.1-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
         "/Users/apple/.gradle/caches/9.0.0/transforms/7ea84db5beb48d0e40563410ea5e2f79/transformed/react-android-0.83.1-debug/prefab/modules/reactnative/libs/android.x86_64/libreactnative.so"
       ]
+    },
+    "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "react_codegen_RNCWebViewSpec"
     },
     "react_codegen_RNDateTimePickerCGen::@59b70ddc31ba2f8ef1d2": {
       "toolchain": "toolchain",
@@ -110,6 +117,11 @@
         "/Users/apple/.gradle/caches/9.0.0/transforms/7ea84db5beb48d0e40563410ea5e2f79/transformed/react-android-0.83.1-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
         "/Users/apple/.gradle/caches/9.0.0/transforms/cda0e1e31099e31fafe505dd251ef83a/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86_64/libfbjni.so"
       ]
+    },
+    "react_codegen_rnviewshot::@0ba03d237e60b9258a87": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "react_codegen_rnviewshot"
     },
     "react_codegen_rnworklets::@68f58d84d4754f193387": {
       "toolchain": "toolchain",

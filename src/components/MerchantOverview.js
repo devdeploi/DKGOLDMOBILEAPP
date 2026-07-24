@@ -7,6 +7,7 @@ import { BASE_URL } from '../constants/api';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useGoldRate } from '../context/GoldRateContext';
 import Calculator from './Calculator';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 const { width } = Dimensions.get('window');
 // --- Reusable Speedometer Component ---
@@ -87,13 +88,31 @@ const RandomNumberLoader = ({ value, style, isCurrency = false }) => {
     return <Text style={style}>{isCurrency ? '₹ ' : ''}{displayValue}</Text>;
 };
 
-const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) => {
+const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh, fetchDashboardStats }) => {
     const { goldRate } = useGoldRate();
     const [selectedUser, setSelectedUser] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [collectionFreq, setCollectionFreq] = useState('daily');
     const [settlementFreq, setSettlementFreq] = useState('daily');
     const [visibleCount, setVisibleCount] = useState(10);
+    const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+
+    const showDatePicker = () => {
+        setDatePickerVisibility(true);
+    };
+
+    const hideDatePicker = () => {
+        setDatePickerVisibility(false);
+    };
+
+    const handleConfirm = (date) => {
+        hideDatePicker();
+        const istOffset = 330 * 60000;
+        const istTime = new Date(date.getTime() + istOffset + date.getTimezoneOffset() * 60000);
+        const dateStr = istTime.toISOString().split('T')[0];
+        setCollectionFreq('custom');
+        if (fetchDashboardStats) fetchDashboardStats(dateStr);
+    };
 
     const showLoader = refreshing;
 
@@ -114,10 +133,10 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
     const formatDate = (dateString, simple = false) => {
         if (!dateString) return '-';
         const date = new Date(dateString);
-        const options = { 
+        const options = {
             timeZone: 'Asia/Kolkata',
-            day: simple ? '2-digit' : 'numeric', 
-            month: simple ? '2-digit' : 'short' 
+            day: simple ? '2-digit' : 'numeric',
+            month: simple ? '2-digit' : 'short'
         };
         return date.toLocaleDateString('en-IN', options);
     };
@@ -147,7 +166,7 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                 plan.subscribers.forEach(sub => {
                     // Total across all time
                     total += Number(sub.deliveredAmount) || 0;
-                    
+
                     // Check history for today and this month
                     if (sub.deliveryHistory && Array.isArray(sub.deliveryHistory)) {
                         sub.deliveryHistory.forEach(delivery => {
@@ -269,12 +288,25 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
         }
     }, [usersList]);
 
-    // 3. Today's Transactions
     const activeTransactions = useMemo(() => {
-        return collectionFreq === 'daily' 
-            ? (stats.todaysCollections || []) 
-            : (stats.monthlyCollections || []);
+        if (collectionFreq === 'monthly') return (stats.monthlyCollections || []);
+        return (stats.todaysCollections || []);
     }, [stats.todaysCollections, stats.monthlyCollections, collectionFreq]);
+
+    const paymentMethodBreakdown = useMemo(() => {
+        let online = 0;
+        let upi = 0;
+        let cash = 0;
+        activeTransactions.forEach(t => {
+            if (!t.amount) return;
+            const type = t.type?.toUpperCase() || 'UNKNOWN';
+            if (type === 'ONLINE' || type === 'RAZORPAY') online += t.amount;
+            else if (type === 'UPI') upi += t.amount;
+            else if (type === 'CASH') cash += t.amount;
+            else online += t.amount; // default fallback if payment method isn't strictly one of those 3
+        });
+        return { online, upi, cash };
+    }, [activeTransactions]);
 
 
     const getPlanScopedAccNo = (paymentItem) => {
@@ -336,7 +368,6 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                         <Text style={styles.greeting}>Overview</Text>
                         <Text style={styles.subGreeting}>Welcome, {user.name}!</Text>
                     </View>
-                    <Image source={{ uri: user.profileImage ? `${BASE_URL}${user.profileImage}` : 'https://via.placeholder.com/100' }} style={styles.headerAvatar} />
                 </View>
 
                 {/* Live Gold Rates */}
@@ -361,22 +392,28 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                                     <View style={[styles.collectionTabs, { marginLeft: 0, marginBottom: 0 }]}>
                                         <TouchableOpacity
                                             style={[styles.collectionTab, collectionFreq === 'daily' && styles.activeCollectionTab]}
-                                            onPress={() => setCollectionFreq('daily')}
+                                            onPress={() => { setCollectionFreq('daily'); if (fetchDashboardStats) fetchDashboardStats(); }}
                                         >
                                             <Text style={[styles.collectionTabText, collectionFreq === 'daily' && styles.activeCollectionTabText]}>Daily</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.collectionTab, collectionFreq === 'monthly' && styles.activeCollectionTab]}
-                                            onPress={() => setCollectionFreq('monthly')}
+                                            onPress={() => { setCollectionFreq('monthly'); if (fetchDashboardStats) fetchDashboardStats(); }}
                                         >
                                             <Text style={[styles.collectionTabText, collectionFreq === 'monthly' && styles.activeCollectionTabText]}>Monthly</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.collectionTab, collectionFreq === 'custom' && styles.activeCollectionTab]}
+                                            onPress={showDatePicker}
+                                        >
+                                            <Text style={[styles.collectionTabText, collectionFreq === 'custom' && styles.activeCollectionTabText]}>Custom</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
 
                                 <View style={styles.collectionValueContainer}>
                                     <Text style={styles.glassLabel}>
-                                        {collectionFreq === 'daily' ? 'Today\'s Collection' : 'This Month\'s Collection'}
+                                        {collectionFreq === 'daily' ? 'Today\'s Collection' : (collectionFreq === 'monthly' ? 'This Month\'s Collection' : 'Custom Date Collection')}
                                     </Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         {showLoader ? (
@@ -389,7 +426,10 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                                             <Text style={styles.glassValue}>
                                                 ₹ {collectionFreq === 'daily'
                                                     ? (stats.dailyCollection ? (stats.dailyCollection - deliveryStats.daily).toLocaleString() : '0')
-                                                    : (stats.monthlyCollection ? (stats.monthlyCollection - deliveryStats.monthly).toLocaleString() : '0')
+                                                    : (collectionFreq === 'monthly'
+                                                        ? (stats.monthlyCollection ? (stats.monthlyCollection - deliveryStats.monthly).toLocaleString() : '0')
+                                                        : (stats.dailyCollection ? stats.dailyCollection.toLocaleString() : '0')
+                                                    )
                                                 }
                                             </Text>
                                         )}
@@ -467,47 +507,90 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                     </View>
                 </View> */}
 
-                {/* Stats Grid - Updated with specific request items */}
-                <View style={[styles.minimalStats, { paddingHorizontal: 10 }]}>
-                    <View style={styles.statBox}>
-                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Subscribers</Text>
+                {/* Stats Grid - Updated with premium colored widgets */}
+                <View style={[styles.minimalStats, { paddingHorizontal: 4, backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0, paddingVertical: 0 }]}>
+                    <View style={[styles.statBox, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE', borderWidth: 1 }]}>
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
+                            <Icon name="users" size={12} color="#4F46E5" style={{marginRight: 6}} />
+                            <Text style={[styles.statLabel, { color: '#4F46E5', fontSize: 12, marginBottom: 0 }]}>Subscribers</Text>
+                        </View>
                         {showLoader ? (
-                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} />
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 16, color: '#312E81' }]} />
                         ) : (
-                            <Text style={[styles.statValue, { fontSize: 11 }]}>{stats.totalEnrolled || 0}</Text>
+                            <Text style={[styles.statValue, { fontSize: 16, color: '#312E81' }]}>{stats.totalEnrolled || 0}</Text>
                         )}
                     </View>
-                    {/* <View style={styles.statBox}>
-                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 9 }]}>Total Collection</Text>
+                    
+                    <View style={[styles.statBox, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1 }]}>
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
+                            <Icon name="chart-line" size={12} color="#059669" style={{marginRight: 6}} />
+                            <Text style={[styles.statLabel, { color: '#059669', fontSize: 12, marginBottom: 0 }]}>Active Collection</Text>
+                        </View>
                         {showLoader ? (
-                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} isCurrency={true} />
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 16, color: '#064E3B' }]} isCurrency={true} />
                         ) : (
-                            <Text style={[styles.statValue, { fontSize: 11 }]}>{totalCollection.toLocaleString()}</Text>
-                        )}
-                    </View> */}
-                    <View style={styles.statBox}>
-                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Active Collection</Text>
-                        {showLoader ? (
-                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} isCurrency={true} />
-                        ) : (
-                            <Text style={[styles.statValue, { fontSize: 11 }]}>{(stats.activeUserCollection - deliveryStats.total).toLocaleString()}</Text>
+                            <Text style={[styles.statValue, { fontSize: 16, color: '#064E3B' }]}>₹{(stats.activeUserCollection - deliveryStats.total).toLocaleString()}</Text>
                         )}
                     </View>
-                    <View style={styles.statBox}>
-                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Settled Amount</Text>
+
+                    <View style={[styles.statBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 }]}>
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
+                            <Icon name="check-circle" size={12} color="#DC2626" style={{marginRight: 6}} />
+                            <Text style={[styles.statLabel, { color: '#DC2626', fontSize: 12, marginBottom: 0 }]}>Settled Amount</Text>
+                        </View>
                         {showLoader ? (
-                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} isCurrency={true} />
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 16, color: '#7F1D1D' }]} isCurrency={true} />
                         ) : (
-                            <Text style={[styles.statValue, { fontSize: 11 }]}>{(stats.settledAmount + deliveryStats.total).toLocaleString()}</Text>
+                            <Text style={[styles.statValue, { fontSize: 16, color: '#7F1D1D' }]}>₹{(stats.settledAmount + deliveryStats.total).toLocaleString()}</Text>
                         )}
                     </View>
-                    <View style={styles.statBox}>
-                        <Text style={[styles.statLabel, { color: '#F87171', fontSize: 11 }]}>Gold Saved</Text>
+
+                    <View style={[styles.statBox, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', borderWidth: 1 }]}>
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
+                            <Icon name="coins" size={12} color="#D97706" style={{marginRight: 6}} />
+                            <Text style={[styles.statLabel, { color: '#D97706', fontSize: 12, marginBottom: 0 }]}>Gold Saved</Text>
+                        </View>
                         {showLoader ? (
-                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 11 }]} />
+                            <RandomNumberLoader value={null} style={[styles.statValue, { fontSize: 16, color: '#78350F' }]} />
                         ) : (
-                            <Text style={[styles.statValue, { fontSize: 11 }]}>{totalGoldSavedUnlimited}gm</Text>
+                            <Text style={[styles.statValue, { fontSize: 16, color: '#78350F' }]}>{totalGoldSavedUnlimited}gm</Text>
                         )}
+                    </View>
+                </View>
+
+                {/* Payment Method Breakdown */}
+                <View style={styles.sectionCard}>
+                    <Text style={styles.sectionTitle}>Collection by Payment Method</Text>
+                    <Text style={styles.sectionSub}>
+                        {collectionFreq === 'daily' ? 'Today' : collectionFreq === 'monthly' ? 'This Month' : 'Custom Date'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                                <Icon name="globe" size={18} color="#3B82F6" />
+                            </View>
+                            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Razorpay</Text>
+                            {showLoader ? <RandomNumberLoader value={null} style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }} isCurrency={true} /> :
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }}>₹{paymentMethodBreakdown.online.toLocaleString()}</Text>}
+                        </View>
+                        <View style={{ width: 1, backgroundColor: '#F1F5F9', marginHorizontal: 5, height: '80%', alignSelf: 'center' }} />
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#ECFDF5', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                                <Icon name="qrcode" size={18} color="#10B981" />
+                            </View>
+                            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>UPI</Text>
+                            {showLoader ? <RandomNumberLoader value={null} style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }} isCurrency={true} /> :
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }}>₹{paymentMethodBreakdown.upi.toLocaleString()}</Text>}
+                        </View>
+                        <View style={{ width: 1, backgroundColor: '#F1F5F9', marginHorizontal: 5, height: '80%', alignSelf: 'center' }} />
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                                <Icon name="money-bill-wave" size={18} color="#F59E0B" />
+                            </View>
+                            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>Cash</Text>
+                            {showLoader ? <RandomNumberLoader value={null} style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }} isCurrency={true} /> :
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1E293B' }}>₹{paymentMethodBreakdown.cash.toLocaleString()}</Text>}
+                        </View>
                     </View>
                 </View>
                 {/* Bar Chart - Plan Distribution */}
@@ -533,93 +616,32 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
 
                 <Calculator />
 
-                
-
-                {/* Payment Progress Speedometer */}
-                <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Subscriber Progress</Text>
-                    <Text style={styles.sectionSub}>Track individual payment completion</Text>
-
-                    <View style={styles.speedometerLayout}>
-                        {/* Left: Search & User List */}
-                        <View style={styles.userListContainer}>
-                            <View style={styles.searchBox}>
-                                <Icon name="search" size={10} color="#9CA3AF" />
-                                <TextInput
-                                    placeholder="Search..."
-                                    placeholderTextColor="#9CA3AF"
-                                    style={styles.searchInput}
-                                    value={searchQuery}
-                                    onChangeText={setSearchQuery}
-                                />
-                            </View>
-
-                            <FlatList
-                                data={filteredUsers}
-                                keyExtractor={(item, idx) => item.id}
-                                showsVerticalScrollIndicator={true}
-                                style={{ height: 220 }}
-                                nestedScrollEnabled={true}
-                                renderItem={({ item, index }) => (
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.userRow,
-                                            selectedUser?.id === item.id && styles.userRowActive
-                                        ]}
-                                        onPress={() => setSelectedUser(item)}
-                                    >
-                                        <View style={[styles.avatarCircle, { backgroundColor: getRandomColor(index) }]}>
-                                            <Text style={styles.avatarInitials}>{getInitials(item.name)}</Text>
-                                        </View>
-                                        <View style={{ flex: 1, marginLeft: 8 }}>
-                                            <Text style={[styles.userNameList, selectedUser?.id === item.id && styles.textActive]} numberOfLines={1}>{item.name}</Text>
-                                            <Text style={styles.userPlanList} numberOfLines={1}>{item.planName}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                )}
-                                ListEmptyComponent={<Text style={styles.emptyText}>No users found</Text>}
-                            />
-                        </View>
-
-                        {/* Right: Speedometer Display */}
-                        <View style={styles.speedometerArea}>
-                            {selectedUser ? (
-                                <View style={{ alignItems: 'center' }}>
-                                    <Speedometer
-                                        progress={selectedUser.progress}
-                                        label={selectedUser.isUnlimited ? "Unlimited" : "Paid"}
-                                        subLabel={selectedUser.isUnlimited ? `${formatCurrencyCompact(selectedUser.totalPaid)} / No Limit` : `${formatCurrencyCompact(selectedUser.totalPaid)} / ${formatCurrencyCompact(selectedUser.totalTarget)}`}
-                                    />
-                                    <View style={styles.selectedDetailBox}>
-                                        <Text style={styles.selectedNameBig}>{selectedUser.name}</Text>
-                                        <Text style={styles.selectedPlanName}>{selectedUser.planName}</Text>
-                                    </View>
-                                </View>
-                            ) : (
-                                <Text style={{ color: '#94A3B8', fontSize: 12 }}>Select a user</Text>
-                            )}
-                        </View>
-                    </View>
 
 
-                </View>
+
 
                 {/* Collections List with Tabs */}
                 <View style={[styles.sectionCard, { marginBottom: 20, minHeight: 400 }]} >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                         <Text style={styles.sectionTitle}>Collections Detail</Text>
                         <View style={styles.tabSwitcher}>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.miniTab, collectionFreq === 'daily' && styles.miniTabActive]}
-                                onPress={() => setCollectionFreq('daily')}
+                                onPress={() => { setCollectionFreq('daily'); if (fetchDashboardStats) fetchDashboardStats(); }}
                             >
                                 <Text style={[styles.miniTabText, collectionFreq === 'daily' && styles.miniTabTextActive]}>Today</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.miniTab, collectionFreq === 'monthly' && styles.miniTabActive]}
-                                onPress={() => setCollectionFreq('monthly')}
+                                onPress={() => { setCollectionFreq('monthly'); if (fetchDashboardStats) fetchDashboardStats(); }}
                             >
                                 <Text style={[styles.miniTabText, collectionFreq === 'monthly' && styles.miniTabTextActive]}>Month</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.miniTab, collectionFreq === 'custom' && styles.miniTabActive]}
+                                onPress={showDatePicker}
+                            >
+                                <Text style={[styles.miniTabText, collectionFreq === 'custom' && styles.miniTabTextActive]}>Custom</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -636,15 +658,15 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                             </View>
 
                             {activeTransactions.length > visibleCount && (
-                                <TouchableOpacity 
-                                    style={styles.loadMoreButton} 
+                                <TouchableOpacity
+                                    style={styles.loadMoreButton}
                                     onPress={() => setVisibleCount(prev => prev + 10)}
                                 >
                                     <Text style={styles.loadMoreText}>Load More ({activeTransactions.length - visibleCount} more)</Text>
                                     <Icon name="chevron-down" size={10} color={COLORS?.primary} />
                                 </TouchableOpacity>
                             )}
-                            
+
                             {/* Total Row */}
                             <View style={styles.totalRow}>
                                 <Text style={styles.totalLabel}>Grand Total ({activeTransactions.length} users)</Text>
@@ -692,7 +714,13 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh }) =>
                     )}
                 </View >
 
-
+                <DateTimePickerModal
+                    isVisible={isDatePickerVisible}
+                    mode="date"
+                    onConfirm={handleConfirm}
+                    onCancel={hideDatePicker}
+                    maximumDate={new Date()}
+                />
 
             </ScrollView >
             {/* <View
@@ -921,6 +949,7 @@ const styles = StyleSheet.create({
     // Stats
     minimalStats: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         backgroundColor: '#fff',
         borderRadius: 16,
         padding: 16,
@@ -932,8 +961,11 @@ const styles = StyleSheet.create({
         elevation: 2
     },
     statBox: {
-        flex: 1,
-        alignItems: 'center'
+        width: '48%',
+        padding: 12,
+        borderRadius: 14,
+        marginBottom: 12,
+        alignItems: 'flex-start',
     },
     statLabel: {
         fontSize: 13,

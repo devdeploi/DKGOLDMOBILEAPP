@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ImageBackground, View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, ActivityIndicator, Modal, TextInput, Image, Alert, Platform, ScrollView, Linking } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -14,7 +14,10 @@ import SkeletonLoader from '../SkeletonLoader';
 import RNFS from 'react-native-fs';
 import { generatePDF } from 'react-native-html-to-pdf';
 import Share from 'react-native-share';
+import ViewShot from 'react-native-view-shot';
+import { WebView } from 'react-native-webview';
 import dklogo from '../../assets/DK.png';
+import logodk from '../../assets/logodk.png';
 import safproLogo from '../../../public/assests/Safpro-logo.png';
 
 import CustomAlert from '../CustomAlert';
@@ -25,6 +28,20 @@ const isPlanUnlimited = (plan) => {
     if (!plan) return false;
     const planNameStr = (plan.planName || '').toLowerCase();
     return plan.type === 'unlimited' || plan.durationMonths === 0 || planNameStr.includes('unlimited') || planNameStr.includes('infinity');
+};
+
+const hasPaidCurrentMonth = (plan) => {
+    if (!plan || isPlanUnlimited(plan)) return false;
+    const history = plan.history || plan.paymentHistory || [];
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    return history.some(p => {
+        const pDate = new Date(p.paymentDate || p.createdAt || p.date);
+        return (p.status === 'Completed' || p.status === 'Paid' || p.status === 'Pending Approval') &&
+               pDate >= startOfMonth && pDate <= endOfMonth;
+    });
 };
 
 const ITEMS_PER_PAGE = 10;
@@ -40,6 +57,11 @@ const AnalyticsTab = ({ user }) => {
 
     const [expandedHistoryId, setExpandedHistoryId] = useState(null);
     const [expandedCardId, setExpandedCardId] = useState(null); // Track which card is expanded
+    const [invoiceHtml, setInvoiceHtml] = useState(null);
+    const [invoiceFileName, setInvoiceFileName] = useState('');
+    const [webViewLoading, setWebViewLoading] = useState(true);
+    const [generatingReceipt, setGeneratingReceipt] = useState(false);
+    const viewShotRef = useRef(null);
     const [alertConfig, setAlertConfig] = useState({
         visible: false,
         title: '',
@@ -71,8 +93,16 @@ const AnalyticsTab = ({ user }) => {
     // Use global synchronized gold rate and timer
     const { goldRate, refreshTimer: goldRefreshTimer } = useGoldRate();
 
-    // Locked rate for Modal calculations
-    const [lockedGoldRate, setLockedGoldRate] = useState(0);
+    // Removed lockedGoldRate to ensure live rate updates
+
+    // Receipt Image Viewer State
+    const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+    const [receiptImageUri, setReceiptImageUri] = useState(null);
+
+    const openReceipt = (uri) => {
+        setReceiptImageUri(uri);
+        setReceiptModalVisible(true);
+    };
 
     const showAlert = (title, message, type = 'info') => {
         setAlertConfig({ visible: true, title, message, type });
@@ -108,7 +138,7 @@ const AnalyticsTab = ({ user }) => {
 
             if (result.statusCode === 200) {
                 const base64Data = await RNFS.readFile(tempFile, 'base64');
-                RNFS.unlink(tempFile).catch(() => {});
+                RNFS.unlink(tempFile).catch(() => { });
                 return `data:image/${mimeType};base64,${base64Data}`;
             } else {
                 console.error("Failed to download image, status:", result.statusCode);
@@ -135,181 +165,217 @@ const AnalyticsTab = ({ user }) => {
     };
 
     const createAndDownloadPDF = async (html, fileName) => {
+        const cleanFileName = fileName.replace(/[^a-z0-9]/gi, '_');
+        setInvoiceHtml(html);
+        setInvoiceFileName(cleanFileName);
+    };
+
+    const downloadInvoiceAsJPG = async () => {
+        if (!viewShotRef.current) return;
         try {
-            const cleanFileName = fileName.replace(/[^a-z0-9]/gi, '_');
-            const options = {
-                html,
-                fileName: cleanFileName,
-                directory: 'Documents',
-            };
-
-            const file = await generatePDF(options);
-
-            if (!file || !file.filePath) {
-                throw new Error("Failed to generate PDF");
-            }
-
+            const uri = await viewShotRef.current.capture();
+            let downloadPath;
+            const cleanFileName = invoiceFileName || `Invoice_${Date.now()}`;
             if (Platform.OS === 'android') {
-                const downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanFileName}.pdf`;
-                try {
-                    const exists = await RNFS.exists(downloadPath);
-                    if (exists) {
-                        await RNFS.unlink(downloadPath);
-                    }
-                    await RNFS.copyFile(file.filePath, downloadPath);
-                    showAlert("Success", "PDF saved successfully to Downloads folder", "success");
-                    // Optionally ask user to share, but for users download is fine
-                    setTimeout(() => {
-                        Alert.alert("Success", "PDF saved. Do you want to share it?", [
-                            { text: "Share", onPress: () => shareFile(downloadPath) },
-                            { text: "OK" }
-                        ]);
-                    }, 500);
-                } catch (copyErr) {
-                    console.error("File Copy Error:", copyErr);
-                    await shareFile(file.filePath);
-                }
+                downloadPath = `${RNFS.DownloadDirectoryPath}/${cleanFileName}.jpg`;
             } else {
-                await shareFile(file.filePath);
+                downloadPath = `${RNFS.DocumentDirectoryPath}/${cleanFileName}.jpg`;
             }
 
+            // Check if file exists and delete it before copying
+            const exists = await RNFS.exists(downloadPath);
+            if (exists) {
+                await RNFS.unlink(downloadPath);
+            }
+            await RNFS.copyFile(uri, downloadPath);
+            showAlert("Success", "Receipt saved successfully as JPG", "success", [
+                {
+                    text: "Share",
+                    onPress: () => shareFile(downloadPath)
+                },
+                { text: "OK" }
+            ]);
         } catch (error) {
-            console.error("PDF Download Error:", error);
-            showAlert("Error", "Failed to generate PDF", "error");
+            console.error("Invoice Capture Error:", error);
+            showAlert("Error", "Failed to save receipt as JPG", "error");
         }
     };
 
     const generateInvoice = async (payment, plan) => {
-        setLoading(true);
+        setGeneratingReceipt(true);
         try {
             let dkLogoImgTag = 'DK';
-            let safproLogoImgTag = 'Safpro';
+            let logodkImgTag = 'logodk';
 
             if (Platform.OS === 'android' && !__DEV__) {
-                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 70px; height: auto;" />`;
-                safproLogoImgTag = `<img src="file:///android_asset/Safpro-logo.png" style="width: 120px; height: auto;" />`;
+                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 250px; height: auto;" />`;
+                logodkImgTag = `<img src="file:///android_asset/logodk.png" style="width: 70px; height: auto;" />`;
             } else {
                 const dklogoUrl = Image.resolveAssetSource(dklogo).uri;
                 const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
-                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 70px; height: auto;" />`;
+                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 250px; height: auto;" />`;
 
-                const safproLogoUrl = Image.resolveAssetSource(safproLogo).uri;
-                const safproLogoBase64 = await fetchImageAsBase64(safproLogoUrl);
-                if (safproLogoBase64) safproLogoImgTag = `<img src="${safproLogoBase64}" style="width: 120px; height: auto;" />`;
-            }
-
-            let shopLogoImgTag = '';
-            if (plan.merchant?.shopLogo) {
-                const shopLogoUrl = `${BASE_URL}${plan.merchant.shopLogo}`;
-                const shopLogoBase64 = await fetchImageAsBase64(shopLogoUrl);
-                if (shopLogoBase64) {
-                    shopLogoImgTag = `<img src="${shopLogoBase64}" style="width: 70px; height: 70px; border-radius: 35px; object-fit: cover;" />`;
-                }
+                const logodkUrl = Image.resolveAssetSource(logodk).uri;
+                const logodkBase64 = await fetchImageAsBase64(logodkUrl);
+                if (logodkBase64) logodkImgTag = `<img src="${logodkBase64}" style="width: 70px; height: auto;" />`;
             }
 
             const planName = plan.planName || 'Unknown Plan';
-            const paymentDate = new Date(payment.paymentDate || payment.createdAt || new Date()).toLocaleDateString();
+            const paymentDate = new Date(payment.paymentDate || payment.createdAt || new Date()).toLocaleDateString('en-IN');
             const merchantName = (plan.merchant?.name || 'Merchant').toUpperCase();
             const customerName = user.name.toUpperCase();
+            const customerAddress = user.address || '';
+            const customerMobile = user.phone || '';
+
+            const isUnlimited = isPlanUnlimited(plan);
+            const receiptNo = payment.receiptNumber || '-';
+            const accNo = plan.acc_no || '-';
+            const amountPaid = Number(payment.amount || 0).toFixed(2);
+            const gramsSaved = Number(payment.goldWeight || 0).toFixed(3);
+            const paymentMode = payment.type || 'Offline';
+            let goldRate24k = payment.lockedGoldRate || payment.goldRate || '-';
+            if (goldRate24k !== '-') goldRate24k = Number(goldRate24k).toFixed(2);
+
+            // Cumulative logic
+            let cumulativeAmount = 0;
+            let cumulativeGrams = 0;
+            let attemptNo = 0;
+            const history = plan.paymentHistory || [];
+            if (history.length > 0) {
+                const sortedHistory = [...history].sort((a, b) => new Date(a.paymentDate || a.createdAt || a.date) - new Date(b.paymentDate || b.createdAt || b.date));
+                const currentIndex = sortedHistory.findIndex(p => p._id === payment._id);
+
+                if (currentIndex !== -1) {
+                    for (let i = 0; i <= currentIndex; i++) {
+                        const p = sortedHistory[i];
+                        if ((p.status === 'Paid' || p.status === 'Completed') && !p.isDelivered) {
+                            attemptNo += 1;
+                            cumulativeAmount += Number(p.amount || 0);
+                            cumulativeGrams += Number(p.goldWeight || 0);
+                        }
+                    }
+                } else {
+                    const currDate = new Date(payment.paymentDate || payment.createdAt || payment.date || new Date());
+                    sortedHistory.forEach(p => {
+                        const pDate = new Date(p.paymentDate || p.createdAt || p.date);
+                        if (pDate <= currDate && (p.status === 'Paid' || p.status === 'Completed') && !p.isDelivered) {
+                            attemptNo += 1;
+                            cumulativeAmount += Number(p.amount || 0);
+                            cumulativeGrams += Number(p.goldWeight || 0);
+                        }
+                    });
+                }
+            } else {
+                cumulativeAmount = Number(plan.totalSaved || 0);
+                cumulativeGrams = Number(plan.totalGoldWeight || 0);
+                attemptNo = 1;
+            }
+
+            const dueNo = attemptNo || payment.installmentNumber || '-';
+
+            const totalPaid = cumulativeAmount.toFixed(2);
+            const totalGrams = cumulativeGrams.toFixed(3);
+            const remainAmount = (Number(plan.totalAmount || 0) - cumulativeAmount).toFixed(2);
 
             const html = `
                 <html>
                 <head>
-                    <style>
-                        body { font-family: 'Helvetica', sans-serif; padding: 20px; color: #333; }
-                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #915200; }
-                        .logo-left, .logo-right { width: 100px; display: flex; align-items: center; justify-content: center; }
-                        .header-center { text-align: center; flex: 1; margin: 0 10px; }
-                        .header-center h2 { color: #915200; margin: 0; font-size: 18px; text-transform: uppercase; }
-                        .header-center p { margin: 2px 0; font-size: 10px; color: #666; }
-                        
-                        .title-section { text-align: center; margin-bottom: 30px; }
-                        .title-section h1 { color: #915200; margin: 0; font-size: 24px; letter-spacing: 2px; }
-                        .title-section p { color: #666; margin: 5px 0 0; font-size: 12px; }
-
-                        .grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
-                        .col { width: 45%; }
-                        .label { color: #915200; font-weight: bold; font-size: 12px; margin-bottom: 5px; }
-                        .name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
-                        .info { font-size: 12px; color: #555; line-height: 1.4; }
-                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                        th { background-color: #915200; color: white; padding: 10px; text-align: left; font-size: 12px; }
-                        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; }
-                        .total-row td { background-color: #fffbf0; font-weight: bold; color: #915200; }
-                        .footer { text-align: center; margin-top: 50px; color: #915200; font-size: 12px; border-top: 1px solid #eee; padding-top: 30px; }
-                    </style>
+                    <meta name="viewport" content="width=700, user-scalable=yes" />
                 </head>
-                <body>
-                    <div class="header">
-                        <div class="logo-left">${dkLogoImgTag}</div>
-                        <div class="header-center">
-                            <h2>${merchantName}</h2>
-                            <p>${plan.merchant?.address || ''}</p>
-                            <p>Phone: ${plan.merchant?.phone || ''}${plan.merchant?.email ? ' | ' + plan.merchant.email : ''}</p>
-                        </div>
-                        <div class="logo-right">${shopLogoImgTag}</div>
-                    </div>
-
-                    <div class="title-section">
-                        <h1>PAYMENT RECEIPT</h1>
-                        <p>Date: ${new Date().toLocaleDateString()}</p>
-                        ${payment.receiptNumber ? `<p style="font-weight: bold; margin-top: 5px;">Receipt No: ${payment.receiptNumber}</p>` : ''}
-                    </div>
-
-                    <div class="grid">
-                        <div class="col">
-                            <div class="label">TO:</div>
-                            <div class="name">${customerName}</div>
-                            <div class="info">
-                                Phone: ${user.phone}<br/>
-                                ${user.email ? user.email : ''}
+                <body style="font-family: 'Helvetica', sans-serif; padding: 20px; color: #000; margin: 0; box-sizing: border-box;">
+                    <div style="border: 2px solid #000; padding: 30px;">
+                        <!-- HEADER -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                            <div style="width: 20%;">
+                                ${logodkImgTag}
+                            </div>
+                            <div style="width: 50%; text-align: center;">
+                                ${dkLogoImgTag}
+                            </div>
+                            <div style="width: 30%; text-align: right; font-weight: bold; font-size: 14px;">
+                                &#128222; 8778841886
                             </div>
                         </div>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Description</th>
-                                <th>Details</th>
-                                <th style="text-align: right;">Amount (INR)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Plan Name</td>
-                                <td>${planName}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                            <tr>
-                                <td>Payment Mode</td>
-                                <td>${payment.type || "Offline"}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                            <tr>
-                                <td>Payment Date</td>
-                                <td>${paymentDate}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                             <tr>
-                                <td>Notes</td>
-                                <td>${payment.notes || "-"}</td>
-                                <td style="text-align: right;"></td>
-                            </tr>
-                            <tr class="total-row">
-                                <td colspan="2">TOTAL PAID</td>
-                                <td style="text-align: right;">Rs. ${Number(payment.amount).toFixed(2)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="footer">
-                        <p>Thank you!</p>
-                        <p style="font-size: 10px; color: #888; font-weight: normal;">If you have any questions, please contact the merchant.</p>
                         
-                        <div style="margin-top: 20px;">
-                            <p style="font-size: 10px; color: #999; margin-bottom: 5px;">Powered By</p>
-                            ${safproLogoImgTag}
+                        <!-- TITLE BAND -->
+                        <div style="background-color: #000; color: #fff; text-align: center; padding: 10px; font-weight: bold; font-size: 18px; letter-spacing: 2px; margin-bottom: 30px;">
+                            ${isUnlimited ? 'GOLD SAVING PLAN RECEIPT' : 'MONTHLY SAVING PLAN RECEIPT'}
+                        </div>
+
+                        <!-- 2 COLUMNS OF DATA -->
+                        <div style="display: flex; justify-content: space-between; font-size: 14px; line-height: 1.5;">
+                            <!-- LEFT COLUMN -->
+                            <div style="width: 48%;">
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>RECEIPT NO. :</span>
+                                    <strong>${receiptNo}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>DATE :</span>
+                                    <strong>${paymentDate}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>NAME :</span>
+                                    <strong>${customerName}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>ADDRESS :</span>
+                                    <strong style="text-align: right;">${customerAddress || 'N/A'}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>MOBILE :</span>
+                                    <strong>${customerMobile}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>AMOUNT PAID :</span>
+                                    <strong>Rs. ${amountPaid}</strong>
+                                </div>
+                                ${isUnlimited ? `
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>GRAMS SAVED :</span>
+                                    <strong>${gramsSaved}g</strong>
+                                </div>
+                                ` : ''}
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>TOTAL PAID :</span>
+                                    <strong>Rs. ${totalPaid}</strong>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT COLUMN -->
+                            <div style="width: 48%;">
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>A/C NO. :</span>
+                                    <strong>${accNo}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>PLAN TYPE :</span>
+                                    <strong>${planName}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 40px;">
+                                    <span>MODE :</span>
+                                    <strong>${paymentMode}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>DUE NO. :</span>
+                                    <strong>${dueNo}</strong>
+                                </div>
+                                ${isUnlimited ? `
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>24K GOLD RATE :</span>
+                                    <strong>Rs. ${goldRate24k}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                                    <span>TOTAL GRAMS :</span>
+                                    <strong>${totalGrams}g</strong>
+                                </div>
+                                ` : `
+                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                                    <span>REMAIN :</span>
+                                    <strong>Rs. ${remainAmount}</strong>
+                                </div>
+                                `}
+                            </div>
                         </div>
                     </div>
                 </body>
@@ -322,21 +388,21 @@ const AnalyticsTab = ({ user }) => {
             console.error("Invoice Gen Error", error);
             showAlert("Error", "Failed to generate invoice", "error");
         } finally {
-            setLoading(false);
+            setGeneratingReceipt(false);
         }
     };
 
     const generateStatement = async (plan) => {
-        setLoading(true);
+        setGeneratingReceipt(true);
         try {
             let dkLogoImgTag = 'DK';
             let safproLogoImgTag = 'Safpro';
 
             if (Platform.OS === 'android' && !__DEV__) {
-                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 70px; height: auto;" />`;
+                dkLogoImgTag = `<img src="file:///android_asset/logodk.png" style="width: 70px; height: auto;" />`;
                 safproLogoImgTag = `<img src="file:///android_asset/Safpro-logo.png" style="width: 120px; height: auto;" />`;
             } else {
-                const dklogoUrl = Image.resolveAssetSource(dklogo).uri;
+                const dklogoUrl = Image.resolveAssetSource(logodk).uri;
                 const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
                 if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 70px; height: auto;" />`;
 
@@ -361,13 +427,13 @@ const AnalyticsTab = ({ user }) => {
 
             let totalPaid = 0;
             const history = plan.history || [];
-            const sortedHistory = [...history].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            const sortedHistory = [...history].sort((a, b) => new Date(a.paymentDate || a.createdAt) - new Date(b.paymentDate || b.createdAt));
 
             const rowsHtml = sortedHistory.map(pay => {
                 if (pay.status === 'Completed' || pay.status === 'Paid') totalPaid += Number(pay.amount);
                 return `
                     <tr>
-                        <td>${new Date(pay.createdAt || pay.paymentDate).toLocaleDateString()}</td>
+                        <td>${new Date(pay.paymentDate || pay.createdAt).toLocaleDateString('en-IN')}</td>
                         <td>${pay.notes || "Installment Payment"}</td>
                         <td>${pay.type === 'online' ? 'Online' : pay.type === 'offline' ? 'Offline' : (pay.type || 'Offline')}</td>
                         <td style="text-align: right;">Rs. ${Number(pay.amount).toFixed(2)}</td>
@@ -380,27 +446,27 @@ const AnalyticsTab = ({ user }) => {
                 <head>
                     <style>
                         body { font-family: 'Helvetica', sans-serif; padding: 20px; color: #333; }
-                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #915200; }
+                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #000000; }
                         .logo-left, .logo-right { width: 100px; display: flex; align-items: center; justify-content: center; }
                         .header-center { text-align: center; flex: 1; margin: 0 10px; }
-                        .header-center h2 { color: #915200; margin: 0; font-size: 18px; text-transform: uppercase; }
+                        .header-center h2 { color: #000000; margin: 0; font-size: 18px; text-transform: uppercase; }
                         .header-center p { margin: 2px 0; font-size: 10px; color: #666; }
                         
                         .title-section { text-align: center; margin-bottom: 30px; }
-                        .title-section h1 { color: #915200; margin: 0; font-size: 24px; letter-spacing: 2px; }
+                        .title-section h1 { color: #000000; margin: 0; font-size: 24px; letter-spacing: 2px; }
                         .title-section p { color: #666; margin: 5px 0 0; font-size: 12px; }
 
                         .grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
                         .col { width: 45%; }
-                        .label { color: #915200; font-weight: bold; font-size: 12px; margin-bottom: 5px; }
+                        .label { color: #000000; font-weight: bold; font-size: 12px; margin-bottom: 5px; }
                         .name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
                         .info { font-size: 12px; color: #555; line-height: 1.4; }
-                        .plan-info { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 12px; border-left: 4px solid #915200; }
+                        .plan-info { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 12px; border-left: 4px solid #000000; }
                         table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                        th { background-color: #915200; color: white; padding: 8px; text-align: left; font-size: 11px; }
+                        th { background-color: #000000; color: white; padding: 8px; text-align: left; font-size: 11px; }
                         td { padding: 8px; border-bottom: 1px solid #eee; font-size: 11px; }
-                        .total-row td { background-color: #fffbf0; font-weight: bold; color: #915200; }
-                        .footer { text-align: center; margin-top: 50px; color: #915200; font-size: 12px; border-top: 1px solid #eee; padding-top: 30px; }
+                        .total-row td { background-color: #f9f9f9; font-weight: bold; color: #000000; }
+                        .footer { text-align: center; margin-top: 50px; color: #000000; font-size: 12px; border-top: 1px solid #eee; padding-top: 30px; }
                     </style>
                 </head>
                 <body>
@@ -416,7 +482,7 @@ const AnalyticsTab = ({ user }) => {
 
                     <div class="title-section">
                         <h1>STATEMENT OF ACCOUNT</h1>
-                        <p>Generated On: ${new Date().toLocaleDateString()}</p>
+                        <p>Generated On: ${new Date().toLocaleDateString('en-IN')}</p>
                     </div>
 
                     <div class="grid">
@@ -468,7 +534,7 @@ const AnalyticsTab = ({ user }) => {
             console.error("Statement Gen Error", error);
             showAlert("Error", "Failed to generate statement", "error");
         } finally {
-            setLoading(false);
+            setGeneratingReceipt(false);
         }
     };
 
@@ -537,9 +603,6 @@ const AnalyticsTab = ({ user }) => {
 
 
         // Initial setup
-        if (currentRate > 0) {
-            setLockedGoldRate(currentRate);
-        }
         setOfflineModalVisible(true);
     };
 
@@ -583,7 +646,7 @@ const AnalyticsTab = ({ user }) => {
                 chitPlanId: selectedPlanForOffline.planId,
                 subscriptionId: selectedPlanForOffline._id,
                 type: 'installment',
-                goldRate: lockedGoldRate || goldRate
+                goldRate: selectedPlanForOffline?.merchant?.goldRate24k > 0 ? Number(selectedPlanForOffline.merchant.goldRate24k) : goldRate
             }, {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
@@ -602,6 +665,13 @@ const AnalyticsTab = ({ user }) => {
                     contact: user.phone || '',
                     name: user.name || ''
                 },
+                notes: {
+                    userId: user._id || '',
+                    chitPlanId: selectedPlanForOffline.planId || '',
+                    subscriptionId: selectedPlanForOffline._id || '',
+                    type: 'installment',
+                    goldRate: selectedPlanForOffline?.merchant?.goldRate24k > 0 ? Number(selectedPlanForOffline.merchant.goldRate24k).toString() : goldRate.toString()
+                },
                 theme: { color: COLORS?.primary }
             };
 
@@ -612,10 +682,10 @@ const AnalyticsTab = ({ user }) => {
                 razorpay_order_id: data.razorpay_order_id,
                 razorpay_payment_id: data.razorpay_payment_id,
                 razorpay_signature: data.razorpay_signature,
-                chitPlanId: selectedPlanForOffline.planId, 
-                subscriptionId: selectedPlanForOffline._id, 
+                chitPlanId: selectedPlanForOffline.planId,
+                subscriptionId: selectedPlanForOffline._id,
                 amount: amountToPay,
-                goldRate: lockedGoldRate || goldRate,
+                goldRate: selectedPlanForOffline?.merchant?.goldRate24k > 0 ? Number(selectedPlanForOffline.merchant.goldRate24k) : goldRate,
                 notes: offlineForm.notes
             };
 
@@ -633,10 +703,10 @@ const AnalyticsTab = ({ user }) => {
             console.error("Payment Error:", error);
             if (error.code === 0 || error.code === 2) {
                 // Payment cancelled by user
-                Alert.alert("Payment Cancelled", "You cancelled the payment process.");
+                showAlert("Payment Cancelled", "You cancelled the payment process.", "warning");
             } else {
                 const msg = error.response?.data?.message || 'Failed to submit payment';
-                Alert.alert("Error", msg);
+                showAlert("Error", msg, "error");
             }
         } finally {
             setSubmittingOffline(false);
@@ -854,247 +924,306 @@ const AnalyticsTab = ({ user }) => {
                     </View>
                 </View>
 
-                        <View style={styles.divider} />
+                <View style={styles.divider} />
 
-                        <View style={styles.statsGrid}>
-                            <View style={styles.statItem}>
-                                <Text style={styles.statLabel}>Total Saved</Text>
-                                <Text style={styles.statValue}>₹{remainingSaved ? remainingSaved.toLocaleString() : 0}</Text>
-                            </View>
+                <View style={styles.statsGrid}>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statLabel}>Total Saved</Text>
+                        <Text style={styles.statValue}>₹{remainingSaved ? remainingSaved.toLocaleString() : 0}</Text>
+                    </View>
 
-                            <View style={styles.statItem}>
-                                <Text style={styles.statLabel}>Attempts</Text>
-                                <Text style={styles.statValue}>{plan.history ? plan.history.length : 0}</Text>
-                            </View>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statLabel}>Attempts</Text>
+                        <Text style={styles.statValue}>{plan.history ? plan.history.length : 0}</Text>
+                    </View>
 
-                            {showGold && (
-                                <View style={styles.statItem}>
-                                    <Text style={styles.statLabel}>Gold Saved</Text>
-                                    <Text style={[styles.statValue, { color: '#B45309' }]}>{goldGrams}g</Text>
-                                </View>
-                            )}
-
-                            {!['completed', 'settled', 'delivered_gold', 'closed'].includes(plan.status) && !isUnlimited && (
-                                <>
-                                    <View style={styles.statItem}>
-                                        <Text style={styles.statLabel}>Next Due</Text>
-                                        <Text style={[styles.statValue, diffDays <= 3 && { color: COLORS?.error }]}>
-                                            {isPlanFullyPaid ? 'Completed' : (dueDate && !isNaN(dueDate.getTime())
-                                                ? dueDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
-                                                : 'Due Now')}
-                                        </Text>
-                                    </View>
-                                    {!isPlanFullyPaid && (
-                                        <View style={styles.statItem}>
-                                            <Text style={styles.statLabel}>Remaining</Text>
-                                            <Text style={styles.statValue}>
-                                                ₹{Math.max(plan.totalAmount - plan.totalSaved, 0).toLocaleString()}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </>
-                            )}
+                    {showGold && (
+                        <View style={styles.statItem}>
+                            <Text style={styles.statLabel}>Gold Saved</Text>
+                            <Text style={[styles.statValue, { color: '#B45309' }]}>{goldGrams}g</Text>
                         </View>
+                    )}
 
-                        {/* Payment Buttons */}
-                        <View style={{ gap: 10 }}>
-                            {/* Withdrawal / Settlement Actions */}
-                            {(effectiveStatus === 'completed' || effectiveStatus === 'closed' || effectiveStatus === 'requested_withdrawal' || (effectiveStatus === 'active' && isPlanFullyPaid)) && (
-                                <View>
-                                    {effectiveStatus === 'requested_withdrawal' ? (
-                                        <View style={[styles.payButton1, { backgroundColor: '#FF9800' }]}>
-                                            <Text style={styles.payButtonText}>Withdrawal Requested - Pending</Text>
-                                        </View>
-                                    ) : (
-                                        plan.returnType === 'Cash' || effectiveStatus === 'closed' ? (
-                                            <TouchableOpacity
-                                                style={[styles.payButton1, { backgroundColor: COLORS?.success }]}
-                                                onPress={() => openWithdrawalModal(plan)}
-                                            >
-                                                <Text style={styles.payButtonText}>Request Withdrawal / Settlement</Text>
-                                            </TouchableOpacity>
-                                        ) : null
-                                    )}
-                                </View>
-                            )}
-
-                            {plan.status === 'settled' && (
-                                <View style={{ backgroundColor: '#F0FFF4', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#C6F6D5' }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                        <Icon name="check-circle" size={16} color="#38A169" />
-                                        <Text style={{ marginLeft: 6, fontWeight: 'bold', color: '#2F855A', fontSize: 14 }}>Plan Settled Successfully</Text>
-                                    </View>
-                                    {plan.settlementDetails && (
-                                        <>
-                                            <Text style={{ fontSize: 12, color: '#2F855A', marginBottom: 2 }}>
-                                                Amount: <Text style={{ fontWeight: 'bold' }}>₹{plan.settlementDetails.amount}</Text>
-                                            </Text>
-                                            <Text style={{ fontSize: 12, color: '#2F855A', marginBottom: 2 }}>
-                                                Ref: {plan.settlementDetails.transactionId}
-                                            </Text>
-                                            <Text style={{ fontSize: 12, color: '#2F855A', marginBottom: 2 }}>
-                                                Date: {new Date(plan.settlementDetails.settledDate).toLocaleDateString()}
-                                            </Text>
-                                            {plan.settlementDetails.note && (
-                                                <Text style={{ fontSize: 12, color: '#2F855A', fontStyle: 'italic' }}>
-                                                    Note: {plan.settlementDetails.note}
-                                                </Text>
-                                            )}
-                                        </>
-                                    )}
-                                </View>
-                            )}
-                            {effectiveStatus === 'requested_closure' ? (
-                                <View style={[styles.payButton, { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB', borderWidth: 1 }]}>
-                                    <Text style={[styles.payButtonText, { color: '#6B7280' }]}>
-                                        Closure Requested - Awaiting Merchant Approval
+                    {!['completed', 'settled', 'delivered_gold', 'closed'].includes(plan.status) && !isUnlimited && (
+                        <>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>Next Due</Text>
+                                <Text style={[styles.statValue, diffDays <= 3 && { color: COLORS?.error }]}>
+                                    {isPlanFullyPaid ? 'Completed' : (dueDate && !isNaN(dueDate.getTime())
+                                        ? dueDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
+                                        : 'Due Now')}
+                                </Text>
+                            </View>
+                            {!isPlanFullyPaid && (
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statLabel}>Remaining</Text>
+                                    <Text style={styles.statValue}>
+                                        ₹{Math.max(plan.totalAmount - plan.totalSaved, 0).toLocaleString()}
                                     </Text>
                                 </View>
-                            ) : effectiveStatus === 'active' && (
+                            )}
+                        </>
+                    )}
+                </View>
+
+                {/* Payment Buttons */}
+                <View style={{ gap: 10 }}>
+                    {/* Withdrawal / Settlement Actions */}
+                    {(effectiveStatus === 'completed' || effectiveStatus === 'closed' || effectiveStatus === 'requested_withdrawal' || (effectiveStatus === 'active' && isPlanFullyPaid)) && (
+                        <View>
+                            {effectiveStatus === 'requested_withdrawal' ? (
+                                <View style={[styles.payButton1, { backgroundColor: '#FF9800' }]}>
+                                    <Text style={styles.payButtonText}>Withdrawal Requested - Pending</Text>
+                                </View>
+                            ) : (
+                                plan.returnType === 'Cash' || effectiveStatus === 'closed' ? (
+                                    <TouchableOpacity
+                                        style={[styles.payButton1, { backgroundColor: COLORS?.success }]}
+                                        onPress={() => openWithdrawalModal(plan)}
+                                    >
+                                        <Text style={styles.payButtonText}>Request Withdrawal / Settlement</Text>
+                                    </TouchableOpacity>
+                                ) : null
+                            )}
+                        </View>
+                    )}
+
+                    {plan.status === 'settled' && (
+                        <View style={{ backgroundColor: '#F0FFF4', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#C6F6D5' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <Icon name="check-circle" size={16} color="#38A169" />
+                                <Text style={{ marginLeft: 6, fontWeight: 'bold', color: '#2F855A', fontSize: 14 }}>Plan Settled Successfully</Text>
+                            </View>
+                            {plan.settlementDetails && (
                                 <>
-                                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                                        {isPayable && (
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.payButton,
-                                                    { flex: 1 },
-                                                    diffDays <= 3 ? styles.payButtonUrgent : styles.payButtonNormal
-                                                ]}
-                                                onPress={() => openOfflineModal(plan)}
-                                            >
-                                                <Text style={[
-                                                    styles.payButtonText,
-                                                    diffDays <= 3 ? styles.payButtonTextUrgent : styles.payButtonTextNormal
-                                                ]}>
-                                                    Pay / Add Money
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                        <TouchableOpacity
-                                            style={[styles.payButton1, { flex: 1, backgroundColor: '#FFF3E0', borderColor: '#FFE0B2', borderWidth: 1 }]}
-                                            onPress={() => openClosingModal(plan)}
-                                        >
-                                            <Text style={[styles.payButtonText, { color: '#E65100' }]}>
-                                                Close Plan
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    <Text style={{ fontSize: 12, color: '#2F855A', marginBottom: 2 }}>
+                                        Amount: <Text style={{ fontWeight: 'bold' }}>₹{plan.settlementDetails.amount}</Text>
+                                    </Text>
+                                    <Text style={{ fontSize: 12, color: '#2F855A', marginBottom: 2 }}>
+                                        Ref: {plan.settlementDetails.transactionId}
+                                    </Text>
+                                    <Text style={{ fontSize: 12, color: '#2F855A', marginBottom: 2 }}>
+                                        Date: {new Date(plan.settlementDetails.settledDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                    </Text>
+                                    {plan.settlementDetails.note && (
+                                        <Text style={{ fontSize: 12, color: '#2F855A', fontStyle: 'italic' }}>
+                                            Note: {plan.settlementDetails.note}
+                                        </Text>
+                                    )}
                                 </>
                             )}
                         </View>
-
-                        <View style={[styles.footerRow, { marginTop: 10, backgroundColor: '#f8f9fa' }]}>
-                            <Icon name="piggy-bank" size={12} color={COLORS?.primary} />
-                            <Text style={styles.footerText}>
-                                Target Goal: ₹{(plan.totalAmount || 0).toLocaleString()}
+                    )}
+                    
+                    {plan.status === 'delivered_gold' && (
+                        <View style={{ backgroundColor: '#FFFBEB', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A', marginTop: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <Icon name="gift" size={16} color="#B45309" />
+                                <Text style={{ marginLeft: 6, fontWeight: 'bold', color: '#92400E', fontSize: 14 }}>Gold Delivered Successfully</Text>
+                            </View>
+                            {(() => {
+                                const details = plan.deliveryDetails || (plan.deliveryHistory?.length > 0 ? plan.deliveryHistory[plan.deliveryHistory.length - 1] : null);
+                                if (!details) return null;
+                                return (
+                                    <>
+                                        <Text style={{ fontSize: 12, color: '#92400E', marginBottom: 2 }}>
+                                            Delivered On: {new Date(details.deliveredDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                        </Text>
+                                    </>
+                                );
+                            })()}
+                        </View>
+                    )}
+                    {effectiveStatus === 'requested_closure' ? (
+                        <View style={[styles.payButton, { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB', borderWidth: 1 }]}>
+                            <Text style={[styles.payButtonText, { color: '#6B7280' }]}>
+                                Closure Requested - Awaiting Merchant Approval
                             </Text>
                         </View>
-
-                        <TouchableOpacity
-                            style={styles.historyToggleButton}
-                            onPress={() => setExpandedHistoryId(expandedHistoryId === plan._id ? null : plan._id)}
-                        >
-                            <Text style={styles.historyToggleText}>
-                                {expandedHistoryId === plan._id ? 'Hide Payment History' : 'View Payment History'}
-                            </Text>
-                            <Icon name={expandedHistoryId === plan._id ? "chevron-up" : "chevron-down"} size={10} color={COLORS?.primary} />
-                        </TouchableOpacity>
-
-                        {expandedHistoryId === plan._id && (
-                            <View style={styles.historyContainer}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                    <Text style={styles.historyTitle}>Payment History</Text>
-                                    <TouchableOpacity onPress={() => generateStatement(plan)}>
-                                        <Icon name="file-download" size={16} color={COLORS?.primary} />
+                    ) : effectiveStatus === 'active' && (
+                        <>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                {isPayable && (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.payButton,
+                                            { flex: 1 },
+                                            diffDays <= 3 ? styles.payButtonUrgent : styles.payButtonNormal,
+                                            hasPaidCurrentMonth(plan) && { backgroundColor: '#E5E7EB', borderColor: '#D1D5DB' }
+                                        ]}
+                                        onPress={() => openOfflineModal(plan)}
+                                        disabled={hasPaidCurrentMonth(plan)}
+                                    >
+                                        <Text style={[
+                                            styles.payButtonText,
+                                            diffDays <= 3 ? styles.payButtonTextUrgent : styles.payButtonTextNormal,
+                                            hasPaidCurrentMonth(plan) && { color: '#9CA3AF' }
+                                        ]}>
+                                            {hasPaidCurrentMonth(plan) ? 'Paid This Month' : 'Pay / Add Money'}
+                                        </Text>
                                     </TouchableOpacity>
-                                </View>
-                                {plan.history && plan.history.length > 0 ? (
-                                    plan.history.map((payment, index) => (
-                                        <View key={payment._id || index} style={styles.historyItem}>
-                                            <View style={styles.historyLeft}>
-                                                <Icon
-                                                    name={payment.isDelivered ? "gift" : "check-circle"}
-                                                    size={10}
-                                                    color={payment.isDelivered ? "#d4af37" : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : "#2E7D32")}
-                                                    style={{ marginTop: 2 }}
-                                                />
-                                                <View style={{ marginLeft: 8 }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                        <Text style={styles.historyDate}>
-                                                            {new Date(payment.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                        </Text>
-                                                        {payment.isDelivered && (
-                                                            <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
-                                                                <Text style={{ fontSize: 8, color: '#92400e', fontWeight: '800' }}>DELIVERED</Text>
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                    <Text style={[styles.historyStatus, { color: payment.isDelivered ? '#d4af37' : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : '#666') }]}>
-                                                        {payment.isDelivered ? 'Delivered' : (payment.status || 'Paid')}
-                                                    </Text>
-                                                    {payment.notes && payment.status === 'Rejected' && (
-                                                        <Text style={{ fontSize: 10, color: 'red', marginTop: 2 }}>{payment.notes}</Text>
-                                                    )}
-                                                </View>
-                                            </View>
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={[styles.historyAmount, payment.isDelivered && { textDecorationLine: 'line-through', opacity: 0.6 }]}>
-                                                    + ₹{payment.amount}
+                                )}
+                                <TouchableOpacity
+                                    style={[styles.payButton1, { flex: 1, backgroundColor: '#FFF3E0', borderColor: '#FFE0B2', borderWidth: 1 }]}
+                                    onPress={() => openClosingModal(plan)}
+                                >
+                                    <Text style={[styles.payButtonText, { color: '#E65100' }]}>
+                                        Close Plan
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </>
+                    )}
+                </View>
+
+                {/* Display all receipts directly on the card */}
+                {((plan.settlementDetails?.receiptImage) || 
+                  (plan.deliveryDetails?.receiptImage) || 
+                  (plan.deliveryHistory?.some(d => d.receiptImage))) && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 10, paddingBottom: 15, marginTop: 10 }}>
+                        {plan.settlementDetails?.receiptImage && (
+                            <TouchableOpacity
+                                style={[styles.chipBtn, { margin: 4 }]}
+                                onPress={() => openReceipt(`${BASE_URL}${plan.settlementDetails.receiptImage}`)}
+                            >
+                                <Icon name="receipt" size={12} color="#2E7D32" />
+                                <Text style={[styles.chipBtnText, { fontSize: 12 }]}>Settlement Receipt</Text>
+                            </TouchableOpacity>
+                        )}
+                        {plan.deliveryDetails?.receiptImage && (
+                            <TouchableOpacity
+                                style={[styles.chipBtn, { margin: 4, backgroundColor: '#FFF8E1', borderColor: '#FFD54F' }]}
+                                onPress={() => openReceipt(`${BASE_URL}${plan.deliveryDetails.receiptImage}`)}
+                            >
+                                <Icon name="receipt" size={12} color="#B45309" />
+                                <Text style={[styles.chipBtnText, { color: '#B45309', fontSize: 12 }]}>Delivery Receipt</Text>
+                            </TouchableOpacity>
+                        )}
+                        {plan.deliveryHistory?.filter(d => d.receiptImage).map((delivery, index) => (
+                            <TouchableOpacity
+                                key={`delivery-receipt-${index}`}
+                                style={[styles.chipBtn, { margin: 4, backgroundColor: '#FFF8E1', borderColor: '#FFD54F' }]}
+                                onPress={() => openReceipt(`${BASE_URL}${delivery.receiptImage}`)}
+                            >
+                                <Icon name="receipt" size={12} color="#B45309" />
+                                <Text style={[styles.chipBtnText, { color: '#B45309', fontSize: 12 }]}>Receipt {index + 1}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
+                <View style={[styles.footerRow, { backgroundColor: '#f8f9fa' }]}>
+                    <Icon name="piggy-bank" size={12} color={COLORS?.primary} />
+                    <Text style={styles.footerText}>
+                        Target Goal: ₹{(plan.totalAmount || 0).toLocaleString()}
+                    </Text>
+                </View>
+
+                <TouchableOpacity
+                    style={styles.historyToggleButton}
+                    onPress={() => setExpandedHistoryId(expandedHistoryId === plan._id ? null : plan._id)}
+                >
+                    <Text style={styles.historyToggleText}>
+                        {expandedHistoryId === plan._id ? 'Hide Payment History' : 'View Payment History'}
+                    </Text>
+                    <Icon name={expandedHistoryId === plan._id ? "chevron-up" : "chevron-down"} size={10} color={COLORS?.primary} />
+                </TouchableOpacity>
+
+                {expandedHistoryId === plan._id && (
+                    <View style={styles.historyContainer}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <Text style={styles.historyTitle}>Payment History</Text>
+                            <TouchableOpacity onPress={() => generateStatement(plan)}>
+                                <Icon name="file-download" size={16} color={COLORS?.primary} />
+                            </TouchableOpacity>
+                        </View>
+                        {plan.history && plan.history.length > 0 ? (
+                            plan.history.map((payment, index) => (
+                                <View key={payment._id || index} style={styles.historyItem}>
+                                    <View style={styles.historyLeft}>
+                                        <Icon
+                                            name={payment.isDelivered ? "gift" : "check-circle"}
+                                            size={10}
+                                            color={payment.isDelivered ? "#d4af37" : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : "#2E7D32")}
+                                            style={{ marginTop: 2 }}
+                                        />
+                                        <View style={{ marginLeft: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={styles.historyDate}>
+                                                    {new Date(payment.paymentDate || payment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                 </Text>
-                                                {payment.lockedGoldRate > 0 && plan.returnType?.toLowerCase() === 'gold' && (
-                                                    <Text style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
-                                                        Rate: ₹{payment.lockedGoldRate.toFixed(2)}/g
-                                                    </Text>
+                                                {payment.isDelivered && (
+                                                    <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                                                        <Text style={{ fontSize: 8, color: '#92400e', fontWeight: '800' }}>DELIVERED</Text>
+                                                    </View>
                                                 )}
-                                                {payment.goldWeight > 0 && (
-                                                    <Text style={[{ fontSize: 10, color: '#B45309', fontWeight: 'bold' }, payment.isDelivered && { textDecorationLine: 'line-through', opacity: 0.6 }]}>
-                                                        {payment.goldWeight.toFixed(3)}g Gold
-                                                    </Text>
-                                                )}
-                                                {(payment.status === 'Paid' || payment.status === 'Completed') && !payment.isDelivered && (
-                                                    <TouchableOpacity onPress={() => generateInvoice(payment, plan)} style={{ marginTop: 6, padding: 4 }}>
-                                                        <Icon name="file-invoice" size={14} color={COLORS?.primary} />
-                                                    </TouchableOpacity>
-                                                )}
+                                            </View>
+                                            <Text style={[styles.historyStatus, { color: payment.isDelivered ? '#d4af37' : (payment.status === 'Pending Approval' ? 'orange' : payment.status === 'Rejected' ? 'red' : '#666') }]}>
+                                                {payment.isDelivered ? 'Delivered' : (payment.status || 'Paid')}
+                                            </Text>
+                                            {payment.notes && payment.status === 'Rejected' && (
+                                                <Text style={{ fontSize: 10, color: 'red', marginTop: 2 }}>{payment.notes}</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        <Text style={[styles.historyAmount, payment.isDelivered && { textDecorationLine: 'line-through', opacity: 0.6 }]}>
+                                            + ₹{payment.amount}
+                                        </Text>
+                                        {payment.lockedGoldRate > 0 && plan.returnType?.toLowerCase() === 'gold' && (
+                                            <Text style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
+                                                Rate: ₹{payment.lockedGoldRate.toFixed(2)}/g
+                                            </Text>
+                                        )}
+                                        {payment.goldWeight > 0 && (
+                                            <Text style={[{ fontSize: 10, color: '#B45309', fontWeight: 'bold' }, payment.isDelivered && { textDecorationLine: 'line-through', opacity: 0.6 }]}>
+                                                {payment.goldWeight.toFixed(3)}g Gold
+                                            </Text>
+                                        )}
+                                        {(payment.status === 'Paid' || payment.status === 'Completed') && !payment.isDelivered && (
+                                            <TouchableOpacity onPress={() => generateInvoice(payment, plan)} style={{ marginTop: 6, padding: 4 }}>
+                                                <Icon name="file-invoice" size={14} color={COLORS?.primary} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={styles.noHistoryText}>No payments recorded yet.</Text>
+                        )}
+
+                        {plan.deliveryHistory && plan.deliveryHistory.length > 0 && (
+                            <View style={{ marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#eee' }}>
+                                <Text style={[styles.historyTitle, { color: '#915200', marginBottom: 10 }]}>Delivery History</Text>
+                                {plan.deliveryHistory.map((delivery, dIdx) => (
+                                    <View key={dIdx} style={[styles.historyItem, { borderLeftWidth: 3, borderLeftColor: '#d4af37', paddingLeft: 10, backgroundColor: '#fffdf5' }]}>
+                                        <View style={styles.historyLeft}>
+                                            <Icon name="truck-loading" size={10} color="#d4af37" style={{ marginTop: 2 }} />
+                                            <View style={{ marginLeft: 8 }}>
+                                                <Text style={styles.historyDate}>
+                                                    {new Date(delivery.deliveredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                </Text>
+                                                <Text style={{ fontSize: 10, color: '#666' }}>{delivery.notes || 'Partial Delivery'}</Text>
                                             </View>
                                         </View>
-                                    ))
-                                ) : (
-                                    <Text style={styles.noHistoryText}>No payments recorded yet.</Text>
-                                )}
-
-                                {plan.deliveryHistory && plan.deliveryHistory.length > 0 && (
-                                    <View style={{ marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#eee' }}>
-                                        <Text style={[styles.historyTitle, { color: '#915200', marginBottom: 10 }]}>Delivery History</Text>
-                                        {plan.deliveryHistory.map((delivery, dIdx) => (
-                                            <View key={dIdx} style={[styles.historyItem, { borderLeftWidth: 3, borderLeftColor: '#d4af37', paddingLeft: 10, backgroundColor: '#fffdf5' }]}>
-                                                <View style={styles.historyLeft}>
-                                                    <Icon name="truck-loading" size={10} color="#d4af37" style={{ marginTop: 2 }} />
-                                                    <View style={{ marginLeft: 8 }}>
-                                                        <Text style={styles.historyDate}>
-                                                            {new Date(delivery.deliveredDate).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                        </Text>
-                                                        <Text style={{ fontSize: 10, color: '#666' }}>{delivery.notes || 'Partial Delivery'}</Text>
-                                                    </View>
-                                                </View>
-                                                <View style={{ alignItems: 'flex-end' }}>
-                                                    {delivery.goldWeight > 0 && (
-                                                        <Text style={{ fontSize: 11, color: '#92400e', fontWeight: 'bold' }}>
-                                                            - {delivery.goldWeight.toFixed(3)}g Gold
-                                                        </Text>
-                                                    )}
-                                                    {delivery.amount > 0 && (
-                                                        <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: 'bold' }}>
-                                                            - ₹{delivery.amount.toLocaleString()}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            </View>
-                                        ))}
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            {delivery.goldWeight > 0 && (
+                                                <Text style={{ fontSize: 11, color: '#92400e', fontWeight: 'bold' }}>
+                                                    - {delivery.goldWeight.toFixed(3)}g Gold
+                                                </Text>
+                                            )}
+                                            {delivery.amount > 0 && (
+                                                <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: 'bold' }}>
+                                                    - ₹{delivery.amount.toLocaleString()}
+                                                </Text>
+                                            )}
+                                        </View>
                                     </View>
-                                )}
+                                ))}
                             </View>
                         )}
+                    </View>
+                )}
             </View>
         );
     };
@@ -1158,11 +1287,32 @@ const AnalyticsTab = ({ user }) => {
             /> */}
 
             {/* Blocking Payment Modal */}
-            <Modal visible={submittingOffline} transparent={true} animationType="fade" onRequestClose={() => {}}>
+            <Modal visible={submittingOffline} transparent={true} animationType="fade" onRequestClose={() => { }}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
                     <ActivityIndicator size="large" color="#d4af37" />
                     <Text style={{ color: '#fff', marginTop: 15, fontSize: 18, fontWeight: 'bold' }}>Processing Payment...</Text>
                     <Text style={{ color: '#e0e0e0', marginTop: 5, fontSize: 13, textAlign: 'center', paddingHorizontal: 20 }}>Please do not close the app, change tabs, or press back.</Text>
+                </View>
+            </Modal>
+
+            {/* Generating Receipt Modal */}
+            <Modal visible={generatingReceipt} transparent={true} animationType="fade" onRequestClose={() => { }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+                    <ActivityIndicator size="large" color="#d4af37" />
+                    <Text style={{ color: '#fff', marginTop: 15, fontSize: 18, fontWeight: 'bold' }}>Generating Receipt...</Text>
+                    <Text style={{ color: '#e0e0e0', marginTop: 5, fontSize: 13, textAlign: 'center', paddingHorizontal: 20 }}>Please wait while we prepare your document.</Text>
+                </View>
+            </Modal>
+
+            {/* Receipt Viewer Modal */}
+            <Modal visible={receiptModalVisible} transparent={true} animationType="fade" onRequestClose={() => setReceiptModalVisible(false)}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+                    <TouchableOpacity style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 }} onPress={() => setReceiptModalVisible(false)}>
+                        <Icon name="times" size={20} color="#FFF" />
+                    </TouchableOpacity>
+                    {receiptImageUri && (
+                        <Image source={{ uri: receiptImageUri }} style={{ width: '90%', height: '80%', resizeMode: 'contain' }} />
+                    )}
                 </View>
             </Modal>
 
@@ -1265,19 +1415,19 @@ const AnalyticsTab = ({ user }) => {
                                         )}
                                     </View>
                                     <Text style={styles.inputHint}>
-                                        {isPlanUnlimited(selectedPlanForOffline) 
-                                            ? 'Enter investment amount (₹500 - ₹1,00,000).' 
+                                        {isPlanUnlimited(selectedPlanForOffline)
+                                            ? 'Enter investment amount (₹500 - ₹1,00,000).'
                                             : 'This is a fixed installment amount for your plan.'}
                                     </Text>
                                     {isPlanUnlimited(selectedPlanForOffline) && (
-                                        <Text style={{ 
-                                            fontSize: 12, 
-                                            color: (customAmount && (Number(customAmount) < 500 || Number(customAmount) > 100000)) ? '#dc3545' : '#b45309', 
-                                            marginTop: 6, 
-                                            fontWeight: '600' 
+                                        <Text style={{
+                                            fontSize: 12,
+                                            color: (customAmount && (Number(customAmount) < 500 || Number(customAmount) > 100000)) ? '#dc3545' : '#b45309',
+                                            marginTop: 6,
+                                            fontWeight: '600'
                                         }}>
-                                            {(customAmount && (Number(customAmount) < 500 || Number(customAmount) > 100000)) 
-                                                ? '⚠️ Amount must be between ₹500 and ₹1,00,000.' 
+                                            {(customAmount && (Number(customAmount) < 500 || Number(customAmount) > 100000))
+                                                ? '⚠️ Amount must be between ₹500 and ₹1,00,000.'
                                                 : 'Note: Amount must be between ₹500 and ₹1,00,000.'
                                             }
                                         </Text>
@@ -1285,28 +1435,40 @@ const AnalyticsTab = ({ user }) => {
 
                                     {((selectedPlanForOffline?.returnType?.toLowerCase() === 'gold') || isPlanUnlimited(selectedPlanForOffline)) && goldRate > 0 && (
                                         <View style={{ marginTop: 15, marginBottom: 15, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
-                                            <Text style={[styles.inputLabel, { color: '#92400E', marginBottom: 8 }]}>Applied Gold Rate (₹/gm)</Text>
-                                            <View style={[styles.inputWrapper, { backgroundColor: '#F3F4F6', borderColor: '#FCD34D', marginBottom: 12, height: 45 }]}>
-                                                <Text style={[styles.flexInput, { color: '#666', fontSize: 15, textAlignVertical: 'center', paddingTop: Platform.OS === 'ios' ? 12 : 0 }]}>
-                                                    ₹{(lockedGoldRate || goldRate).toFixed(2)}
-                                                </Text>
-                                                <Icon name="lock" size={12} color="#999" />
-                                            </View>
+                                            {(() => {
+                                                const liveRate = selectedPlanForOffline?.merchant?.goldRate24k > 0 ? Number(selectedPlanForOffline.merchant.goldRate24k) : goldRate;
+                                                return (
+                                                    <>
+                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                            <Text style={[styles.inputLabel, { color: '#92400E', marginBottom: 0 }]}>Applied Gold Rate (₹/gm)</Text>
+                                                            <View style={{ backgroundColor: '#D97706', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                                                <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>LIVE</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={[styles.inputWrapper, { backgroundColor: '#F3F4F6', borderColor: '#FCD34D', marginBottom: 12, height: 45 }]}>
+                                                            <Text style={[styles.flexInput, { color: '#666', fontSize: 15, textAlignVertical: 'center', paddingTop: Platform.OS === 'ios' ? 12 : 0 }]}>
+                                                                ₹{liveRate.toFixed(2)}
+                                                            </Text>
+                                                            <Icon name="bolt" size={12} color="#D97706" />
+                                                        </View>
 
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#FEF3C7', marginBottom: 10 }}>
-                                                <Text style={{ fontSize: 12, color: '#92400E', fontWeight: 'bold' }}>Calculated Gold Weight:</Text>
-                                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS?.dark }}>
-                                                    {(customAmount && (lockedGoldRate || goldRate)) ? (parseFloat(customAmount) / (lockedGoldRate || goldRate)).toFixed(3) : '0.000'}g
-                                                </Text>
-                                            </View>
+                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#FEF3C7', marginBottom: 10 }}>
+                                                            <Text style={{ fontSize: 12, color: '#92400E', fontWeight: 'bold' }}>Calculated Gold Weight:</Text>
+                                                            <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS?.dark }}>
+                                                                {(customAmount && liveRate) ? (parseFloat(customAmount) / liveRate).toFixed(3) : '0.000'}g
+                                                            </Text>
+                                                        </View>
+                                                    </>
+                                                );
+                                            })()}
                                         </View>
                                     )}
                                 </View>
                             </View>
 
                             {(() => {
-                                const isPayDisabled = submittingOffline || 
-                                    (isPlanUnlimited(selectedPlanForOffline) 
+                                const isPayDisabled = submittingOffline ||
+                                    (isPlanUnlimited(selectedPlanForOffline)
                                         ? (!customAmount || isNaN(customAmount) || Number(customAmount) < 500 || Number(customAmount) > 100000)
                                         : (!customAmount || isNaN(customAmount) || Number(customAmount) <= 0));
                                 return (
@@ -1418,6 +1580,62 @@ const AnalyticsTab = ({ user }) => {
                                 )}
                             </TouchableOpacity>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Invoice Popup Modal */}
+            <Modal
+                visible={!!invoiceHtml}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setInvoiceHtml(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { padding: 0, height: '80%', overflow: 'hidden' }]}>
+                        <View style={[styles.modalHeader, { padding: 16, backgroundColor: '#f5f5f5', borderBottomWidth: 1, borderColor: '#eee', marginBottom: 0 }]}>
+                            <Text style={styles.modalTitle}>Receipt</Text>
+                            <TouchableOpacity onPress={() => setInvoiceHtml(null)}>
+                                <Icon name="times" size={20} color={COLORS?.dark} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ flex: 1, position: 'relative' }}>
+                            <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }} style={{ flex: 1 }}>
+                                <WebView
+                                    originWhitelist={['*']}
+                                    source={{ html: invoiceHtml }}
+                                    style={{ flex: 1 }}
+                                    showsVerticalScrollIndicator={false}
+                                    allowFileAccess={true}
+                                    allowUniversalAccessFromFileURLs={true}
+                                    allowFileAccessFromFileURLs={true}
+                                    onLoadStart={() => setWebViewLoading(true)}
+                                    onLoadEnd={() => setWebViewLoading(false)}
+                                />
+                            </ViewShot>
+                            {webViewLoading && (
+                                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center' }}>
+                                    <ActivityIndicator size="large" color="#915200" />
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={{ padding: 16, borderTopWidth: 1, borderColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: '#f0f0f0', flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }]}
+                                onPress={() => setInvoiceHtml(null)}
+                            >
+                                <Text style={{ color: COLORS?.dark, fontWeight: 'bold' }}>Close</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: COLORS?.primary, flex: 1, flexDirection: 'row', gap: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }]}
+                                onPress={downloadInvoiceAsJPG}
+                            >
+                                <Icon name="download" size={16} color="#fff" />
+                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save JPG</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -2263,6 +2481,22 @@ const styles = StyleSheet.create({
         marginTop: 10,
         textAlign: 'center',
         opacity: 0.8,
+    },
+    chipBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: '#E8F5E9',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#A5D6A7',
+    },
+    chipBtnText: {
+        fontSize: 11,
+        color: '#2E7D32',
+        fontWeight: '600',
+        marginLeft: 4,
     },
 });
 

@@ -509,6 +509,12 @@ const AdManager = ({ user }) => {
                                     </TouchableOpacity>
                                 )}
                             </ScrollView>
+                            <View style={styles.recommendationBox}>
+                                <Icon name="info-circle" size={14} color={COLORS.primary} />
+                                <Text style={styles.recommendationText}>
+                                    Recommended banner: 1600 × 900 px (16:9). Upload high-quality JPG, PNG, or WebP images. Maximum 5 images.
+                                </Text>
+                            </View>
 
                             {/* Info Fields */}
                             <Text style={styles.label}>Headline</Text>
@@ -779,6 +785,24 @@ const styles = StyleSheet.create({
     contentBlock: {
         padding: 20,
         paddingBottom: 10,
+    },
+    recommendationBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#FFF8E6',
+        borderWidth: 1,
+        borderColor: '#F6D365',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 15,
+    },
+
+    recommendationText: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 12,
+        color: '#7A5A00',
+        lineHeight: 18,
     },
     contentTitle: {
         fontSize: 22,

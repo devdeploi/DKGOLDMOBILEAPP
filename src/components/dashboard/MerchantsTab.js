@@ -45,6 +45,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     const [plans, setPlans] = useState([]);
     const [loadingPlans, setLoadingPlans] = useState(false);
     const [subscribedPlanIds, setSubscribedPlanIds] = useState([]);
+    const [mySubscriptions, setMySubscriptions] = useState([]);
     const [selectedImage, setSelectedImage] = useState(null);
 
     // Subscription Modal State
@@ -57,8 +58,8 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
     // Use global synchronized gold rate and timer from context
     const { goldRate, refreshTimer: goldRefreshTimer } = useGoldRate();
 
-    // Locked rate for Modal calculations
-    const [lockedGoldRate, setLockedGoldRate] = useState(0);
+    // Active rate for Modal calculations (always live)
+    const activeGoldRate = (Number(merchant?.goldRate24k) > 0) ? Number(merchant?.goldRate24k) : goldRate;
 
     // acc_no preview for user with no acc_no
     const [accNoPreview, setAccNoPreview] = useState(null); // { lastAccNo, nextAccNo }
@@ -71,6 +72,10 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         type: 'info',
         buttons: []
     });
+
+    const showAlert = (title, message, type = 'info', buttons = []) => {
+        setAlertConfig({ visible: true, title, message, type, buttons });
+    };
 
     useEffect(() => {
         if (merchant) {
@@ -97,7 +102,8 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
             const { data } = await axios.get(`${APIURL}/chit-plans/my-plans`, {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
-            const ids = data.map(p => p._id);
+            setMySubscriptions(data);
+            const ids = data.map(p => p.planId || (p.plan && p.plan._id) || p._id);
             setSubscribedPlanIds(ids);
         } catch (error) {
             console.log("Failed to fetch subscriptions", error);
@@ -116,6 +122,30 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
             return;
         }
 
+        if (subscribedPlanIds.includes(plan._id)) {
+            const existingSub = mySubscriptions.find(s => (s.planId || (s.plan && s.plan._id) || s._id) === plan._id);
+            const accNoText = existingSub?.acc_no ? `\n\nAccount No: ${existingSub.acc_no}` : '';
+
+            setAlertConfig({
+                visible: true,
+                title: "Already Subscribed",
+                message: `You are already enrolled in this plan.${accNoText}\n\nDo you want to join again?`,
+                type: "warning",
+                buttons: [
+                    { text: "CANCEL", style: "cancel", onPress: () => setAlertConfig({ visible: false }) },
+                    { text: "YES", onPress: () => {
+                        setAlertConfig({ visible: false });
+                        proceedWithSubscription(plan);
+                    }}
+                ]
+            });
+            return;
+        }
+
+        proceedWithSubscription(plan);
+    };
+
+    const proceedWithSubscription = async (plan) => {
         setSelectedPlanForSub(plan);
         if (isPlanUnlimited(plan)) {
             setSubscriptionAmount('500'); // Minimum 500
@@ -124,12 +154,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         }
         setSubNote('');
 
-        // Calculate merchant-specific rate
-        const manual24k = Number(merchant?.goldRate24k);
-        const currentRate = (manual24k > 0) ? manual24k : goldRate;
-        if (currentRate > 0) {
-            setLockedGoldRate(currentRate);
-        }
+        // Note: live activeGoldRate is now used instead of lockedGoldRate
 
         // Fetch plan-scoped acc_no preview if user has no acc_no
         if (!user.acc_no) {
@@ -150,7 +175,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
 
     const handleUpiPayment = async () => {
         if (!merchant?.upiId) {
-            Alert.alert("Error", "Merchant UPI ID not available.");
+            showAlert("Error", "Merchant UPI ID not available.", "error");
             return;
         }
 
@@ -159,12 +184,12 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         if (isPlanUnlimited(selectedPlanForSub)) {
             const numAmount = Number(amount);
             if (!amount || isNaN(amount) || numAmount < 500 || numAmount > 100000) {
-                Alert.alert("Error", "Investment amount for unlimited plans must be between ₹500 and ₹1,00,000.");
+                showAlert("Error", "Investment amount for unlimited plans must be between ₹500 and ₹1,00,000.", "warning");
                 return;
             }
         } else {
             if (!amount || isNaN(amount) || Number(amount) <= 0) {
-                Alert.alert("Error", "Please enter a valid amount.");
+                showAlert("Error", "Please enter a valid amount.", "warning");
                 return;
             }
         }
@@ -191,9 +216,10 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
 
         if (!opened) {
             // All schemes failed — show manual fallback with UPI ID to copy
-            Alert.alert(
+            showAlert(
                 "Pay via UPI",
                 `No UPI app could be opened automatically.\n\nOpen GPay, PhonePe or any UPI app and pay to:\n\n📱 UPI ID: ${merchant.upiId}\n💰 Amount: ₹${amount}\n\nThen upload the payment screenshot below.`,
+                "info",
                 [{ text: "Got it" }]
             );
         }
@@ -213,12 +239,12 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         if (isPlanUnlimited(selectedPlanForSub)) {
             const numAmount = Number(amountToPay);
             if (!amountToPay || isNaN(amountToPay) || numAmount < 500 || numAmount > 100000) {
-                Alert.alert("Error", "Investment amount for unlimited plans must be between ₹500 and ₹1,00,000.");
+                showAlert("Error", "Investment amount for unlimited plans must be between ₹500 and ₹1,00,000.", "warning");
                 return;
             }
         } else {
             if (!amountToPay || isNaN(amountToPay) || Number(amountToPay) <= 0) {
-                Alert.alert("Error", "Please enter a valid amount.");
+                showAlert("Error", "Please enter a valid amount.", "warning");
                 return;
             }
         }
@@ -229,7 +255,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                 amount: amountToPay,
                 chitPlanId: selectedPlanForSub._id,
                 type: 'subscription',
-                goldRate: lockedGoldRate || goldRate
+                goldRate: activeGoldRate
             }, {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
@@ -248,6 +274,13 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                     contact: user.phone || '',
                     name: user.name || ''
                 },
+                notes: {
+                    userId: user._id || '',
+                    chitPlanId: selectedPlanForSub._id || '',
+                    subscriptionId: '',
+                    type: 'subscription',
+                    goldRate: activeGoldRate ? activeGoldRate.toString() : '0'
+                },
                 theme: { color: COLORS?.primary }
             };
 
@@ -260,7 +293,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                 razorpay_signature: data.razorpay_signature,
                 note: subNote,
                 amount: amountToPay,
-                goldRate: lockedGoldRate || goldRate
+                goldRate: activeGoldRate
             }, {
                 headers: { Authorization: `Bearer ${user.token}` }
             });
@@ -281,10 +314,20 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
             setSubmitting(false);
             if (error.code === 0 || error.code === 2) {
                 // Payment cancelled by user
-                Alert.alert("Payment Cancelled", "You cancelled the payment process.");
+                setAlertConfig({
+                    visible: true,
+                    title: 'Payment Cancelled',
+                    message: 'You cancelled the payment process.',
+                    type: 'warning'
+                });
             } else {
                 const msg = error.response?.data?.message || 'Failed to submit request';
-                Alert.alert("Error", msg);
+                setAlertConfig({
+                    visible: true,
+                    title: 'Error',
+                    message: msg,
+                    type: 'error'
+                });
             }
         }
     };
@@ -381,7 +424,7 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                             // Assume Indian number if 10 digits
                             const formattedPhone = phone.toString().length === 10 ? `+91${phone}` : phone;
                             Linking.openURL(`whatsapp://send?phone=${formattedPhone}`).catch(() => {
-                                Alert.alert("Error", "Make sure WhatsApp is installed on your device");
+                                showAlert("Error", "Make sure WhatsApp is installed on your device", "error");
                             });
                         }
                     }}
@@ -447,9 +490,6 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                     <>
                         <View style={{ paddingTop: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: 'transparent', overflow: 'hidden' }}>
                             <View>
-                                {renderMerchantProfile()}
-                                {renderInfoSection()}
-                                {renderGallery()}
                                 <View style={[styles.sectionContainer, { paddingBottom: 10, alignItems: 'center' }]}>
                                     <Text style={{ fontSize: 24, color: '#fff', fontWeight: 'bold' }}>DK GOLD</Text>
                                     <Text style={{ fontSize: 12, color: '#f0f0f0', marginBottom: 10, fontStyle: 'italic' }}>Presents</Text>
@@ -595,18 +635,22 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
                                 )}
                                 {(selectedPlanForSub?.returnType?.toLowerCase() === 'gold' || isPlanUnlimited(selectedPlanForSub)) && goldRate > 0 && (
                                     <View style={{ marginTop: 15, marginBottom: 15, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#FEF3C7' }}>
-                                        <Text style={[styles.label, { color: '#92400E', marginBottom: 8 }]}>Applied Gold Rate (₹/gm)</Text>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                            <Text style={[styles.label, { color: '#92400E', marginBottom: 0 }]}>Applied Gold Rate (₹/gm)</Text>
+                                            <View style={{ backgroundColor: '#D97706', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                                <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>LIVE</Text>
+                                            </View>
+                                        </View>
                                         <View style={[styles.input, { backgroundColor: '#F3F4F6', borderColor: '#FCD34D', marginBottom: 12, height: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
                                             <Text style={{ color: '#666', fontSize: 15 }}>
-                                                ₹{(lockedGoldRate || goldRate).toFixed(2)}
+                                                ₹{activeGoldRate.toFixed(2)}
                                             </Text>
-                                            <Icon name="lock" size={12} color="#999" />
                                         </View>
  
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <Text style={{ fontSize: 12, color: '#92400E', fontWeight: 'bold' }}>Allocated Gold Weight:</Text>
                                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS?.dark }}>
-                                                {((isPlanUnlimited(selectedPlanForSub) ? Number(subscriptionAmount) : selectedPlanForSub?.monthlyAmount) / (lockedGoldRate || goldRate)).toFixed(3)}g
+                                                {((isPlanUnlimited(selectedPlanForSub) ? Number(subscriptionAmount) : selectedPlanForSub?.monthlyAmount) / activeGoldRate).toFixed(3)}g
                                             </Text>
                                         </View>
                                     </View>
