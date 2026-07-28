@@ -312,7 +312,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "appmodules::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-appmodules-Debug-21960e07062c4b87c7ab.json",
+					"jsonFile" : "target-appmodules-Debug-0bad51865351377497f6.json",
 					"name" : "appmodules",
 					"projectIndex" : 0
 				},
@@ -326,7 +326,7 @@
 				{
 					"directoryIndex" : 3,
 					"id" : "react_codegen_RNCSlider::@4898bc4726ecf1751b6a",
-					"jsonFile" : "target-react_codegen_RNCSlider-Debug-61e208af378601cbbbd7.json",
+					"jsonFile" : "target-react_codegen_RNCSlider-Debug-5250311263343d8f5528.json",
 					"name" : "react_codegen_RNCSlider",
 					"projectIndex" : 0
 				},
@@ -396,7 +396,7 @@
 				{
 					"directoryIndex" : 11,
 					"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65",
-					"jsonFile" : "target-react_codegen_rnsvg-Debug-cb43667702bd5035e704.json",
+					"jsonFile" : "target-react_codegen_rnsvg-Debug-6c5c1d55d4566515b400.json",
 					"name" : "react_codegen_rnsvg",
 					"projectIndex" : 0
 				},
@@ -417,7 +417,7 @@
 				{
 					"directoryIndex" : 9,
 					"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a",
-					"jsonFile" : "target-react_codegen_safeareacontext-Debug-a7004fc8d9bd4e3bceb6.json",
+					"jsonFile" : "target-react_codegen_safeareacontext-Debug-12a1ebacf939a307322d.json",
 					"name" : "react_codegen_safeareacontext",
 					"projectIndex" : 0
 				}
@@ -427,7 +427,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86",
+		"build" : "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/android/app/.cxx/Debug/x1s6t1w5/x86_64",
 		"source" : "/Users/apple/DKGOLD/DKGOLDMOBILEAPP/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup"
 	},
 	"version" : 

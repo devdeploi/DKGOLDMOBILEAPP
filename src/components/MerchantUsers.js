@@ -39,14 +39,8 @@ import { useGoldRate } from '../context/GoldRateContext';
 import { launchImageLibrary } from 'react-native-image-picker';
 
 const hasPaidCurrentMonth = (subscriber) => {
-    if (!subscriber || !subscriber.plan) return false;
-    const plan = subscriber.plan;
-    const planNameStr = (plan.planName || '').toLowerCase();
-    const isUnlimited = plan.type === 'unlimited' || plan.durationMonths === 0 || planNameStr.includes('unlimited') || planNameStr.includes('infinity');
-    if (isUnlimited) return false;
-    
-    // Rely strictly on backend actual payment history check
-    return !!(subscriber.subscription && subscriber.subscription.hasPaidCurrentMonth);
+    // Disabled month lock for merchants, allowing multiple records anytime
+    return false;
 };
 
 if (Platform.OS === 'android') {
@@ -120,10 +114,15 @@ const MerchantUsers = ({ user }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [expandedSubId, setExpandedSubId] = useState(null);
 
-    const formatDisplayDate = (dateString) => {
+    const formatDisplayDate = (dateString, timeString) => {
         if (!dateString) return '-';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const dateDate = new Date(dateString);
+        const timeDate = timeString ? new Date(timeString) : dateDate;
+        
+        const formattedDate = dateDate.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formattedTime = timeDate.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+        
+        return `${formattedDate}, ${formattedTime}`;
     };
 
     const TODAY = React.useMemo(() => new Date(), []);
@@ -851,11 +850,9 @@ const MerchantUsers = ({ user }) => {
                 RNFS.unlink(tempFile).catch(() => {});
                 return `data:image/${mimeType};base64,${base64Data}`;
             } else {
-                console.error("Failed to download image, status:", result.statusCode);
                 return null;
             }
         } catch (error) {
-            console.error("Error fetching image as Base64:", error);
             return null;
         }
     };
@@ -2044,7 +2041,7 @@ const MerchantUsers = ({ user }) => {
                 </View>
                 <View style={styles.row}>
                     <Text style={styles.label}>Date:</Text>
-                    <Text style={styles.value}>{formatDisplayDate(item.paymentDate)}</Text>
+                    <Text style={styles.value}>{formatDisplayDate(item.paymentDate, item.createdAt)}</Text>
                 </View>
                 {item.paymentDetails?.transactionId && (
                     <View style={styles.row}>
@@ -2869,7 +2866,7 @@ const MerchantUsers = ({ user }) => {
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <Text style={styles.resultPlan}>{pay.planName || pay.chitPlan?.planName}</Text>
                                                 {isRangeSearch && (
-                                                    <Text style={{ fontSize: 10, color: '#999' }}>{formatDisplayDate(pay.paymentDate || pay.date)}</Text>
+                                                    <Text style={{ fontSize: 10, color: '#999' }}>{formatDisplayDate(pay.paymentDate || pay.date, pay.createdAt)}</Text>
                                                 )}
                                             </View>
 
@@ -3352,7 +3349,7 @@ const MerchantUsers = ({ user }) => {
                                 renderItem={({ item }) => (
                                     <View style={styles.historyItem}>
                                         <View style={styles.historyLeft}>
-                                            <Text style={styles.historyDate}>{formatDisplayDate(item.paymentDate || item.createdAt)}</Text>
+                                            <Text style={styles.historyDate}>{formatDisplayDate(item.paymentDate || item.createdAt, item.createdAt)}</Text>
                                             <Text style={styles.historyType}>
                                                 {item.type === 'online' ? 'Online' : item.type === 'offline' ? 'Offline' : item.type}
                                             </Text>
@@ -3414,7 +3411,7 @@ const MerchantUsers = ({ user }) => {
                                             {selectedSubscriber.subscription.deliveryHistory.map((delivery, index) => (
                                                 <View key={index} style={styles.historyItem}>
                                                     <View style={styles.historyLeft}>
-                                                        <Text style={styles.historyDate}>{formatDisplayDate(delivery.deliveredDate || delivery.createdAt)}</Text>
+                                                        <Text style={styles.historyDate}>{formatDisplayDate(delivery.deliveredDate || delivery.createdAt, delivery.createdAt)}</Text>
                                                         <Text style={[styles.historyType, { color: '#B45309' }]}>
                                                             Gold Delivery
                                                         </Text>

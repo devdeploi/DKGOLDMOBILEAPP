@@ -141,11 +141,9 @@ const AnalyticsTab = ({ user }) => {
                 RNFS.unlink(tempFile).catch(() => { });
                 return `data:image/${mimeType};base64,${base64Data}`;
             } else {
-                console.error("Failed to download image, status:", result.statusCode);
                 return null;
             }
         } catch (error) {
-            console.error("Error fetching image:", error);
             return null;
         }
     };
@@ -1150,7 +1148,7 @@ const AnalyticsTab = ({ user }) => {
                                         <View style={{ marginLeft: 8 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 <Text style={styles.historyDate}>
-                                                    {new Date(payment.paymentDate || payment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                    {`${new Date(payment.paymentDate || payment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}, ${new Date(payment.createdAt || payment.paymentDate || new Date()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`}
                                                 </Text>
                                                 {payment.isDelivered && (
                                                     <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
