@@ -904,7 +904,7 @@ const MerchantUsers = ({ user }) => {
             const customerName = subscriber.user.name.toUpperCase();
             const customerAddress = subscriber.user.address || '';
             const customerMobile = subscriber.user.phone || '';
-            const receiptNo = payment.receiptNumber || '-';
+            const receiptNo = payment.receiptNumber ? String(payment.receiptNumber).padStart(3, '0') : '-';
             const accNo = subscriber.subscription?.acc_no || subscriber.user?.acc_no || '-';
             const amountPaid = Number(payment.amount || 0).toFixed(2);
             const gramsSaved = Number(payment.goldWeight || 0).toFixed(3);
@@ -919,35 +919,42 @@ const MerchantUsers = ({ user }) => {
             const history = subscriber?.subscription?.paymentHistory || subscriber?.payments || paymentHistory || [];
             if (history.length > 0) {
                 const sortedHistory = [...history].sort((a, b) => new Date(a.paymentDate || a.createdAt || a.date) - new Date(b.paymentDate || b.createdAt || b.date));
-                const currentIndex = sortedHistory.findIndex(p => p._id === payment._id);
+                const targetId = String(payment._id || payment.id || '');
+                const currentIndex = targetId ? sortedHistory.findIndex(p => String(p._id || p.id || '') === targetId) : -1;
                 
                 if (currentIndex !== -1) {
                     for (let i = 0; i <= currentIndex; i++) {
                         const p = sortedHistory[i];
-                        if ((p.status === 'Paid' || p.status === 'Completed') && !p.isDelivered) {
+                        const isSuccess = p.status === 'Paid' || p.status === 'Completed' || p.status === 'Delivered' || p.isDelivered;
+                        if (isSuccess) {
                             attemptNo += 1;
-                            cumulativeAmount += Number(p.amount || 0);
-                            cumulativeGrams += Number(p.goldWeight || 0);
+                            if (!p.isDelivered && p.status !== 'Delivered') {
+                                cumulativeAmount += Number(p.amount || 0);
+                                cumulativeGrams += Number(p.goldWeight || 0);
+                            }
                         }
                     }
                 } else {
                     const currDate = new Date(payment.paymentDate || payment.createdAt || payment.date || new Date());
                     sortedHistory.forEach(p => {
                         const pDate = new Date(p.paymentDate || p.createdAt || p.date);
-                        if (pDate <= currDate && (p.status === 'Paid' || p.status === 'Completed') && !p.isDelivered) {
+                        const isSuccess = p.status === 'Paid' || p.status === 'Completed' || p.status === 'Delivered' || p.isDelivered;
+                        if (pDate <= currDate && isSuccess) {
                             attemptNo += 1;
-                            cumulativeAmount += Number(p.amount || 0);
-                            cumulativeGrams += Number(p.goldWeight || 0);
+                            if (!p.isDelivered && p.status !== 'Delivered') {
+                                cumulativeAmount += Number(p.amount || 0);
+                                cumulativeGrams += Number(p.goldWeight || 0);
+                            }
                         }
                     });
                 }
             } else {
                 cumulativeAmount = Number(subscriber.subscription?.totalSaved || 0);
                 cumulativeGrams = Number(subscriber.subscription?.totalGoldWeight || 0);
-                attemptNo = 1;
+                attemptNo = subscriber.subscription?.installmentsPaid || 1;
             }
 
-            const dueNo = attemptNo || payment.installmentNumber || '-';
+            const dueNo = payment.installmentNumber || attemptNo || 1;
 
             const totalPaid = cumulativeAmount.toFixed(2);
             const totalGrams = cumulativeGrams.toFixed(3);
@@ -957,103 +964,109 @@ const MerchantUsers = ({ user }) => {
             const html = `
                 <html>
                 <head>
-                    <meta name="viewport" content="width=700, user-scalable=yes" />
+                    <meta name="viewport" content="width=500, user-scalable=yes" />
                 </head>
-                <body style="font-family: 'Helvetica', sans-serif; padding: 20px; color: #000; margin: 0; box-sizing: border-box;">
-                    <div style="border: 2px solid #000; padding: 30px;">
+                <body style="font-family: 'Courier New', Courier, monospace; padding: 20px; color: #000; margin: 0; background: #fff;">
+                    <div style="border: 3px solid #000; padding: 24px 28px; max-width: 480px; margin: 0 auto;">
+
                         <!-- HEADER -->
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
-                            <div style="width: 20%;">
-                                ${logodkImgTag}
+                        <div style="text-align: center; margin-bottom: 14px;">
+                            <!-- DK GOLD banner -->
+                            <div style="display: flex; align-items: center; justify-content: center;">
+                                ${dkLogoImgTag !== 'DK'
+                                    ? `<img src="${dkLogoImgTag.match(/src="([^"]+)"/)[1] || ''}" style="width:240px;height:auto;display:block;" />`
+                                    : '<span style="font-size:32px;font-weight:900;letter-spacing:5px;font-family:Courier New,monospace;">DK GOLD</span>'}
                             </div>
-                            <div style="width: 50%; text-align: center;">
-                                ${dkLogoImgTag}
-                            </div>
-                            <div style="width: 30%; text-align: right; font-weight: bold; font-size: 14px;">
-                                &#128222; 8778841886
+                            <!-- Address -->
+                            <div style="font-size: 12px; color: #000; margin-top: 8px; font-family: 'Courier New', Courier, monospace; font-weight: 600;">
+                                No. 35/13, Mungil Mandi Street, Sandapet, Ambur
                             </div>
                         </div>
-                        
+
                         <!-- TITLE BAND -->
-                        <div style="background-color: #000; color: #fff; text-align: center; padding: 10px; font-weight: bold; font-size: 18px; letter-spacing: 2px; margin-bottom: 30px;">
+                        <div style="border: 2px solid #000; text-align: center; padding: 8px 10px; font-weight: 900; font-size: 15px; letter-spacing: 1px; margin-bottom: 16px; font-family: 'Courier New', Courier, monospace;">
                             ${isUnlimited ? 'GOLD SAVING PLAN RECEIPT' : 'MONTHLY SAVING PLAN RECEIPT'}
                         </div>
 
-                        <!-- 2 COLUMNS OF DATA -->
-                        <div style="display: flex; justify-content: space-between; font-size: 14px; line-height: 1.5;">
-                            <!-- LEFT COLUMN -->
-                            <div style="width: 48%;">
-                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                    <span>RECEIPT NO. :</span>
-                                    <strong>${receiptNo}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                    <span>DATE :</span>
-                                    <strong>${paymentDate}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-                                    <span>NAME :</span>
-                                    <strong>${customerName}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                    <span>ADDRESS :</span>
-                                    <strong style="text-align: right;">${customerAddress || 'N/A'}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-                                    <span>MOBILE :</span>
-                                    <strong>${customerMobile}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-                                    <span>AMOUNT PAID :</span>
-                                    <strong>Rs. ${amountPaid}</strong>
-                                </div>
+                        <!-- ROWS -->
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Courier New', Courier, monospace;">
+                            <tbody>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700; width: 44%;">RECEIPT NO.</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; width: 6%; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${receiptNo}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">DATE</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${paymentDate}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">NAME</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${customerName}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">ADDRESS</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${customerAddress || 'N/A'}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">MOBILE</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${customerMobile}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">ACCOUNT NO.</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${accNo}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">PLAN TYPE</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${planName}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">PAYMENT MODE</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${paymentMode.toUpperCase()}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">AMOUNT PAID</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">Rs. ${amountPaid}</td>
+                                </tr>
                                 ${isUnlimited ? `
-                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                    <span>GRAMS SAVED :</span>
-                                    <strong>${gramsSaved}g</strong>
-                                </div>
-                                ` : ''}
-                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-                                    <span>TOTAL PAID :</span>
-                                    <strong>Rs. ${totalPaid}</strong>
-                                </div>
-                            </div>
-
-                            <!-- RIGHT COLUMN -->
-                            <div style="width: 48%;">
-                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                    <span>A/C NO. :</span>
-                                    <strong>${accNo}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                    <span>PLAN TYPE :</span>
-                                    <strong>${planName}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 40px;"> <!-- Aligns roughly with Mobile -->
-                                    <span>MODE :</span>
-                                    <strong>${paymentMode}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-                                    <span>DUE NO. :</span>
-                                    <strong>${dueNo}</strong>
-                                </div>
-                                ${isUnlimited ? `
-                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-                                    <span>24K GOLD RATE :</span>
-                                    <strong>Rs. ${goldRate24k}</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                    <span>TOTAL GRAMS :</span>
-                                    <strong>${totalGrams}g</strong>
-                                </div>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">GRAMS SAVED</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${gramsSaved}g</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">24K GOLD RATE</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">Rs. ${goldRate24k}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">TOTAL GRAMS</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${totalGrams}g</td>
+                                </tr>
                                 ` : `
-                                <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-                                    <span>REMAIN :</span>
-                                    <strong>Rs. ${remainAmount}</strong>
-                                </div>
+                                <tr style="border-bottom: 1px solid #bbb;">
+                                    <td style="padding: 7px 4px; font-weight: 700;">TOTAL PAID</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">Rs. ${totalPaid}</td>
+                                </tr>
                                 `}
-                            </div>
-                        </div>
+                                <tr>
+                                    <td style="padding: 7px 4px; font-weight: 700;">DUE NO.</td>
+                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 7px 4px; font-weight: 700;">${String(dueNo).padStart(2, '0')}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
                     </div>
                 </body>
                 </html>

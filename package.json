@@ -1,6 +1,6 @@
 {
   "name": "JewelMobileApp",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -30,6 +30,7 @@
     "react-native-image-picker": "^8.2.1",
     "react-native-linear-gradient": "^2.8.3",
     "react-native-modal-datetime-picker": "^18.0.0",
+    "react-native-print": "^0.11.0",
     "react-native-razorpay": "^3.0.0",
     "react-native-reanimated": "^4.2.1",
     "react-native-safe-area-context": "^5.5.2",
