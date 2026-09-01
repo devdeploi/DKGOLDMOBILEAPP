@@ -325,14 +325,14 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                 const savedGold = (plan.totalGoldWeight || 0) - (plan.deliveredGoldWeight || 0);
 
                                 return (
-                                    <View key={`saved-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: idx === recentActivity.length - 1 ? 0 : 1, borderBottomColor: 'rgba(255,255,255,0.2)', paddingBottom: idx === recentActivity.length - 1 ? 0 : 6 }}>
+                                    <View key={`saved-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: idx === recentActivity.length - 1 ? 0 : 1, borderBottomColor: 'rgba(255,255,255,0.2)', paddingVertical: 8 }}>
                                         <View style={{ flex: 1, paddingRight: 5 }}>
-                                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '400' }} numberOfLines={1}>{plan.planName}</Text>
+                                            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 9, fontWeight: '400' }} numberOfLines={2}>{plan.planName}</Text>
                                         </View>
                                         <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>{isDataVisible ? `₹ ${savedAmount.toLocaleString()}` : '****'}</Text>
+                                            <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>{isDataVisible ? `₹ ${savedAmount.toLocaleString()}` : '****'}</Text>
                                             {isUnlimited && (
-                                                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '600' }}>{isDataVisible ? `${savedGold.toFixed(3)}g` : '****'}</Text>
+                                                <Text style={{ color: '#ffe066', fontSize: 16, fontWeight: 'bold', marginTop: 2 }}>{isDataVisible ? `${savedGold.toFixed(3)}g` : '****'}</Text>
                                             )}
                                         </View>
                                     </View>
@@ -343,7 +343,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                             )}
                         </View>
                     </View>
-
+ 
                     <View style={styles.statCard}>
                         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
                             <Text style={[styles.statLabel, { textAlign: 'center' }]}>Monthly Due</Text>
@@ -352,11 +352,11 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                             {recentActivity.map((plan, idx) => {
                                 const isUnlimited = plan.durationMonths === 0 || plan.returnType === 'gold' || (plan.planName && plan.planName.toLowerCase().includes('unlimited'));
                                 const monthlyDue = plan.monthlyAmount || 0;
-
+ 
                                 return (
-                                    <View key={`due-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: idx === recentActivity.length - 1 ? 0 : 1, borderBottomColor: '#eee', paddingBottom: idx === recentActivity.length - 1 ? 0 : 6 }}>
+                                    <View key={`due-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: idx === recentActivity.length - 1 ? 0 : 1, borderBottomColor: '#eee', paddingVertical: 8 }}>
                                         <View style={{ flex: 1, paddingRight: 5 }}>
-                                            <Text style={{ color: COLORS?.dark, fontSize: 11, fontWeight: 'bold' }} numberOfLines={1}>{plan.planName}</Text>
+                                            <Text style={{ color: COLORS?.dark, fontSize: 9, fontWeight: 'bold' }} numberOfLines={1}>{plan.planName}</Text>
                                             <Text style={{ color: COLORS?.secondary, fontSize: 9 }}>A/c: {plan.acc_no || 'N/A'}</Text>
                                         </View>
                                         <View style={{ alignItems: 'flex-end' }}>
@@ -366,7 +366,7 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                         </View>
                                     </View>
                                 );
-                            })}
+                            })}     
                             {recentActivity.length === 0 && (
                                 <Text style={{ color: COLORS?.secondary, fontSize: 11, fontStyle: 'italic' }}>No active plans</Text>
                             )}
@@ -646,6 +646,7 @@ const styles = StyleSheet.create({
     statGrid: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'flex-start',
         marginBottom: 25,
     },
     statCard: {

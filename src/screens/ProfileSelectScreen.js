@@ -75,12 +75,23 @@ const ProfileCard = ({ profile, onSelect, index }) => {
 
                 <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{profile.name || 'User'}</Text>
-                    {/* {profile.email ? (
-                        <Text style={styles.cardEmail} numberOfLines={1}>{profile.email}</Text>
+                    {profile.activePlanAcc ? (
+                        <View style={styles.accBadge}>
+                            <Icon name="file-invoice-dollar" size={10} color={THEME.primaryDark} />
+                            <Text style={styles.accText} numberOfLines={1}>
+                                {profile.activePlanAcc.includes(',') ? 'Active A/cs' : 'Active A/c'}: {profile.activePlanAcc}
+                            </Text>
+                        </View>
+                    ) : profile.allPlansAcc ? (
+                        <View style={[styles.accBadge, { backgroundColor: '#f5f5f5', borderColor: '#ccc' }]}>
+                            <Icon name="check-circle" size={10} color="#888" />
+                            <Text style={[styles.accText, { color: '#888' }]} numberOfLines={1}>
+                                {profile.allPlansAcc.includes(',') ? 'Completed A/cs' : 'Completed A/c'}: {profile.allPlansAcc}
+                            </Text>
+                        </View>
                     ) : (
-                        <Text style={[styles.cardEmail, { fontStyle: 'italic', color: '#bbb' }]}>No email set</Text>
-                    )} */}
-
+                        <Text style={{ fontSize: 11, color: '#aaa', fontStyle: 'italic', marginTop: 2 }}>No plans registered</Text>
+                    )}
                 </View>
 
                 <View style={styles.selectArrow}>

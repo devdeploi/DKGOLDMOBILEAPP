@@ -11,6 +11,8 @@ import {
     Modal
 } from 'react-native';
 import { useGoldRate } from '../../context/GoldRateContext';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 
 const LivePriceText = ({ value, style, prefix = '', isInteger = false }) => {
     const prevValueRef = useRef(value);
@@ -185,6 +187,14 @@ const GoldTab = () => {
                         <LivePriceText value={retail18.sellRate || 0} style={styles.mjdtaValue} prefix="(₹) " isInteger={true} />
                     </View>
                     <View style={styles.mjdtaRow}>
+                        <Text style={styles.mjdtaLabel}>GOLD 14K 585 - 1GM</Text>
+                        <LivePriceText value={finalRate14} style={styles.mjdtaValue} prefix="(₹) " isInteger={true} />
+                    </View>
+                    <View style={styles.mjdtaRow}>
+                        <Text style={styles.mjdtaLabel}>GOLD 9K 375 - 1GM</Text>
+                        <LivePriceText value={finalRate9} style={styles.mjdtaValue} prefix="(₹) " isInteger={true} />
+                    </View>
+                    <View style={styles.mjdtaRow}>
                         <Text style={styles.mjdtaLabel}>SILVER - 1GM</Text>
                         <LivePriceText value={silverInr.sellRate || 0} style={styles.mjdtaValue} prefix="(₹) " isInteger={true} />
                     </View>
@@ -193,10 +203,21 @@ const GoldTab = () => {
 
                 {/* Calculator Button */}
                 <TouchableOpacity 
-                    style={styles.openCalcBtn} 
                     onPress={() => setCalcModalVisible(true)}
+                    activeOpacity={0.8}
+                    style={styles.openCalcBtnWrapper}
                 >
-                    <Text style={styles.openCalcBtnText}>Open Jewel Price Calculator</Text>
+                    <LinearGradient
+                        colors={['#ffe066', '#f5c03c', '#c49018', '#9c6f08']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.openCalcBtn}
+                    >
+                        <View style={styles.openCalcBtnContent}>
+                            <Icon name="calculator" size={18} color="#1a0f00" style={styles.openCalcBtnIcon} />
+                            <Text style={styles.openCalcBtnText}>GOLD & JEWEL PRICE CALCULATOR</Text>
+                        </View>
+                    </LinearGradient>
                 </TouchableOpacity>
 
             </ScrollView>
@@ -567,18 +588,42 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#000'
     },
+    openCalcBtnWrapper: {
+        marginTop: 15,
+        marginBottom: 20,
+        borderRadius: 10,
+        overflow: 'hidden',
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+    },
     openCalcBtn: {
-        backgroundColor: '#592c14',
-        padding: 15,
-        borderRadius: 8,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderRadius: 10,
         alignItems: 'center',
-        marginTop: 10,
-        marginBottom: 20
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#ffe066',
+    },
+    openCalcBtnContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    openCalcBtnIcon: {
+        marginRight: 8,
     },
     openCalcBtnText: {
-        color: '#fef178',
+        color: '#1a0f00',
         fontWeight: 'bold',
-        fontSize: 16
+        fontSize: 16,
+        letterSpacing: 0.8,
+        textShadowColor: 'rgba(255, 255, 255, 0.4)',
+        textShadowOffset: { width: 0.5, height: 0.5 },
+        textShadowRadius: 1,
     },
     modalOverlay: {
         flex: 1,

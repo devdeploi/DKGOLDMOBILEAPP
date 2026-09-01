@@ -88,7 +88,22 @@ const MerchantsTab = ({ merchants, refreshing, onRefresh, loading, user }) => {
         setLoadingPlans(true);
         try {
             const { data } = await axios.get(`${APIURL}/chit-plans/merchant/${merchant._id}`);
-            setPlans(data.plans || []);
+            const fetchedPlans = data.plans || [];
+            
+            // Sort: Alphabetical order (Plan A, B, C...) with Unlimited plans at the bottom
+            fetchedPlans.sort((a, b) => {
+                const isAUnlimited = isPlanUnlimited(a);
+                const isBUnlimited = isPlanUnlimited(b);
+                
+                if (isAUnlimited && !isBUnlimited) return 1;
+                if (!isAUnlimited && isBUnlimited) return -1;
+                
+                const nameA = (a.planName || '').toLowerCase();
+                const nameB = (b.planName || '').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+            
+            setPlans(fetchedPlans);
         } catch (error) {
             console.error("Failed to fetch plans", error);
         } finally {
