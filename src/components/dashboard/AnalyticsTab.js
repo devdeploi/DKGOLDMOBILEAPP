@@ -62,7 +62,7 @@ const AnalyticsTab = ({ user }) => {
     const [invoiceFileName, setInvoiceFileName] = useState('');
     const [webViewLoading, setWebViewLoading] = useState(true);
     const [generatingReceipt, setGeneratingReceipt] = useState(false);
-    const [receiptHeight, setReceiptHeight] = useState(650);
+    const [receiptHeight, setReceiptHeight] = useState(380);
     const viewShotRef = useRef(null);
     const [alertConfig, setAlertConfig] = useState({
         visible: false,
@@ -175,6 +175,7 @@ const AnalyticsTab = ({ user }) => {
 
     const createAndDownloadPDF = async (html, fileName) => {
         const cleanFileName = fileName.replace(/[^a-z0-9]/gi, '_');
+        setReceiptHeight(380);
         setInvoiceHtml(html);
         setInvoiceFileName(cleanFileName);
     };
@@ -322,103 +323,103 @@ const AnalyticsTab = ({ user }) => {
                 <head>
                     <meta name="viewport" content="width=500, user-scalable=yes" />
                 </head>
-                <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #000; margin: 0; background: #fff;">
-                    <div style="border: 3px solid #000; padding: 24px 28px; max-width: 480px; margin: 0 auto; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                <body style="font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif; font-size: 12px; padding: 10px; color: #000; margin: 0; background: #fff;">
+                    <div id="receipt-box" style="border: 2px solid #000; padding: 12px 14px; max-width: 480px; margin: 0 auto; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif; font-size: 12px;">
 
                         <!-- HEADER -->
-                        <div style="text-align: center; margin-bottom: 14px;">
+                        <div style="text-align: center; margin-bottom: 10px;">
                             <!-- DK GOLD banner -->
                             <div style="display: flex; align-items: center; justify-content: center;">
                                 ${dkLogoImgTag !== 'DK'
                                     ? dkLogoImgTag
-                                    : '<span style="font-size:32px;font-weight:900;letter-spacing:5px;font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif;">DK GOLD</span>'}
+                                    : '<span style="font-size:24px;font-weight:900;letter-spacing:4px;font-family:\'Arial Narrow\', \'Nimbus Sans L\', sans-serif-condensed, Arial, sans-serif;">DK GOLD</span>'}
                             </div>
                             <!-- Address -->
-                            <div style="font-size: 15px; color: #000; margin-top: 8px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700;">
+                            <div style="font-size: 12px; color: #000; margin-top: 4px; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif; font-weight: 700;">
                                 No. 35/13, Mungil Mandi Street, Sandapet, Ambur
                             </div>
                         </div>
 
                         <!-- TITLE BAND -->
-                        <div style="border: 2px solid #000; text-align: center; padding: 8px 10px; font-weight: 800; font-size: 18px; letter-spacing: 0.5px; margin-bottom: 16px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                            ${isUnlimited ? 'GOLD SAVING PLAN RECEIPT' : 'MONTHLY SAVING PLAN RECEIPT'}
+                        <div style="border: 1.5px solid #000; text-align: center; padding: 5px 8px; font-weight: 800; font-size: 13px; letter-spacing: 0.5px; margin-bottom: 10px; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif;">
+                            ${isUnlimited ? 'DIGI GOLD SAVING PLAN RECEIPT' : 'MONTHLY SAVING PLAN RECEIPT'}
                         </div>
 
                         <!-- ROWS -->
-                        <table style="width: 100%; border-collapse: collapse; font-size: 16px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif;">
                             <tbody>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700; width: 44%;">RECEIPT NO.</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; width: 6%; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${receiptNo}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; width: 42%; white-space: nowrap; vertical-align: top;">RECEIPT NO.</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; width: 4%; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${receiptNo}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">DATE</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${paymentDate}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">DATE</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${paymentDate}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">NAME</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${customerName}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">NAME</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${customerName}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">ADDRESS</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${customerAddress || 'N/A'}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">ADDRESS</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${customerAddress || 'N/A'}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">MOBILE</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${customerMobile}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">MOBILE</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${customerMobile}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">ACCOUNT NO.</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${accNo}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">ACCOUNT NO.</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${accNo}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">PLAN TYPE</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${planName}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">PLAN TYPE</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${planName}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">PAYMENT MODE</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${paymentMode.toUpperCase()}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">PAYMENT MODE</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${paymentMode.toUpperCase()}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">AMOUNT PAID</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">Rs. ${amountPaid}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">AMOUNT PAID</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">Rs. ${amountPaid}</td>
                                 </tr>
                                 ${isUnlimited ? `
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">GRAMS SAVED</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${gramsSaved}g</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">GRAMS SAVED</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${gramsSaved}g</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">24K GOLD RATE</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">Rs. ${goldRate24k}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">24K GOLD RATE</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">Rs. ${goldRate24k}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">TOTAL GRAMS</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${totalGrams}g</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">TOTAL GRAMS</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${totalGrams}g</td>
                                 </tr>
                                 ` : `
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 8px 4px; font-weight: 700;">TOTAL PAID</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">Rs. ${totalPaid}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">TOTAL PAID</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">Rs. ${totalPaid}</td>
                                 </tr>
                                 `}
                                 <tr>
-                                    <td style="padding: 8px 4px; font-weight: 700;">DUE NO.</td>
-                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 8px 4px; font-weight: 800;">${String(dueNo).padStart(2, '0')}</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">DUE NO.</td>
+                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
+                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${String(dueNo).padStart(2, '0')}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1680,20 +1681,17 @@ const AnalyticsTab = ({ user }) => {
                                         onLoadEnd={() => setWebViewLoading(false)}
                                         injectedJavaScript={`
                                             setTimeout(function() {
-                                                var h = Math.max(
-                                                    document.body.scrollHeight || 0,
-                                                    document.body.offsetHeight || 0,
-                                                    document.documentElement.scrollHeight || 0,
-                                                    document.documentElement.offsetHeight || 0
-                                                );
+                                                var el = document.getElementById('receipt-box') || document.body;
+                                                var rect = el.getBoundingClientRect();
+                                                var h = Math.ceil(rect.height || el.scrollHeight || 300);
                                                 window.ReactNativeWebView.postMessage(h.toString());
-                                            }, 400);
+                                            }, 300);
                                             true;
                                         `}
                                         onMessage={(event) => {
                                             const h = parseInt(event.nativeEvent.data, 10);
-                                            if (h && h > 200 && h < 4000) {
-                                                setReceiptHeight(h + 30);
+                                            if (h && h > 150 && h < 4000) {
+                                                setReceiptHeight(h + 24);
                                             }
                                         }}
                                     />
