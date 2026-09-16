@@ -21,6 +21,20 @@ const IntroScreen = ({ onFinish }) => {
     const textOpacity = useRef(new Animated.Value(0)).current;
     const textTranslateY = useRef(new Animated.Value(20)).current;
 
+    const hasFinishedRef = useRef(false);
+
+    // Safety fallback timer: guarantee app opens even if video stalls, loses audio focus during active calls, or fails onEnd
+    useEffect(() => {
+        const fallbackTimer = setTimeout(() => {
+            if (!hasFinishedRef.current) {
+                console.log('Splash video fallback timer triggered');
+                handleVideoEnd();
+            }
+        }, 3500);
+
+        return () => clearTimeout(fallbackTimer);
+    }, [showUpdateModal, updateType]);
+
     useEffect(() => {
         if (showUpdateModal) {
             // Reset animations
@@ -89,7 +103,7 @@ const IntroScreen = ({ onFinish }) => {
 
         const checkUpdate = async () => {
             try {
-                const { data } = await axios.get(`${APIURL}/app/config`);
+                const { data } = await axios.get(`${APIURL}/app/config`, { timeout: 3000 });
                 const currentVersion = packageJson.version;
 
                 // Case 1: Version is lower than minVersion (e.g. user has 1.1.2, min is 1.1.3)
@@ -130,9 +144,11 @@ const IntroScreen = ({ onFinish }) => {
     };
 
     const handleVideoEnd = () => {
+        if (hasFinishedRef.current) return;
         if (updateType === 'mandatory' && showUpdateModal) {
             return;
         }
+        hasFinishedRef.current = true;
         if (onFinish) {
             onFinish();
         }
@@ -175,6 +191,14 @@ const IntroScreen = ({ onFinish }) => {
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
                 onEnd={handleVideoEnd}
+                onError={(err) => {
+                    console.log('Intro video error:', err);
+                    handleVideoEnd();
+                }}
+                muted={true}
+                ignoreSilentSwitch="ignore"
+                playInBackground={false}
+                playWhenInactive={true}
                 repeat={false}
             />
 

@@ -308,14 +308,16 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                     </View>
                 ) : (
                     <View style={styles.activityCard}>
-                        <Text style={{ color: COLORS?.secondary }}>No active plans yet.</Text>
+                        <Icon name="gem" size={24} color={COLORS?.primary} style={{ marginBottom: 6 }} />
+                        <Text style={{ color: COLORS?.dark, fontSize: 14, fontWeight: '700', marginBottom: 2 }}>No Active Plans Yet</Text>
+                        <Text style={{ color: COLORS?.secondary, fontSize: 11, textAlign: 'center' }}>Subscribe to gold saving plans to start investing</Text>
                     </View>
                 )}
 
                 {/* Key Stats Cards */}
                 <View style={styles.statGrid}>
                     <View style={[styles.statCard, { backgroundColor: COLORS?.primary }]}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
                             <Text style={[styles.statLabel, { color: '#fff', textAlign: 'center' }]}>Total Saved</Text>
                         </View>
                         <View style={{ gap: 8 }}>
@@ -339,13 +341,16 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                 );
                             })}
                             {recentActivity.length === 0 && (
-                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontStyle: 'italic' }}>No active plans</Text>
+                                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                    <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold', letterSpacing: 0.5 }}>{isDataVisible ? '₹ 0' : '****'}</Text>
+                                    <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 4, fontWeight: '500' }}>0 Active Plans</Text>
+                                </View>
                             )}
                         </View>
                     </View>
  
                     <View style={styles.statCard}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
                             <Text style={[styles.statLabel, { textAlign: 'center' }]}>Monthly Due</Text>
                         </View>
                         <View style={{ gap: 8 }}>
@@ -368,7 +373,10 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
                                 );
                             })}     
                             {recentActivity.length === 0 && (
-                                <Text style={{ color: COLORS?.secondary, fontSize: 11, fontStyle: 'italic' }}>No active plans</Text>
+                                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+                                    <Text style={{ color: COLORS?.primary, fontSize: 22, fontWeight: 'bold', letterSpacing: 0.5 }}>{isDataVisible ? '₹ 0' : '****'}</Text>
+                                    <Text style={{ color: COLORS?.secondary, fontSize: 11, marginTop: 4, fontWeight: '500' }}>0 Dues Pending</Text>
+                                </View>
                             )}
                         </View>
                     </View>
@@ -646,13 +654,13 @@ const styles = StyleSheet.create({
     statGrid: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 25,
+        alignItems: 'stretch',
+        marginBottom: 20,
     },
     statCard: {
         backgroundColor: '#fff',
         borderRadius: 20,
-        padding: 20,
+        padding: 16,
         elevation: 4,
         width: '48%',
         shadowColor: '#000',
@@ -660,7 +668,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 8,
         justifyContent: 'space-between',
-        minHeight: 120
+        minHeight: 125
     },
     statValue: {
         fontSize: 22,
@@ -745,10 +753,17 @@ const styles = StyleSheet.create({
     // Fallback
     activityCard: {
         backgroundColor: '#fff',
-        padding: 20,
+        paddingVertical: 20,
+        paddingHorizontal: 16,
         borderRadius: 15,
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        marginBottom: 16,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
     },
     newPlanCard: {
         backgroundColor: '#FFF9C4',

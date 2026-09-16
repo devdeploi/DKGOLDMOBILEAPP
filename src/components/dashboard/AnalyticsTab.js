@@ -16,6 +16,7 @@ import { generatePDF } from 'react-native-html-to-pdf';
 import Share from 'react-native-share';
 import ViewShot from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
+import RNPrint from 'react-native-print';
 import dklogo from '../../assets/DK.png';
 import logodk from '../../assets/logodk.png';
 import safproLogo from '../../../public/assests/Safpro-logo.png';
@@ -61,6 +62,7 @@ const AnalyticsTab = ({ user }) => {
     const [invoiceFileName, setInvoiceFileName] = useState('');
     const [webViewLoading, setWebViewLoading] = useState(true);
     const [generatingReceipt, setGeneratingReceipt] = useState(false);
+    const [receiptHeight, setReceiptHeight] = useState(650);
     const viewShotRef = useRef(null);
     const [alertConfig, setAlertConfig] = useState({
         visible: false,
@@ -115,6 +117,15 @@ const AnalyticsTab = ({ user }) => {
     const fetchImageAsBase64 = async (url) => {
         try {
             if (!url) return null;
+            if (Platform.OS === 'android' && url.includes('android_asset/')) {
+                const assetName = url.split('android_asset/')[1];
+                try {
+                    const base64Data = await RNFS.readFileAssets(assetName, 'base64');
+                    return `data:image/png;base64,${base64Data}`;
+                } catch (e) {
+                    console.error("Asset file read error:", e);
+                }
+            }
             if (url.startsWith('file://') || url.startsWith('/')) {
                 const cleanPath = url.replace('file://', '');
                 try {
@@ -126,7 +137,7 @@ const AnalyticsTab = ({ user }) => {
                 }
             }
 
-            const extMatch = url.match(/\\.(jpeg|jpg|png|gif|webp)/i);
+            const extMatch = url.match(/\.(jpeg|jpg|png|gif|webp)/i);
             const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
             const mimeType = ext === 'jpg' ? 'jpeg' : ext;
             const tempFile = `${RNFS.CachesDirectoryPath}/temp_img_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
@@ -199,23 +210,47 @@ const AnalyticsTab = ({ user }) => {
         }
     };
 
+    const printInvoice = async () => {
+        if (!invoiceHtml) return;
+        try {
+            await RNPrint.print({ html: invoiceHtml });
+        } catch (error) {
+            console.log("Print Error:", error);
+            showAlert("Error", "Failed to send receipt to printer", "error");
+        }
+    };
+
     const generateInvoice = async (payment, plan) => {
         setGeneratingReceipt(true);
         try {
             let dkLogoImgTag = 'DK';
             let logodkImgTag = 'logodk';
 
-            if (Platform.OS === 'android' && !__DEV__) {
-                dkLogoImgTag = `<img src="file:///android_asset/DK.png" style="width: 250px; height: auto;" />`;
-                logodkImgTag = `<img src="file:///android_asset/logodk.png" style="width: 70px; height: auto;" />`;
-            } else {
+            if (Platform.OS === 'android') {
+                try {
+                    const dkBase64 = await RNFS.readFileAssets('DK.png', 'base64');
+                    if (dkBase64) dkLogoImgTag = `<img src="data:image/png;base64,${dkBase64}" style="width: 240px; height: auto; display: block; margin: 0 auto;" />`;
+                } catch (e) {
+                    console.log("Could not read asset DK.png:", e);
+                }
+                try {
+                    const logoBase64 = await RNFS.readFileAssets('logodk.png', 'base64');
+                    if (logoBase64) logodkImgTag = `<img src="data:image/png;base64,${logoBase64}" style="width: 70px; height: auto; display: block; margin: 0 auto;" />`;
+                } catch (e) {
+                    console.log("Could not read asset logodk.png:", e);
+                }
+            }
+
+            if (dkLogoImgTag === 'DK') {
                 const dklogoUrl = Image.resolveAssetSource(dklogo).uri;
                 const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
-                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 250px; height: auto;" />`;
+                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 240px; height: auto; display: block; margin: 0 auto;" />`;
+            }
 
+            if (logodkImgTag === 'logodk') {
                 const logodkUrl = Image.resolveAssetSource(logodk).uri;
                 const logodkBase64 = await fetchImageAsBase64(logodkUrl);
-                if (logodkBase64) logodkImgTag = `<img src="${logodkBase64}" style="width: 70px; height: auto;" />`;
+                if (logodkBase64) logodkImgTag = `<img src="${logodkBase64}" style="width: 70px; height: auto; display: block; margin: 0 auto;" />`;
             }
 
             const planName = plan.planName || 'Unknown Plan';
@@ -287,103 +322,103 @@ const AnalyticsTab = ({ user }) => {
                 <head>
                     <meta name="viewport" content="width=500, user-scalable=yes" />
                 </head>
-                <body style="font-family: 'Courier New', Courier, monospace; padding: 20px; color: #000; margin: 0; background: #fff;">
-                    <div style="border: 3px solid #000; padding: 24px 28px; max-width: 480px; margin: 0 auto;">
+                <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #000; margin: 0; background: #fff;">
+                    <div style="border: 3px solid #000; padding: 24px 28px; max-width: 480px; margin: 0 auto; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
 
                         <!-- HEADER -->
                         <div style="text-align: center; margin-bottom: 14px;">
                             <!-- DK GOLD banner -->
                             <div style="display: flex; align-items: center; justify-content: center;">
                                 ${dkLogoImgTag !== 'DK'
-                                    ? `<img src="${dkLogoImgTag.match(/src="([^"]+)"/)[1] || ''}" style="width:240px;height:auto;display:block;" />`
-                                    : '<span style="font-size:32px;font-weight:900;letter-spacing:5px;font-family:Courier New,monospace;">DK GOLD</span>'}
+                                    ? dkLogoImgTag
+                                    : '<span style="font-size:32px;font-weight:900;letter-spacing:5px;font-family:\'Helvetica Neue\', Helvetica, Arial, sans-serif;">DK GOLD</span>'}
                             </div>
                             <!-- Address -->
-                            <div style="font-size: 12px; color: #000; margin-top: 8px; font-family: 'Courier New', Courier, monospace; font-weight: 600;">
+                            <div style="font-size: 15px; color: #000; margin-top: 8px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700;">
                                 No. 35/13, Mungil Mandi Street, Sandapet, Ambur
                             </div>
                         </div>
 
                         <!-- TITLE BAND -->
-                        <div style="border: 2px solid #000; text-align: center; padding: 8px 10px; font-weight: 900; font-size: 15px; letter-spacing: 1px; margin-bottom: 16px; font-family: 'Courier New', Courier, monospace;">
+                        <div style="border: 2px solid #000; text-align: center; padding: 8px 10px; font-weight: 800; font-size: 18px; letter-spacing: 0.5px; margin-bottom: 16px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                             ${isUnlimited ? 'GOLD SAVING PLAN RECEIPT' : 'MONTHLY SAVING PLAN RECEIPT'}
                         </div>
 
                         <!-- ROWS -->
-                        <table style="width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Courier New', Courier, monospace;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 16px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                             <tbody>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700; width: 44%;">RECEIPT NO.</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; width: 6%; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${receiptNo}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700; width: 44%;">RECEIPT NO.</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; width: 6%; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${receiptNo}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">DATE</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${paymentDate}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">DATE</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${paymentDate}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">NAME</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${customerName}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">NAME</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${customerName}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">ADDRESS</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${customerAddress || 'N/A'}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">ADDRESS</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${customerAddress || 'N/A'}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">MOBILE</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${customerMobile}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">MOBILE</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${customerMobile}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">ACCOUNT NO.</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${accNo}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">ACCOUNT NO.</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${accNo}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">PLAN TYPE</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${planName}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">PLAN TYPE</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${planName}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">PAYMENT MODE</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${paymentMode.toUpperCase()}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">PAYMENT MODE</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${paymentMode.toUpperCase()}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">AMOUNT PAID</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">Rs. ${amountPaid}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">AMOUNT PAID</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">Rs. ${amountPaid}</td>
                                 </tr>
                                 ${isUnlimited ? `
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">GRAMS SAVED</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${gramsSaved}g</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">GRAMS SAVED</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${gramsSaved}g</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">24K GOLD RATE</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">Rs. ${goldRate24k}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">24K GOLD RATE</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">Rs. ${goldRate24k}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">TOTAL GRAMS</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${totalGrams}g</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">TOTAL GRAMS</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${totalGrams}g</td>
                                 </tr>
                                 ` : `
                                 <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 7px 4px; font-weight: 700;">TOTAL PAID</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">Rs. ${totalPaid}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">TOTAL PAID</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">Rs. ${totalPaid}</td>
                                 </tr>
                                 `}
                                 <tr>
-                                    <td style="padding: 7px 4px; font-weight: 700;">DUE NO.</td>
-                                    <td style="padding: 7px 2px; font-weight: 700; text-align: center;">:</td>
-                                    <td style="padding: 7px 4px; font-weight: 700;">${String(dueNo).padStart(2, '0')}</td>
+                                    <td style="padding: 8px 4px; font-weight: 700;">DUE NO.</td>
+                                    <td style="padding: 8px 2px; font-weight: 700; text-align: center;">:</td>
+                                    <td style="padding: 8px 4px; font-weight: 800;">${String(dueNo).padStart(2, '0')}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -409,14 +444,28 @@ const AnalyticsTab = ({ user }) => {
             let dkLogoImgTag = 'DK';
             let safproLogoImgTag = 'Safpro';
 
-            if (Platform.OS === 'android' && !__DEV__) {
-                dkLogoImgTag = `<img src="file:///android_asset/logodk.png" style="width: 70px; height: auto;" />`;
-                safproLogoImgTag = `<img src="file:///android_asset/Safpro-logo.png" style="width: 120px; height: auto;" />`;
-            } else {
+            if (Platform.OS === 'android') {
+                try {
+                    const dkBase64 = await RNFS.readFileAssets('logodk.png', 'base64');
+                    if (dkBase64) dkLogoImgTag = `<img src="data:image/png;base64,${dkBase64}" style="width: 70px; height: auto;" />`;
+                } catch (e) {
+                    console.log("Could not read asset logodk.png:", e);
+                }
+                try {
+                    const safproBase64 = await RNFS.readFileAssets('Safpro-logo.png', 'base64');
+                    if (safproBase64) safproLogoImgTag = `<img src="data:image/png;base64,${safproBase64}" style="width: 120px; height: auto;" />`;
+                } catch (e) {
+                    console.log("Could not read asset Safpro-logo.png:", e);
+                }
+            }
+
+            if (dkLogoImgTag === 'DK') {
                 const dklogoUrl = Image.resolveAssetSource(logodk).uri;
                 const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
                 if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 70px; height: auto;" />`;
+            }
 
+            if (safproLogoImgTag === 'Safpro') {
                 const safproLogoUrl = Image.resolveAssetSource(safproLogo).uri;
                 const safproLogoBase64 = await fetchImageAsBase64(safproLogoUrl);
                 if (safproLogoBase64) safproLogoImgTag = `<img src="${safproLogoBase64}" style="width: 120px; height: auto;" />`;
@@ -1603,28 +1652,53 @@ const AnalyticsTab = ({ user }) => {
                 onRequestClose={() => setInvoiceHtml(null)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { padding: 0, height: '80%', overflow: 'hidden' }]}>
+                    <View style={[styles.modalContent, { padding: 0, height: '85%', overflow: 'hidden' }]}>
                         <View style={[styles.modalHeader, { padding: 16, backgroundColor: '#f5f5f5', borderBottomWidth: 1, borderColor: '#eee', marginBottom: 0 }]}>
-                            <Text style={styles.modalTitle}>Receipt</Text>
+                            <Text style={styles.modalTitle}>Receipt Preview</Text>
                             <TouchableOpacity onPress={() => setInvoiceHtml(null)}>
                                 <Icon name="times" size={20} color={COLORS?.dark} />
                             </TouchableOpacity>
                         </View>
 
                         <View style={{ flex: 1, position: 'relative' }}>
-                            <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }} style={{ flex: 1 }}>
-                                <WebView
-                                    originWhitelist={['*']}
-                                    source={{ html: invoiceHtml }}
-                                    style={{ flex: 1 }}
-                                    showsVerticalScrollIndicator={false}
-                                    allowFileAccess={true}
-                                    allowUniversalAccessFromFileURLs={true}
-                                    allowFileAccessFromFileURLs={true}
-                                    onLoadStart={() => setWebViewLoading(true)}
-                                    onLoadEnd={() => setWebViewLoading(false)}
-                                />
-                            </ViewShot>
+                            <ScrollView
+                                style={{ flex: 1 }}
+                                contentContainerStyle={{ flexGrow: 1 }}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.95 }} style={{ backgroundColor: '#ffffff', width: '100%' }}>
+                                    <WebView
+                                        originWhitelist={['*']}
+                                        source={{ html: invoiceHtml, baseUrl: Platform.OS === 'android' ? 'file:///android_asset/' : '' }}
+                                        style={{ width: '100%', height: receiptHeight }}
+                                        scrollEnabled={false}
+                                        nestedScrollEnabled={false}
+                                        allowFileAccess={true}
+                                        allowUniversalAccessFromFileURLs={true}
+                                        allowFileAccessFromFileURLs={true}
+                                        onLoadStart={() => setWebViewLoading(true)}
+                                        onLoadEnd={() => setWebViewLoading(false)}
+                                        injectedJavaScript={`
+                                            setTimeout(function() {
+                                                var h = Math.max(
+                                                    document.body.scrollHeight || 0,
+                                                    document.body.offsetHeight || 0,
+                                                    document.documentElement.scrollHeight || 0,
+                                                    document.documentElement.offsetHeight || 0
+                                                );
+                                                window.ReactNativeWebView.postMessage(h.toString());
+                                            }, 400);
+                                            true;
+                                        `}
+                                        onMessage={(event) => {
+                                            const h = parseInt(event.nativeEvent.data, 10);
+                                            if (h && h > 200 && h < 4000) {
+                                                setReceiptHeight(h + 30);
+                                            }
+                                        }}
+                                    />
+                                </ViewShot>
+                            </ScrollView>
                             {webViewLoading && (
                                 <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center' }}>
                                     <ActivityIndicator size="large" color="#915200" />
@@ -1632,19 +1706,19 @@ const AnalyticsTab = ({ user }) => {
                             )}
                         </View>
 
-                        <View style={{ padding: 16, borderTopWidth: 1, borderColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+                        <View style={{ padding: 12, borderTopWidth: 1, borderColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#f0f0f0', flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }]}
+                                style={[styles.modalButton, { backgroundColor: '#f0f0f0', flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }]}
                                 onPress={() => setInvoiceHtml(null)}
                             >
                                 <Text style={{ color: COLORS?.dark, fontWeight: 'bold' }}>Close</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: COLORS?.primary, flex: 1, flexDirection: 'row', gap: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }]}
+                                style={[styles.modalButton, { backgroundColor: COLORS?.primary || '#915200', flex: 1, flexDirection: 'row', gap: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }]}
                                 onPress={downloadInvoiceAsJPG}
                             >
-                                <Icon name="download" size={16} color="#fff" />
-                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save JPG</Text>
+                                <Icon name="download" size={14} color="#fff" />
+                                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Save JPG</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
