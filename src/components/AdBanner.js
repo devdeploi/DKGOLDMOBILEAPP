@@ -95,16 +95,22 @@ const AdBanner = ({ ads }) => {
                     style={styles.adImage}
                     resizeMode="cover"
                 />
-                <View style={styles.overlay}>
-                    <View style={styles.textContainer}>
-                        <Text style={styles.adTitle} numberOfLines={1}>
-                            {item.title || 'Special Offer'}
-                        </Text>
-                        <Text style={styles.adSubtitle} numberOfLines={2}>
-                            {item.description || 'Check out our latest premium collections and offers.'}
-                        </Text>
+                {(item.title || item.description) ? (
+                    <View style={styles.overlay}>
+                        <View style={styles.textContainer}>
+                            {item.title ? (
+                                <Text style={styles.adTitle} numberOfLines={1}>
+                                    {item.title}
+                                </Text>
+                            ) : null}
+                            {item.description ? (
+                                <Text style={styles.adSubtitle} numberOfLines={2}>
+                                    {item.description}
+                                </Text>
+                            ) : null}
+                        </View>
                     </View>
-                </View>
+                ) : null}
             </TouchableOpacity>
         );
     };

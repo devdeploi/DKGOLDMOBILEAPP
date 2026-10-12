@@ -204,20 +204,21 @@ const GoldTab = () => {
                 {/* Calculator Button */}
                 <TouchableOpacity 
                     onPress={() => setCalcModalVisible(true)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                     style={styles.openCalcBtnWrapper}
                 >
                     <LinearGradient
-                        colors={['#ffe066', '#f5c03c', '#c49018', '#9c6f08']}
+                        colors={['#fef178', '#f5c03c', '#d49b1a', '#b37d0c']}
                         start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.openCalcBtn}
-                    >
-                        <View style={styles.openCalcBtnContent}>
-                            <Icon name="calculator" size={18} color="#1a0f00" style={styles.openCalcBtnIcon} />
-                            <Text style={styles.openCalcBtnText}>GOLD & JEWEL PRICE CALCULATOR</Text>
-                        </View>
-                    </LinearGradient>
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFill}
+                    />
+                    <View style={styles.openCalcBtnContent}>
+                        <Icon name="calculator" size={18} color="#2b1700" style={styles.openCalcBtnIcon} />
+                        <Text style={styles.openCalcBtnText} numberOfLines={1} adjustsFontSizeToFit={true} minimumFontScale={0.85}>
+                            GOLD & JEWEL PRICE CALCULATOR
+                        </Text>
+                    </View>
                 </TouchableOpacity>
 
             </ScrollView>
@@ -589,41 +590,35 @@ const styles = StyleSheet.create({
         color: '#000'
     },
     openCalcBtnWrapper: {
-        marginTop: 15,
-        marginBottom: 20,
-        borderRadius: 10,
+        marginTop: 18,
+        marginBottom: 25,
+        borderRadius: 14,
         overflow: 'hidden',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.4,
-        shadowRadius: 4,
-    },
-    openCalcBtn: {
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
         borderWidth: 1.5,
-        borderColor: '#ffe066',
+        borderColor: '#fef178',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 5,
+        elevation: 6,
+        position: 'relative',
     },
     openCalcBtnContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
     },
     openCalcBtnIcon: {
-        marginRight: 8,
+        marginRight: 10,
     },
     openCalcBtnText: {
-        color: '#1a0f00',
+        color: '#2b1700',
         fontWeight: 'bold',
-        fontSize: 16,
-        letterSpacing: 0.8,
-        textShadowColor: 'rgba(255, 255, 255, 0.4)',
-        textShadowOffset: { width: 0.5, height: 0.5 },
-        textShadowRadius: 1,
+        fontSize: 15,
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
     },
     modalOverlay: {
         flex: 1,

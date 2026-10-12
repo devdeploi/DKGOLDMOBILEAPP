@@ -13,8 +13,11 @@ import {
     KeyboardAvoidingView,
     Platform,
     ImageBackground,
-    Linking
+    Linking,
+    ActionSheetIOS,
+    Alert
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import axios from 'axios';
@@ -50,6 +53,7 @@ const UnsubscribedUsersList = ({ user }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalUsers, setTotalUsers] = useState(0);
     const [plans, setPlans] = useState([]);
 
     // Subscription Modal
@@ -70,7 +74,7 @@ const UnsubscribedUsersList = ({ user }) => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [submitting, setSubmitting] = useState(false);
 
-    const selectedPlan = plans.find(p => p._id === subscribeForm.planId);
+    const selectedPlan = plans?.find(p => p._id === subscribeForm.planId);
     const isUnlimited = selectedPlan?.type === 'unlimited';
     const effectiveGoldRate = Number(subscribeForm.customGoldRate) || (isUnlimited ? (user.goldRate24k || goldRate) : goldRate);
     const calculatedWeight = (isUnlimited && subscribeForm.amount && effectiveGoldRate > 0)
@@ -96,11 +100,16 @@ const UnsubscribedUsersList = ({ user }) => {
             const { data } = await axios.get(`${APIURL}/chit-plans/unsubscribed-users?page=${pageNum}&search=${searchQuery}`, config);
 
             if (pageNum === 1) {
-                setUsers(data.users);
+                setUsers(data.users || []);
             } else {
-                setUsers(prev => [...prev, ...data.users]);
+                setUsers(prev => [...prev, ...(data.users || [])]);
             }
-            setTotalPages(data.pages);
+            setTotalPages(data.pages || 1);
+            if (data.total !== undefined) {
+                setTotalUsers(data.total);
+            } else if (pageNum === 1) {
+                setTotalUsers(data.users?.length || 0);
+            }
         } catch (error) {
             console.error("Error fetching unsubscribed users", error);
         } finally {
@@ -272,6 +281,94 @@ const UnsubscribedUsersList = ({ user }) => {
         });
     };
 
+    const handlePhonePress = (phoneNumber, userName) => {
+        if (!phoneNumber) {
+            Toast.show({
+                type: 'error',
+                text1: 'No Phone Number',
+                text2: 'This user does not have a valid phone number.'
+            });
+            return;
+        }
+
+        const cleanPhone = String(phoneNumber).replace(/[^0-9+]/g, '');
+        const whatsappNumber = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone.replace(/^\+/, '');
+
+        const makeCall = () => {
+            const url = `tel:${cleanPhone}`;
+            Linking.canOpenURL(url)
+                .then(supported => {
+                    if (supported) {
+                        return Linking.openURL(url);
+                    } else {
+                        Alert.alert(
+                            `${userName || 'User'}'s Phone`,
+                            `${phoneNumber}\n\nCalling is not available on this device / simulator.`,
+                            [
+                                { text: 'WhatsApp Message', onPress: openWhatsApp },
+                                { text: 'OK' }
+                            ]
+                        );
+                    }
+                })
+                .catch(err => {
+                    console.error("Phone call error:", err);
+                    Alert.alert(
+                        `${userName || 'User'}'s Phone`,
+                        `${phoneNumber}\n\nCould not open dialpad.`,
+                        [
+                            { text: 'WhatsApp Message', onPress: openWhatsApp },
+                            { text: 'OK' }
+                        ]
+                    );
+                });
+        };
+
+        const openWhatsApp = () => {
+            const waUrl = `whatsapp://send?phone=${whatsappNumber}&text=Hello%20${encodeURIComponent(userName || '')}`;
+            const webWaUrl = `https://wa.me/${whatsappNumber}`;
+            Linking.canOpenURL(waUrl)
+                .then(supported => {
+                    if (supported) {
+                        return Linking.openURL(waUrl);
+                    } else {
+                        return Linking.openURL(webWaUrl);
+                    }
+                })
+                .catch(() => {
+                    Linking.openURL(webWaUrl).catch(() => {});
+                });
+        };
+
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options: ['Cancel', `Call ${phoneNumber}`, 'WhatsApp Message'],
+                    cancelButtonIndex: 0,
+                    title: userName || 'Contact User',
+                    message: phoneNumber,
+                },
+                buttonIndex => {
+                    if (buttonIndex === 1) {
+                        makeCall();
+                    } else if (buttonIndex === 2) {
+                        openWhatsApp();
+                    }
+                }
+            );
+        } else {
+            Alert.alert(
+                userName || 'Contact User',
+                phoneNumber,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'WhatsApp', onPress: openWhatsApp },
+                    { text: 'Call', onPress: makeCall }
+                ]
+            );
+        }
+    };
+
     const renderUserItem = ({ item }) => (
         <View style={styles.userCard}>
             <View style={styles.userInfo}>
@@ -282,10 +379,14 @@ const UnsubscribedUsersList = ({ user }) => {
                     <TouchableOpacity onPress={() => handleOpenUserModal(item)}>
                         <Text style={styles.userName} numberOfLines={1}>{item.name}</Text>
                     </TouchableOpacity>
-                    <View style={styles.userMetaRow}>
-                        <Icon name="phone-alt" size={10} color="#999" />
+                    <TouchableOpacity
+                        style={styles.userMetaRow}
+                        onPress={() => handlePhonePress(item.phone, item.name)}
+                        activeOpacity={0.7}
+                    >
+                        <Icon name="phone-alt" size={10} color="#1890ff" />
                         <Text style={styles.userPhone}>{item.phone}</Text>
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.userMetaRow}>
                         <Icon name="clock" size={10} color="#aaa" />
                         <Text style={styles.joinedText}>Joined {getTimeAgo(item.createdAt)}</Text>
@@ -294,7 +395,9 @@ const UnsubscribedUsersList = ({ user }) => {
                 <View style={styles.actionButtons}>
                     <TouchableOpacity
                         style={styles.callBtn}
-                        onPress={() => Linking.openURL(`tel:${item.phone}`)}
+                        onPress={() => handlePhonePress(item.phone, item.name)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                         <Icon name="phone-alt" size={12} color="#1890ff" />
                     </TouchableOpacity>
@@ -328,17 +431,27 @@ const UnsubscribedUsersList = ({ user }) => {
     return (
         <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
             <View style={styles.header}>
+                <View style={styles.titleContainer}>
+                    <Icon name="user-plus" size={16} color="#fff" />
+                    <Text style={styles.headerTitle}>New Unsubscribed Users ({totalUsers || users.length})</Text>
+                </View>
                 <View style={styles.searchContainer}>
                     <Icon name="search" size={16} color="#999" style={styles.searchIcon} />
                     <TextInput
                         style={styles.searchInput}
                         placeholder="Search by name or phone..."
+                        placeholderTextColor="#999"
                         value={searchQuery}
                         onChangeText={(text) => {
                             setSearchQuery(text);
                             setPage(1);
                         }}
                     />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => { setSearchQuery(''); setPage(1); }} style={{ padding: 4 }}>
+                            <Icon name="times-circle" size={16} color="#999" />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
 
@@ -656,10 +769,19 @@ const UnsubscribedUsersList = ({ user }) => {
                                 <Text style={styles.userPhone}>Registered User</Text>
                             </View>
 
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>PHONE</Text>
-                                <Text style={styles.detailValue}>{selectedUser?.phone}</Text>
-                            </View>
+                            <TouchableOpacity
+                                style={[styles.detailRow, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                                onPress={() => handlePhonePress(selectedUser?.phone, selectedUser?.name)}
+                                activeOpacity={0.7}
+                            >
+                                <View>
+                                    <Text style={styles.detailLabel}>PHONE</Text>
+                                    <Text style={[styles.detailValue, { color: '#1890ff' }]}>{selectedUser?.phone}</Text>
+                                </View>
+                                <View style={styles.callBtn}>
+                                    <Icon name="phone-alt" size={12} color="#1890ff" />
+                                </View>
+                            </TouchableOpacity>
 
                             <View style={styles.detailRow}>
                                 <Text style={styles.detailLabel}>EMAIL</Text>
@@ -708,8 +830,21 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     header: {
-        padding: 15,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 4,
         backgroundColor: 'transparent',
+    },
+    titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginLeft: 8,
     },
     searchContainer: {
         flexDirection: 'row',

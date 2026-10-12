@@ -2048,6 +2048,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - react-native-print (0.11.0):
+    - React-Core
   - react-native-razorpay (3.0.0):
     - boost
     - DoubleConversion
@@ -3421,6 +3423,7 @@ DEPENDENCIES:
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
+  - react-native-print (from `../node_modules/react-native-print`)
   - react-native-razorpay (from `../node_modules/react-native-razorpay`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
@@ -3591,6 +3594,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
   react-native-image-picker:
     :path: "../node_modules/react-native-image-picker"
+  react-native-print:
+    :path: "../node_modules/react-native-print"
   react-native-razorpay:
     :path: "../node_modules/react-native-razorpay"
   react-native-safe-area-context:
@@ -3762,6 +3767,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 7b72a669e94662359dad4f42b5af005eb24b4e83
   React-microtasksnativemodule: cdc02da075f2857803ed63f24f5f72fc40e094c0
   react-native-image-picker: 0314366753615115fa55c3cc937ac44cb7e75702
+  react-native-print: 692e8782bc89872ea01738c6759631388e77358c
   react-native-razorpay: 32fd7bcf366a277fa14a82305279e825258008db
   react-native-safe-area-context: befb5404eb8a16fdc07fa2bebab3568ecabcbb8a
   react-native-slider: 34064ca1a6864d7b263e44dd76a2d794e8d26744

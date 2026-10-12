@@ -37,6 +37,8 @@ interface UserData {
   phone?: string;
   address?: string;
   token?: string;
+  goldRate9k?: number;
+  goldRate14k?: number;
   goldRate18k?: number;
   goldRate22k?: number;
   goldRate24k?: number;
@@ -347,7 +349,7 @@ function App() {
       <GoldRateProvider merchantRates={merchantRatesObj}>
         <View style={{ flex: 1, backgroundColor: COLORS?.light }}>
           <StatusBar
-            barStyle={isLoginOrRegister ? 'light-content' : 'dark-content'}
+            barStyle="light-content"
             backgroundColor="transparent"
             translucent
           />

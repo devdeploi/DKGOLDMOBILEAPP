@@ -14,7 +14,9 @@ import {
     ActivityIndicator,
     Image,
     Animated,
-    Easing
+    Easing,
+    BackHandler,
+    StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../styles/theme';
@@ -57,7 +59,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
         ]).start();
     };
 
-    const closeSidebar = () => {
+    const closeSidebar = (callback) => {
         Animated.parallel([
             Animated.timing(slideAnim, {
                 toValue: -300,
@@ -72,8 +74,26 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             })
         ]).start(() => {
             setShowSidebar(false);
+            if (typeof callback === 'function') {
+                callback();
+            }
         });
     };
+
+    useEffect(() => {
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+            if (showSidebar) {
+                closeSidebar();
+                return true;
+            }
+            if (showLogoutModal) {
+                setShowLogoutModal(false);
+                return true;
+            }
+            return false;
+        });
+        return () => backHandler.remove();
+    }, [showSidebar, showLogoutModal]);
 
     // Custom Alert State
     const [alertConfig, setAlertConfig] = useState({
@@ -374,6 +394,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
 
     return (
         <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={styles.container} resizeMode="cover">
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
                 {/* Header */}
                 <View style={[styles.header, { position: 'relative' }]}>
@@ -404,9 +425,9 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             {/* BottomNav outside SafeAreaView — its paddingBottom from insets fills home-indicator area with gold color */}
             <BottomNav activeTab={activeTab} onTabChange={setActiveTab} tabs={merchantTabs} />
 
-            {/* Sidebar Modal */}
-            <Modal visible={showSidebar} transparent onRequestClose={closeSidebar}>
-                <View style={styles.sidebarOverlay}>
+            {/* Sidebar Drawer Overlay */}
+            {showSidebar && (
+                <View style={[styles.sidebarOverlay, StyleSheet.absoluteFill, { zIndex: 9999, elevation: 20 }]}>
                     {/* Animated Backdrop */}
                     <Animated.View
                         style={[
@@ -417,7 +438,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                             }
                         ]}
                     >
-                        <TouchableOpacity style={{ flex: 1 }} onPress={closeSidebar} activeOpacity={1} />
+                        <TouchableOpacity style={{ flex: 1 }} onPress={() => closeSidebar()} activeOpacity={1} />
                     </Animated.View>
 
                     <Animated.View style={[styles.sidebarContent, { transform: [{ translateX: slideAnim }] }]}>
@@ -428,7 +449,7 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                             end={{ x: 1, y: 1 }}
                         />
                         <View style={styles.sidebarHeader}>
-                            <TouchableOpacity style={styles.sidebarCloseBtn} onPress={closeSidebar}>
+                            <TouchableOpacity style={styles.sidebarCloseBtn} onPress={() => closeSidebar()}>
                                 <Icon name="times" size={22} color="#915200" />
                             </TouchableOpacity>
                             <View style={styles.profileImageWrapper}>
@@ -473,27 +494,50 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                             </TouchableOpacity>
                         </View>
                         <View style={styles.sidebarFooter}>
-                            <TouchableOpacity style={styles.sidebarLogoutBtn} onPress={() => { closeSidebar(); setShowLogoutModal(true); }}>
+                            <TouchableOpacity
+                                style={styles.sidebarLogoutBtn}
+                                onPress={() => {
+                                    closeSidebar(() => {
+                                        setShowLogoutModal(true);
+                                    });
+                                }}
+                            >
                                 <Icon name="sign-out-alt" size={16} color="#fff" style={styles.sidebarIconLogout} />
                                 <Text style={styles.sidebarLogoutText}>Logout</Text>
                             </TouchableOpacity>
                         </View>
                     </Animated.View>
                 </View>
-            </Modal>
+            )}
 
             {/* Logout Modal */}
-            <Modal visible={showLogoutModal} transparent animationType="fade">
+            <Modal
+                visible={showLogoutModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowLogoutModal(false)}
+            >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Icon name="sign-out-alt" size={40} color="#915200" style={{ marginBottom: 15 }} />
                         <Text style={styles.modalTitle}>Confirm Logout</Text>
                         <Text style={styles.modalText}>Are you sure you want to log out?</Text>
                         <View style={styles.modalButtons}>
-                            <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setShowLogoutModal(false)}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setShowLogoutModal(false)}
+                            >
                                 <Text style={styles.cancelButtonText}>Cancel</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={onLogout}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.confirmButton]}
+                                onPress={() => {
+                                    setShowLogoutModal(false);
+                                    if (onLogout) {
+                                        onLogout();
+                                    }
+                                }}
+                            >
                                 <Text style={styles.confirmButtonText}>Logout</Text>
                             </TouchableOpacity>
                         </View>

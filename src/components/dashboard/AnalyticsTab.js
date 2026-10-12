@@ -62,7 +62,7 @@ const AnalyticsTab = ({ user }) => {
     const [invoiceFileName, setInvoiceFileName] = useState('');
     const [webViewLoading, setWebViewLoading] = useState(true);
     const [generatingReceipt, setGeneratingReceipt] = useState(false);
-    const [receiptHeight, setReceiptHeight] = useState(380);
+    const [receiptHeight, setReceiptHeight] = useState(560);
     const viewShotRef = useRef(null);
     const [alertConfig, setAlertConfig] = useState({
         visible: false,
@@ -106,8 +106,8 @@ const AnalyticsTab = ({ user }) => {
         setReceiptModalVisible(true);
     };
 
-    const showAlert = (title, message, type = 'info') => {
-        setAlertConfig({ visible: true, title, message, type });
+    const showAlert = (title, message, type = 'info', buttons = []) => {
+        setAlertConfig({ visible: true, title, message, type, buttons });
     };
 
     const hideAlert = () => {
@@ -142,10 +142,16 @@ const AnalyticsTab = ({ user }) => {
             const mimeType = ext === 'jpg' ? 'jpeg' : ext;
             const tempFile = `${RNFS.CachesDirectoryPath}/temp_img_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
 
-            const result = await RNFS.downloadFile({
+            const downloadPromise = RNFS.downloadFile({
                 fromUrl: url,
                 toFile: tempFile,
             }).promise;
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Download timeout')), 2500)
+            );
+
+            const result = await Promise.race([downloadPromise, timeoutPromise]);
 
             if (result.statusCode === 200) {
                 const base64Data = await RNFS.readFile(tempFile, 'base64');
@@ -159,23 +165,29 @@ const AnalyticsTab = ({ user }) => {
         }
     };
 
-    const shareFile = async (filePath) => {
+    const shareFile = async (filePath, customType) => {
         try {
+            const isPdf = filePath.toLowerCase().endsWith('.pdf');
+            const isJpg = filePath.toLowerCase().endsWith('.jpg') || filePath.toLowerCase().endsWith('.jpeg');
+            const mimeType = customType || (isPdf ? 'application/pdf' : isJpg ? 'image/jpeg' : 'image/png');
+            const cleanUri = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
             const shareOptions = {
-                title: 'Share PDF',
-                url: Platform.OS === 'android' ? `file://${filePath}` : `file://${filePath}`,
-                type: 'application/pdf',
+                title: isPdf ? 'Share Document' : 'Share Receipt',
+                url: cleanUri,
+                type: mimeType,
                 failOnCancel: false
             };
             await Share.open(shareOptions);
         } catch (error) {
-            console.log("Share Error:", error);
+            if (error && error.message && !error.message.includes('User did not share') && !error.message.includes('cancel')) {
+                console.log("Share Error:", error);
+            }
         }
     };
 
     const createAndDownloadPDF = async (html, fileName) => {
         const cleanFileName = fileName.replace(/[^a-z0-9]/gi, '_');
-        setReceiptHeight(380);
+        setReceiptHeight(560);
         setInvoiceHtml(html);
         setInvoiceFileName(cleanFileName);
     };
@@ -198,13 +210,18 @@ const AnalyticsTab = ({ user }) => {
                 await RNFS.unlink(downloadPath);
             }
             await RNFS.copyFile(uri, downloadPath);
-            showAlert("Success", "Receipt saved successfully as JPG", "success", [
-                {
-                    text: "Share",
-                    onPress: () => shareFile(downloadPath)
-                },
-                { text: "OK" }
-            ]);
+
+            if (Platform.OS === 'ios') {
+                await shareFile(downloadPath, 'image/jpeg');
+            } else {
+                showAlert("Success", "Receipt saved successfully as JPG", "success", [
+                    {
+                        text: "Share",
+                        onPress: () => shareFile(downloadPath, 'image/jpeg')
+                    },
+                    { text: "OK" }
+                ]);
+            }
         } catch (error) {
             console.error("Invoice Capture Error:", error);
             showAlert("Error", "Failed to save receipt as JPG", "error");
@@ -230,13 +247,13 @@ const AnalyticsTab = ({ user }) => {
             if (Platform.OS === 'android') {
                 try {
                     const dkBase64 = await RNFS.readFileAssets('DK.png', 'base64');
-                    if (dkBase64) dkLogoImgTag = `<img src="data:image/png;base64,${dkBase64}" style="width: 240px; height: auto; display: block; margin: 0 auto;" />`;
+                    if (dkBase64) dkLogoImgTag = `<img src="data:image/png;base64,${dkBase64}" style="width: 140px; height: auto; display: block; margin: 0 auto;" />`;
                 } catch (e) {
                     console.log("Could not read asset DK.png:", e);
                 }
                 try {
                     const logoBase64 = await RNFS.readFileAssets('logodk.png', 'base64');
-                    if (logoBase64) logodkImgTag = `<img src="data:image/png;base64,${logoBase64}" style="width: 70px; height: auto; display: block; margin: 0 auto;" />`;
+                    if (logoBase64) logodkImgTag = `<img src="data:image/png;base64,${logoBase64}" style="width: 50px; height: auto; display: block; margin: 0 auto;" />`;
                 } catch (e) {
                     console.log("Could not read asset logodk.png:", e);
                 }
@@ -245,21 +262,21 @@ const AnalyticsTab = ({ user }) => {
             if (dkLogoImgTag === 'DK') {
                 const dklogoUrl = Image.resolveAssetSource(dklogo).uri;
                 const dklogoBase64 = await fetchImageAsBase64(dklogoUrl);
-                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 240px; height: auto; display: block; margin: 0 auto;" />`;
+                if (dklogoBase64) dkLogoImgTag = `<img src="${dklogoBase64}" style="width: 140px; height: auto; display: block; margin: 0 auto;" />`;
             }
 
             if (logodkImgTag === 'logodk') {
                 const logodkUrl = Image.resolveAssetSource(logodk).uri;
                 const logodkBase64 = await fetchImageAsBase64(logodkUrl);
-                if (logodkBase64) logodkImgTag = `<img src="${logodkBase64}" style="width: 70px; height: auto; display: block; margin: 0 auto;" />`;
+                if (logodkBase64) logodkImgTag = `<img src="${logodkBase64}" style="width: 50px; height: auto; display: block; margin: 0 auto;" />`;
             }
 
             const planName = plan.planName || 'Unknown Plan';
             const paymentDate = new Date(payment.paymentDate || payment.createdAt || new Date()).toLocaleDateString('en-IN');
             const merchantName = (plan.merchant?.name || 'Merchant').toUpperCase();
-            const customerName = user.name.toUpperCase();
-            const customerAddress = user.address || '';
-            const customerMobile = user.phone || '';
+            const customerName = (user?.name || 'Customer').toUpperCase();
+            const customerAddress = user?.address || '';
+            const customerMobile = user?.phone || '';
 
             const isUnlimited = isPlanUnlimited(plan);
             const receiptNo = payment.receiptNumber ? String(payment.receiptNumber).padStart(3, '0') : '-';
@@ -318,112 +335,224 @@ const AnalyticsTab = ({ user }) => {
             const totalGrams = cumulativeGrams.toFixed(3);
             const remainAmount = (Number(plan.totalAmount || 0) - cumulativeAmount).toFixed(2);
 
+            // 3. Compact HTML Template (Single Page Thermal Optimized)
             const html = `
+                <!DOCTYPE html>
                 <html>
                 <head>
-                    <meta name="viewport" content="width=500, user-scalable=yes" />
+                    <meta charset="utf-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                    <style>
+                        @page {
+                            size: auto;
+                            margin: 0;
+                        }
+                        @media print {
+                            body {
+                                margin: 0 !important;
+                                padding: 2px !important;
+                                -webkit-print-color-adjust: exact;
+                                print-color-adjust: exact;
+                            }
+                            #receipt-box {
+                                page-break-inside: avoid !important;
+                                page-break-after: avoid !important;
+                                break-inside: avoid !important;
+                                border: 1.5px solid #000 !important;
+                            }
+                        }
+                        * {
+                            box-sizing: border-box;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        body {
+                            font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif;
+                            font-size: 10px;
+                            color: #000;
+                            background: #fff;
+                            padding: 3px;
+                            -webkit-font-smoothing: antialiased;
+                        }
+                        #receipt-box {
+                            border: 1.5px solid #000;
+                            border-radius: 2px;
+                            padding: 6px 8px;
+                            max-width: 380px;
+                            margin: 0 auto;
+                            background: #fff;
+                        }
+                        .header {
+                            text-align: center;
+                            margin-bottom: 4px;
+                        }
+                        .address {
+                            font-size: 9.5px;
+                            color: #000;
+                            margin-top: 2px;
+                            font-weight: 700;
+                            line-height: 1.15;
+                        }
+                        .title-band {
+                            border: 1px solid #000;
+                            text-align: center;
+                            padding: 2.5px 4px;
+                            font-weight: 900;
+                            font-size: 10.5px;
+                            letter-spacing: 0.5px;
+                            margin-bottom: 4px;
+                            line-height: 1.15;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 10px;
+                        }
+                        tr {
+                            border-bottom: 1px solid #e0e0e0;
+                        }
+                        td {
+                            padding: 2px 1px;
+                            vertical-align: middle;
+                            line-height: 1.15;
+                        }
+                        .label {
+                            font-weight: 700;
+                            width: 44%;
+                            white-space: nowrap;
+                            color: #222;
+                            font-size: 9.5px;
+                        }
+                        .colon {
+                            font-weight: 700;
+                            width: 4%;
+                            text-align: center;
+                            color: #000;
+                            font-size: 9.5px;
+                        }
+                        .val {
+                            font-weight: 800;
+                            color: #000;
+                            word-break: break-word;
+                            font-size: 10px;
+                        }
+                        .highlight-val {
+                            font-weight: 900;
+                            font-size: 10.5px;
+                        }
+                        .footer {
+                            text-align: center;
+                            margin-top: 4px;
+                            padding-top: 3px;
+                            border-top: 1px dashed #888;
+                            font-size: 8.5px;
+                            font-weight: 700;
+                            letter-spacing: 0.5px;
+                            color: #333;
+                        }
+                    </style>
                 </head>
-                <body style="font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif; font-size: 12px; padding: 10px; color: #000; margin: 0; background: #fff;">
-                    <div id="receipt-box" style="border: 2px solid #000; padding: 12px 14px; max-width: 480px; margin: 0 auto; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif; font-size: 12px;">
-
+                <body>
+                    <div id="receipt-box">
                         <!-- HEADER -->
-                        <div style="text-align: center; margin-bottom: 10px;">
-                            <!-- DK GOLD banner -->
+                        <div class="header">
                             <div style="display: flex; align-items: center; justify-content: center;">
                                 ${dkLogoImgTag !== 'DK'
                                     ? dkLogoImgTag
-                                    : '<span style="font-size:24px;font-weight:900;letter-spacing:4px;font-family:\'Arial Narrow\', \'Nimbus Sans L\', sans-serif-condensed, Arial, sans-serif;">DK GOLD</span>'}
+                                    : '<span style="font-size:18px;font-weight:900;letter-spacing:3px;">DK GOLD</span>'}
                             </div>
-                            <!-- Address -->
-                            <div style="font-size: 12px; color: #000; margin-top: 4px; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif; font-weight: 700;">
+                            <div class="address">
                                 No. 35/13, Mungil Mandi Street, Sandapet, Ambur
                             </div>
                         </div>
 
                         <!-- TITLE BAND -->
-                        <div style="border: 1.5px solid #000; text-align: center; padding: 5px 8px; font-weight: 800; font-size: 13px; letter-spacing: 0.5px; margin-bottom: 10px; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif;">
+                        <div class="title-band">
                             ${isUnlimited ? 'DIGI GOLD SAVING PLAN RECEIPT' : 'MONTHLY SAVING PLAN RECEIPT'}
                         </div>
 
                         <!-- ROWS -->
-                        <table style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Arial Narrow', 'Nimbus Sans L', sans-serif-condensed, Arial, sans-serif;">
+                        <table>
                             <tbody>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; width: 42%; white-space: nowrap; vertical-align: top;">RECEIPT NO.</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; width: 4%; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${receiptNo}</td>
+                                <tr>
+                                    <td class="label">RECEIPT NO.</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${receiptNo}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">DATE</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${paymentDate}</td>
+                                <tr>
+                                    <td class="label">DATE</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${paymentDate}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">NAME</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${customerName}</td>
+                                <tr>
+                                    <td class="label">NAME</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${customerName}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">ADDRESS</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${customerAddress || 'N/A'}</td>
+                                <tr>
+                                    <td class="label">ADDRESS</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${customerAddress || 'N/A'}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">MOBILE</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${customerMobile}</td>
+                                <tr>
+                                    <td class="label">MOBILE</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${customerMobile}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">ACCOUNT NO.</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${accNo}</td>
+                                <tr>
+                                    <td class="label">ACCOUNT NO.</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${accNo}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">PLAN TYPE</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${planName}</td>
+                                <tr>
+                                    <td class="label">PLAN TYPE</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${planName}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">PAYMENT MODE</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${paymentMode.toUpperCase()}</td>
+                                <tr>
+                                    <td class="label">PAYMENT MODE</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${paymentMode.toUpperCase()}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">AMOUNT PAID</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">Rs. ${amountPaid}</td>
+                                <tr>
+                                    <td class="label">AMOUNT PAID</td>
+                                    <td class="colon">:</td>
+                                    <td class="val highlight-val">Rs. ${amountPaid}</td>
                                 </tr>
                                 ${isUnlimited ? `
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">GRAMS SAVED</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${gramsSaved}g</td>
+                                <tr>
+                                    <td class="label">GRAMS SAVED</td>
+                                    <td class="colon">:</td>
+                                    <td class="val highlight-val">${gramsSaved}g</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">24K GOLD RATE</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">Rs. ${goldRate24k}</td>
+                                <tr>
+                                    <td class="label">24K GOLD RATE</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">Rs. ${goldRate24k}</td>
                                 </tr>
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">TOTAL GRAMS</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${totalGrams}g</td>
+                                <tr>
+                                    <td class="label">TOTAL GRAMS</td>
+                                    <td class="colon">:</td>
+                                    <td class="val highlight-val">${totalGrams}g</td>
                                 </tr>
                                 ` : `
-                                <tr style="border-bottom: 1px solid #bbb;">
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">TOTAL PAID</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">Rs. ${totalPaid}</td>
+                                <tr>
+                                    <td class="label">TOTAL PAID</td>
+                                    <td class="colon">:</td>
+                                    <td class="val highlight-val">Rs. ${totalPaid}</td>
                                 </tr>
                                 `}
-                                <tr>
-                                    <td style="padding: 4px 2px; font-weight: 700; white-space: nowrap; vertical-align: top;">DUE NO.</td>
-                                    <td style="padding: 4px 2px; font-weight: 700; text-align: center; vertical-align: top;">:</td>
-                                    <td style="padding: 4px 2px; font-weight: 800; vertical-align: top; word-break: break-word; line-height: 1.3;">${String(dueNo).padStart(2, '0')}</td>
+                                <tr style="border-bottom: none;">
+                                    <td class="label">DUE NO.</td>
+                                    <td class="colon">:</td>
+                                    <td class="val">${String(dueNo).padStart(2, '0')}</td>
                                 </tr>
                             </tbody>
                         </table>
 
+                        <div class="footer">
+                            THANK YOU! VISIT AGAIN
+                        </div>
                     </div>
                 </body>
                 </html>
@@ -482,12 +611,12 @@ const AnalyticsTab = ({ user }) => {
             }
 
             const merchantName = (plan.merchant?.name || 'Merchant').toUpperCase();
-            const customerName = user.name.toUpperCase();
+            const customerName = (user?.name || 'Customer').toUpperCase();
             const planName = plan.planName || 'Unknown Plan';
             const totalPlanAmount = plan.totalAmount || 0;
 
             let totalPaid = 0;
-            const history = plan.history || [];
+            const history = plan.history || plan.paymentHistory || [];
             const sortedHistory = [...history].sort((a, b) => new Date(a.paymentDate || a.createdAt) - new Date(b.paymentDate || b.createdAt));
 
             const rowsHtml = sortedHistory.map(pay => {
@@ -531,6 +660,7 @@ const AnalyticsTab = ({ user }) => {
                     </style>
                 </head>
                 <body>
+                    <div id="receipt-box" style="max-width: 600px; margin: 0 auto;">
                     <div class="header">
                         <div class="logo-left">${dkLogoImgTag}</div>
                         <div class="header-center">
@@ -551,7 +681,7 @@ const AnalyticsTab = ({ user }) => {
                             <div class="label">TO:</div>
                             <div class="name">${customerName}</div>
                             <div class="info">
-                                Phone: ${user.phone}<br/>
+                                Phone: ${user?.phone || ''}<br/>
                             </div>
                         </div>
                     </div>
@@ -584,6 +714,7 @@ const AnalyticsTab = ({ user }) => {
                             <p style="font-size: 10px; color: #999; margin-bottom: 5px;">Powered By</p>
                             ${safproLogoImgTag}
                         </div>
+                    </div>
                     </div>
                 </body>
                 </html>
@@ -1194,7 +1325,11 @@ const AnalyticsTab = ({ user }) => {
                     <View style={styles.historyContainer}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                             <Text style={styles.historyTitle}>Payment History</Text>
-                            <TouchableOpacity onPress={() => generateStatement(plan)}>
+                            <TouchableOpacity 
+                                onPress={() => generateStatement(plan)}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                activeOpacity={0.7}
+                            >
                                 <Icon name="file-download" size={16} color={COLORS?.primary} />
                             </TouchableOpacity>
                         </View>
@@ -1242,8 +1377,13 @@ const AnalyticsTab = ({ user }) => {
                                             </Text>
                                         )}
                                         {(payment.status === 'Paid' || payment.status === 'Completed') && !payment.isDelivered && (
-                                            <TouchableOpacity onPress={() => generateInvoice(payment, plan)} style={{ marginTop: 6, padding: 4 }}>
-                                                <Icon name="file-invoice" size={14} color={COLORS?.primary} />
+                                            <TouchableOpacity 
+                                                onPress={() => generateInvoice(payment, plan)} 
+                                                style={{ marginTop: 6, padding: 6 }}
+                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Icon name="file-invoice" size={15} color={COLORS?.primary} />
                                             </TouchableOpacity>
                                         )}
                                     </View>
@@ -1325,6 +1465,161 @@ const AnalyticsTab = ({ user }) => {
         );
     };
 
+    const renderInvoiceOverlay = () => {
+        if (!invoiceHtml) return null;
+        return (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.65)', justifyContent: 'center', alignItems: 'center', zIndex: 99999, elevation: 99999, padding: 16 }]}>
+                <View style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: 22,
+                    width: '100%',
+                    height: '85%',
+                    overflow: 'hidden',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 20,
+                    elevation: 15,
+                }}>
+                    {/* Header */}
+                    <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingHorizontal: 18,
+                        paddingVertical: 15,
+                        backgroundColor: '#ffffff',
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#f0f0f0',
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#fef7e7', justifyContent: 'center', alignItems: 'center' }}>
+                                <Icon name="file-invoice" size={13} color="#915200" />
+                            </View>
+                            <Text style={{ fontSize: 16, fontWeight: '700', color: '#1a1a1a', letterSpacing: 0.2 }}>Document Preview</Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setInvoiceHtml(null)}
+                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                            style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#f2f4f7', justifyContent: 'center', alignItems: 'center' }}
+                            activeOpacity={0.7}
+                        >
+                            <Icon name="times" size={13} color="#667085" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Document Scroll Content */}
+                    <View style={{ flex: 1, position: 'relative', backgroundColor: '#f5f6f8' }}>
+                        <ScrollView
+                            style={{ flex: 1 }}
+                            contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            <ViewShot
+                                ref={viewShotRef}
+                                options={{ format: "jpg", quality: 0.98 }}
+                                style={{
+                                    backgroundColor: '#ffffff',
+                                    width: '100%',
+                                    alignSelf: 'stretch',
+                                    borderRadius: 10,
+                                    overflow: 'hidden',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 6,
+                                    elevation: 2,
+                                    paddingBottom: 16,
+                                }}
+                            >
+                                <WebView
+                                    originWhitelist={['*']}
+                                    source={{ html: invoiceHtml, baseUrl: Platform.OS === 'android' ? 'file:///android_asset/' : '' }}
+                                    style={{ width: '100%', height: receiptHeight, backgroundColor: '#ffffff' }}
+                                    scrollEnabled={false}
+                                    nestedScrollEnabled={false}
+                                    allowFileAccess={true}
+                                    allowUniversalAccessFromFileURLs={true}
+                                    allowFileAccessFromFileURLs={true}
+                                    onLoadStart={() => setWebViewLoading(true)}
+                                    onLoadEnd={() => setWebViewLoading(false)}
+                                    injectedJavaScript={`
+                                        setTimeout(function() {
+                                            var el = document.getElementById('receipt-box') || document.body;
+                                            var h = Math.ceil(el.scrollHeight || el.offsetHeight || 500);
+                                            window.ReactNativeWebView.postMessage((h + 60).toString());
+                                        }, 250);
+                                        true;
+                                    `}
+                                    onMessage={(event) => {
+                                        const h = parseInt(event.nativeEvent.data, 10);
+                                        if (h && h > 200 && h < 5000) {
+                                            setReceiptHeight(h);
+                                        }
+                                    }}
+                                />
+                            </ViewShot>
+                        </ScrollView>
+                        {webViewLoading && (
+                            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center' }}>
+                                <ActivityIndicator size="large" color="#915200" />
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Bottom Actions Footer */}
+                    <View style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 14,
+                        borderTopWidth: 1,
+                        borderTopColor: '#f0f0f0',
+                        backgroundColor: '#ffffff',
+                        flexDirection: 'row',
+                        gap: 12,
+                    }}>
+                        <TouchableOpacity
+                            style={{
+                                flex: 1,
+                                paddingVertical: 13,
+                                borderRadius: 12,
+                                backgroundColor: '#f2f4f7',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                            onPress={() => setInvoiceHtml(null)}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={{ color: '#344054', fontWeight: '700', fontSize: 14 }}>Close</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={{
+                                flex: 1.6,
+                                paddingVertical: 13,
+                                borderRadius: 12,
+                                backgroundColor: '#915200',
+                                flexDirection: 'row',
+                                gap: 8,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                shadowColor: '#915200',
+                                shadowOffset: { width: 0, height: 3 },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 5,
+                                elevation: 4,
+                            }}
+                            onPress={downloadInvoiceAsJPG}
+                            activeOpacity={0.8}
+                        >
+                            <Icon name="download" size={14} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 14, letterSpacing: 0.3 }}>Save JPG</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
     return (
         <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={styles.wrapper} resizeMode="cover">
 
@@ -1356,14 +1651,16 @@ const AnalyticsTab = ({ user }) => {
                 </View>
             </Modal>
 
-            {/* Generating Receipt Modal */}
-            <Modal visible={generatingReceipt} transparent={true} animationType="fade" onRequestClose={() => { }}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                    <ActivityIndicator size="large" color="#d4af37" />
-                    <Text style={{ color: '#fff', marginTop: 15, fontSize: 18, fontWeight: 'bold' }}>Generating Receipt...</Text>
-                    <Text style={{ color: '#e0e0e0', marginTop: 5, fontSize: 13, textAlign: 'center', paddingHorizontal: 20 }}>Please wait while we prepare your document.</Text>
+            {/* Generating Receipt Loading Overlay */}
+            {generatingReceipt && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 999999, elevation: 999999 }]}>
+                    <View style={{ backgroundColor: 'white', padding: 25, borderRadius: 15, alignItems: 'center', elevation: 5, minWidth: 220 }}>
+                        <ActivityIndicator size="large" color="#915200" />
+                        <Text style={{ marginTop: 15, fontWeight: 'bold', fontSize: 16, color: '#915200' }}>Preparing Document...</Text>
+                        <Text style={{ marginTop: 5, fontSize: 12, color: '#666', textAlign: 'center' }}>Please wait while we prepare your preview</Text>
+                    </View>
                 </View>
-            </Modal>
+            )}
 
             {/* Receipt Viewer Modal */}
             <Modal visible={receiptModalVisible} transparent={true} animationType="fade" onRequestClose={() => setReceiptModalVisible(false)}>
@@ -1645,83 +1942,8 @@ const AnalyticsTab = ({ user }) => {
                 </View>
             </Modal>
 
-            {/* Invoice Popup Modal */}
-            <Modal
-                visible={!!invoiceHtml}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setInvoiceHtml(null)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { padding: 0, height: '85%', overflow: 'hidden' }]}>
-                        <View style={[styles.modalHeader, { padding: 16, backgroundColor: '#f5f5f5', borderBottomWidth: 1, borderColor: '#eee', marginBottom: 0 }]}>
-                            <Text style={styles.modalTitle}>Receipt Preview</Text>
-                            <TouchableOpacity onPress={() => setInvoiceHtml(null)}>
-                                <Icon name="times" size={20} color={COLORS?.dark} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={{ flex: 1, position: 'relative' }}>
-                            <ScrollView
-                                style={{ flex: 1 }}
-                                contentContainerStyle={{ flexGrow: 1 }}
-                                showsVerticalScrollIndicator={true}
-                            >
-                                <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.95 }} style={{ backgroundColor: '#ffffff', width: '100%' }}>
-                                    <WebView
-                                        originWhitelist={['*']}
-                                        source={{ html: invoiceHtml, baseUrl: Platform.OS === 'android' ? 'file:///android_asset/' : '' }}
-                                        style={{ width: '100%', height: receiptHeight }}
-                                        scrollEnabled={false}
-                                        nestedScrollEnabled={false}
-                                        allowFileAccess={true}
-                                        allowUniversalAccessFromFileURLs={true}
-                                        allowFileAccessFromFileURLs={true}
-                                        onLoadStart={() => setWebViewLoading(true)}
-                                        onLoadEnd={() => setWebViewLoading(false)}
-                                        injectedJavaScript={`
-                                            setTimeout(function() {
-                                                var el = document.getElementById('receipt-box') || document.body;
-                                                var rect = el.getBoundingClientRect();
-                                                var h = Math.ceil(rect.height || el.scrollHeight || 300);
-                                                window.ReactNativeWebView.postMessage(h.toString());
-                                            }, 300);
-                                            true;
-                                        `}
-                                        onMessage={(event) => {
-                                            const h = parseInt(event.nativeEvent.data, 10);
-                                            if (h && h > 150 && h < 4000) {
-                                                setReceiptHeight(h + 24);
-                                            }
-                                        }}
-                                    />
-                                </ViewShot>
-                            </ScrollView>
-                            {webViewLoading && (
-                                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center' }}>
-                                    <ActivityIndicator size="large" color="#915200" />
-                                </View>
-                            )}
-                        </View>
-
-                        <View style={{ padding: 12, borderTopWidth: 1, borderColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-                            <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: '#f0f0f0', flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }]}
-                                onPress={() => setInvoiceHtml(null)}
-                            >
-                                <Text style={{ color: COLORS?.dark, fontWeight: 'bold' }}>Close</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.modalButton, { backgroundColor: COLORS?.primary || '#915200', flex: 1, flexDirection: 'row', gap: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }]}
-                                onPress={downloadInvoiceAsJPG}
-                            >
-                                <Icon name="download" size={14} color="#fff" />
-                                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Save JPG</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            {/* Invoice / Statement Preview Overlay */}
+            {renderInvoiceOverlay()}
         </ImageBackground>
     );
 };

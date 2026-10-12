@@ -14,7 +14,8 @@ import {
     ScrollView,
     Dimensions,
     Alert,
-    Animated
+    Animated,
+    PanResponder
 } from 'react-native';
 import { COLORS } from '../styles/theme';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -22,9 +23,13 @@ import axios from 'axios';
 import { APIURL, BASE_URL } from '../constants/api';
 import { launchImageLibrary } from 'react-native-image-picker';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import ViewShot from 'react-native-view-shot';
+import Slider from '@react-native-community/slider';
 import CustomAlert from './CustomAlert';
 
 const { width } = Dimensions.get('window');
+const CROP_BOX_WIDTH = Math.min(width - 48, 340);
+const CROP_BOX_HEIGHT = Math.round((CROP_BOX_WIDTH * 9) / 16);
 
 const SkeletonAdCard = () => {
     const pulseAnim = useRef(new Animated.Value(0.5)).current;
@@ -123,9 +128,122 @@ const AdManager = ({ user }) => {
     const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
     // Date Picker State
+    const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
+    // Crop State & Gesture Refs
+    const [cropModalVisible, setCropModalVisible] = useState(false);
+    const [cropTarget, setCropTarget] = useState(null); // { type: 'new' | 'existing', index: number, uri: string, width?: number, height?: number }
+    const [imageNaturalSize, setImageNaturalSize] = useState({ width: CROP_BOX_WIDTH, height: CROP_BOX_HEIGHT });
+    const [cropScale, setCropScale] = useState(1);
+    const [fitMode, setFitMode] = useState('cover'); // 'cover' or 'contain'
+    const [isCropping, setIsCropping] = useState(false);
+    const cropPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+    const cropPanPos = useRef({ x: 0, y: 0 });
+    const cropPanOffset = useRef({ x: 0, y: 0 });
+    const cropViewShotRef = useRef(null);
+
+    const cropPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: () => {
+                cropPanOffset.current = {
+                    x: cropPanPos.current.x,
+                    y: cropPanPos.current.y
+                };
+            },
+            onPanResponderMove: (e, gestureState) => {
+                const nextX = Math.round(cropPanOffset.current.x + gestureState.dx);
+                const nextY = Math.round(cropPanOffset.current.y + gestureState.dy);
+                cropPanPos.current = { x: nextX, y: nextY };
+                cropPan.setValue({ x: nextX, y: nextY });
+            },
+            onPanResponderRelease: () => {}
+        })
+    ).current;
+
+    const handleOpenCrop = (target) => {
+        setCropTarget(target);
+        setCropScale(1);
+        setFitMode('cover');
+
+        const setupSizes = (origW, origH) => {
+            const w = origW || CROP_BOX_WIDTH;
+            const h = origH || CROP_BOX_HEIGHT;
+            setImageNaturalSize({ width: w, height: h });
+            const s = Math.max(CROP_BOX_WIDTH / w, CROP_BOX_HEIGHT / h);
+            const rW = Math.round(w * s);
+            const rH = Math.round(h * s);
+            // If image is vertical (taller than 16:9), start at top (y: 0) to show head/title!
+            // If horizontal (wider than 16:9), center horizontally
+            const initX = rW > CROP_BOX_WIDTH ? Math.round((CROP_BOX_WIDTH - rW) / 2) : 0;
+            const initY = 0; // Always start at top so head/title isn't cut off!
+            cropPanPos.current = { x: initX, y: initY };
+            cropPanOffset.current = { x: initX, y: initY };
+            cropPan.setValue({ x: initX, y: initY });
+            setCropModalVisible(true);
+        };
+
+        if (target.width && target.height) {
+            setupSizes(target.width, target.height);
+        } else if (target.uri) {
+            Image.getSize(
+                target.uri,
+                (w, h) => setupSizes(w, h),
+                () => setupSizes(CROP_BOX_WIDTH, CROP_BOX_HEIGHT)
+            );
+        } else {
+            setupSizes(CROP_BOX_WIDTH, CROP_BOX_HEIGHT);
+        }
+    };
+
+    const handleApplyCrop = async () => {
+        if (!cropViewShotRef.current || !cropTarget) return;
+        setIsCropping(true);
+        try {
+            const croppedUri = await cropViewShotRef.current.capture();
+            if (cropTarget.type === 'new') {
+                const updated = [...imageFiles];
+                updated[cropTarget.index] = {
+                    ...updated[cropTarget.index],
+                    uri: croppedUri,
+                    fileName: `cropped_ad_${Date.now()}.jpg`
+                };
+                setImageFiles(updated);
+            } else if (cropTarget.type === 'existing') {
+                const updatedExisting = existingImages.filter((_, i) => i !== cropTarget.index);
+                setExistingImages(updatedExisting);
+                setImageFiles(prev => [
+                    ...prev,
+                    {
+                        uri: croppedUri,
+                        type: 'image/jpeg',
+                        fileName: `cropped_ad_${Date.now()}.jpg`
+                    }
+                ]);
+            }
+            setCropModalVisible(false);
+            setCropTarget(null);
+            showAlert("Image Cropped", "Creative aligned to standard 16:9 banner format for user screens.", "success");
+        } catch (err) {
+            console.error("Crop error:", err);
+            showAlert("Crop Failed", "Could not crop image. Please try again.", "danger");
+        } finally {
+            setIsCropping(false);
+        }
+    };
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    const isCover = fitMode === 'cover';
+    const natW = imageNaturalSize.width || CROP_BOX_WIDTH;
+    const natH = imageNaturalSize.height || CROP_BOX_HEIGHT;
+    const coverScale = Math.max(CROP_BOX_WIDTH / natW, CROP_BOX_HEIGHT / natH);
+    const containScale = Math.min(CROP_BOX_WIDTH / natW, CROP_BOX_HEIGHT / natH);
+    const baseScale = isCover ? coverScale : containScale;
+    const renderedWidth = Math.max(1, Math.round(natW * baseScale));
+    const renderedHeight = Math.max(1, Math.round(natH * baseScale));
 
     useEffect(() => {
         if (user) fetchAds();
@@ -163,18 +281,30 @@ const AdManager = ({ user }) => {
     const handleImagePick = async () => {
         const options = {
             mediaType: 'photo',
-            quality: 0.8,
+            quality: 0.9,
             selectionLimit: 5,
-            maxWidth: 1024,
-            maxHeight: 1024,
+            maxWidth: 1920,
+            maxHeight: 1080,
         };
         const result = await launchImageLibrary(options);
         if (result.assets && result.assets.length > 0) {
-            if (result.assets.length + existingImages.length > 5) {
+            if (result.assets.length + existingImages.length + imageFiles.length > 5) {
                 showAlert("Limit Reached", "Max 5 images allowed total.", "warning");
                 return;
             }
-            setImageFiles(result.assets);
+            const startIndex = imageFiles.length;
+            const newFiles = [...imageFiles, ...result.assets];
+            setImageFiles(newFiles);
+            // If single image was selected, automatically open crop tool
+            if (result.assets.length === 1) {
+                handleOpenCrop({
+                    type: 'new',
+                    index: startIndex,
+                    uri: result.assets[0].uri,
+                    width: result.assets[0].width,
+                    height: result.assets[0].height,
+                });
+            }
         }
     };
 
@@ -203,6 +333,8 @@ const AdManager = ({ user }) => {
         setDescription('');
         setStartDate(new Date());
         setEndDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        setCropTarget(null);
+        setCropModalVisible(false);
     };
 
     const handleRemoveExistingImage = (index) => {
@@ -316,9 +448,26 @@ const AdManager = ({ user }) => {
         );
     };
 
+    const handleStartDateConfirm = (selectedDate) => {
+        setShowStartPicker(false);
+        if (selectedDate) {
+            setStartDate(selectedDate);
+            if (selectedDate > endDate) {
+                const newEnd = new Date(selectedDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+                setEndDate(newEnd);
+            }
+        }
+    };
+
     const handleEndDateConfirm = (selectedDate) => {
         setShowEndPicker(false);
-        if (selectedDate) setEndDate(selectedDate);
+        if (selectedDate) {
+            if (selectedDate < startDate) {
+                showAlert("Invalid Date", "End date cannot be earlier than start date.", "warning");
+                return;
+            }
+            setEndDate(selectedDate);
+        }
     };
 
     const renderEmptyState = () => (
@@ -366,17 +515,33 @@ const AdManager = ({ user }) => {
         </Animated.View>
     );
 
-    const renderActiveState = () => (
-        <Animated.View style={[styles.activeContainer, { opacity: fadeAnim }]}>
-            <View style={styles.activeCard}>
-                {/* Status Header */}
-                <View style={styles.cardHeader}>
-                    <View style={styles.statusContainer}>
-                        <View style={[styles.statusDot, { backgroundColor: activeAd.isActive ? COLORS?.success : COLORS?.secondary }]} />
-                        <Text style={styles.statusLabel}>{activeAd.isActive ? 'Active Campaign' : 'Paused'}</Text>
+    const renderActiveState = () => {
+        const isScheduled = activeAd?.startDate && new Date(activeAd.startDate) > new Date();
+        const isExpired = activeAd?.endDate && new Date(activeAd.endDate) < new Date();
+        let statusText = 'Active Campaign';
+        let statusColor = COLORS?.success;
+        if (!activeAd?.isActive) {
+            statusText = 'Paused';
+            statusColor = COLORS?.secondary;
+        } else if (isScheduled) {
+            statusText = `Scheduled (${formatDateToIndian(activeAd.startDate)})`;
+            statusColor = '#3B82F6';
+        } else if (isExpired) {
+            statusText = 'Expired';
+            statusColor = '#EF4444';
+        }
+
+        return (
+            <Animated.View style={[styles.activeContainer, { opacity: fadeAnim }]}>
+                <View style={styles.activeCard}>
+                    {/* Status Header */}
+                    <View style={styles.cardHeader}>
+                        <View style={styles.statusContainer}>
+                            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                            <Text style={[styles.statusLabel, isScheduled && { color: '#2563EB' }]}>{statusText}</Text>
+                        </View>
+                        <Text style={styles.frequencyBadge}>Runs every 15 min</Text>
                     </View>
-                    <Text style={styles.frequencyBadge}>Runs every 15 min</Text>
-                </View>
 
                 {/* Main Preview with Image */}
                 <View style={styles.previewContainer}>
@@ -453,6 +618,7 @@ const AdManager = ({ user }) => {
             </View>
         </Animated.View>
     );
+};
 
     return (
         <View style={styles.container}>
@@ -488,17 +654,33 @@ const AdManager = ({ user }) => {
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
                                 {existingImages.map((url, i) => (
                                     <View key={`exist-${i}`} style={styles.imagePreview}>
-                                        <Image source={{ uri: `${BASE_URL}${url}` }} style={styles.thumbImage} />
+                                        <Image source={{ uri: `${BASE_URL}${url}` }} style={styles.thumbImage} resizeMode="cover" />
                                         <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveExistingImage(i)}>
                                             <Icon name="times" size={10} color="#fff" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.cropOverlayBtn}
+                                            onPress={() => handleOpenCrop({ type: 'existing', index: i, uri: `${BASE_URL}${url}` })}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Icon name="crop-alt" size={10} color="#fff" style={{ marginRight: 3 }} />
+                                            <Text style={styles.cropOverlayText}>Crop 16:9</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ))}
                                 {imageFiles.map((file, i) => (
                                     <View key={`new-${i}`} style={styles.imagePreview}>
-                                        <Image source={{ uri: file.uri }} style={styles.thumbImage} />
+                                        <Image source={{ uri: file.uri }} style={styles.thumbImage} resizeMode="cover" />
                                         <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveNewImage(i)}>
                                             <Icon name="times" size={10} color="#fff" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.cropOverlayBtn}
+                                            onPress={() => handleOpenCrop({ type: 'new', index: i, uri: file.uri })}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Icon name="crop-alt" size={10} color="#fff" style={{ marginRight: 3 }} />
+                                            <Text style={styles.cropOverlayText}>Crop 16:9</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ))}
@@ -512,7 +694,7 @@ const AdManager = ({ user }) => {
                             <View style={styles.recommendationBox}>
                                 <Icon name="info-circle" size={14} color={COLORS.primary} />
                                 <Text style={styles.recommendationText}>
-                                    Recommended banner: 1600 × 900 px (16:9). Upload high-quality JPG, PNG, or WebP images. Maximum 5 images.
+                                    Recommended banner: 16:9 ratio. Tap "Crop 16:9" on any photo to fit standard user dashboard banner format. Maximum 5 images.
                                 </Text>
                             </View>
 
@@ -557,10 +739,10 @@ const AdManager = ({ user }) => {
                             <View style={styles.row}>
                                 <View style={styles.col}>
                                     <Text style={styles.label}>Start Date</Text>
-                                    <View style={[styles.dateInput, { backgroundColor: '#f0f2f5' }]}>
-                                        <Text style={[styles.dateText, { color: COLORS?.secondary }]}>{formatDateToIndian(startDate)}</Text>
-                                        <Icon name="calendar-alt" size={14} color={COLORS?.secondary} />
-                                    </View>
+                                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
+                                        <Text style={styles.dateText}>{formatDateToIndian(startDate)}</Text>
+                                        <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
+                                    </TouchableOpacity>
                                 </View>
                                 <View style={styles.col}>
                                     <Text style={styles.label}>End Date</Text>
@@ -570,6 +752,14 @@ const AdManager = ({ user }) => {
                                     </TouchableOpacity>
                                 </View>
                             </View>
+
+                            <DateTimePickerModal
+                                isVisible={showStartPicker}
+                                mode="date"
+                                date={startDate}
+                                onConfirm={handleStartDateConfirm}
+                                onCancel={() => setShowStartPicker(false)}
+                            />
 
                             <DateTimePickerModal
                                 isVisible={showEndPicker}
@@ -593,6 +783,206 @@ const AdManager = ({ user }) => {
 
                             <View style={{ height: 40 }} />
                         </ScrollView>
+                    </View>
+                </Modal>
+
+                {/* 16:9 Image Crop Modal */}
+                <Modal visible={cropModalVisible} transparent animationType="fade" onRequestClose={() => setCropModalVisible(false)}>
+                    <View style={styles.cropModalBackdrop}>
+                        <View style={styles.cropModalContainer}>
+                            <View style={styles.cropModalHeader}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.cropModalTitle}>Crop Ad Banner (16:9)</Text>
+                                    <Text style={styles.cropModalSubtitle}>Drag to pan, use slider to zoom. Formats for user dashboard.</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setCropModalVisible(false)} style={styles.cropCloseBtn}>
+                                    <Icon name="times" size={16} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Viewport Box */}
+                            <View style={styles.cropViewportOuter}>
+                                <View
+                                    style={[styles.cropViewportBox, { width: CROP_BOX_WIDTH, height: CROP_BOX_HEIGHT }]}
+                                    {...cropPanResponder.panHandlers}
+                                >
+                                    <ViewShot
+                                        ref={cropViewShotRef}
+                                        options={{ format: "jpg", quality: 0.95 }}
+                                        style={{
+                                            width: CROP_BOX_WIDTH,
+                                            height: CROP_BOX_HEIGHT,
+                                            backgroundColor: '#0F172A',
+                                            overflow: 'hidden',
+                                            position: 'relative',
+                                        }}
+                                    >
+                                        <Animated.View
+                                            style={{
+                                                position: 'absolute',
+                                                left: 0,
+                                                top: 0,
+                                                width: renderedWidth,
+                                                height: renderedHeight,
+                                                transform: [
+                                                    { translateX: cropPan.x },
+                                                    { translateY: cropPan.y },
+                                                    { scale: cropScale }
+                                                ],
+                                            }}
+                                        >
+                                            {cropTarget?.uri ? (
+                                                <Image
+                                                    source={{ uri: cropTarget.uri }}
+                                                    style={{ width: renderedWidth, height: renderedHeight }}
+                                                    resizeMode="stretch"
+                                                />
+                                            ) : null}
+                                        </Animated.View>
+                                    </ViewShot>
+
+                                    {/* Grid Overlay */}
+                                    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                                        <View style={styles.cropGridH1} />
+                                        <View style={styles.cropGridH2} />
+                                        <View style={styles.cropGridV1} />
+                                        <View style={styles.cropGridV2} />
+                                        <View style={styles.cropBadge}>
+                                            <Icon name="crop-alt" size={10} color="#fff" style={{ marginRight: 4 }} />
+                                            <Text style={styles.cropBadgeText}>16:9 Banner</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Zoom & Presets */}
+                            <View style={styles.cropControls}>
+                                <View style={styles.zoomRow}>
+                                    <TouchableOpacity
+                                        onPress={() => setCropScale(s => Math.max(0.8, Number((s - 0.1).toFixed(2))))}
+                                        style={styles.zoomBtn}
+                                    >
+                                        <Icon name="search-minus" size={14} color="#64748B" />
+                                    </TouchableOpacity>
+                                    <Slider
+                                        style={{ flex: 1, marginHorizontal: 8, height: 40 }}
+                                        minimumValue={0.8}
+                                        maximumValue={3.0}
+                                        step={0.05}
+                                        value={cropScale}
+                                        onValueChange={val => setCropScale(Number(val.toFixed(2)))}
+                                        minimumTrackTintColor={COLORS?.primary}
+                                        maximumTrackTintColor="#CBD5E1"
+                                        thumbTintColor={COLORS?.primary}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setCropScale(s => Math.min(3.0, Number((s + 0.1).toFixed(2))))}
+                                        style={styles.zoomBtn}
+                                    >
+                                        <Icon name="search-plus" size={14} color="#64748B" />
+                                    </TouchableOpacity>
+                                    <Text style={styles.zoomText}>{Math.round(cropScale * 100)}%</Text>
+                                </View>
+
+                                <View style={styles.presetRow}>
+                                    <TouchableOpacity
+                                        style={[styles.presetBtn, fitMode === 'cover' && styles.presetBtnActive]}
+                                        onPress={() => {
+                                            setFitMode('cover');
+                                            setCropScale(1);
+                                            const s = Math.max(CROP_BOX_WIDTH / natW, CROP_BOX_HEIGHT / natH);
+                                            const rW = Math.round(natW * s);
+                                            const initX = rW > CROP_BOX_WIDTH ? Math.round((CROP_BOX_WIDTH - rW) / 2) : 0;
+                                            cropPanPos.current = { x: initX, y: 0 };
+                                            cropPan.setValue({ x: initX, y: 0 });
+                                        }}
+                                    >
+                                        <Icon name="arrow-up" size={11} color={fitMode === 'cover' ? '#fff' : '#64748B'} style={{ marginRight: 4 }} />
+                                        <Text style={[styles.presetBtnText, fitMode === 'cover' && styles.presetBtnTextActive]}>Top</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.presetBtn}
+                                        onPress={() => {
+                                            setFitMode('cover');
+                                            setCropScale(1);
+                                            const s = Math.max(CROP_BOX_WIDTH / natW, CROP_BOX_HEIGHT / natH);
+                                            const rW = Math.round(natW * s);
+                                            const rH = Math.round(natH * s);
+                                            const initX = Math.round((CROP_BOX_WIDTH - rW) / 2);
+                                            const initY = Math.round((CROP_BOX_HEIGHT - rH) / 2);
+                                            cropPanPos.current = { x: initX, y: initY };
+                                            cropPan.setValue({ x: initX, y: initY });
+                                        }}
+                                    >
+                                        <Icon name="arrows-alt-v" size={11} color="#64748B" style={{ marginRight: 4 }} />
+                                        <Text style={styles.presetBtnText}>Center</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.presetBtn}
+                                        onPress={() => {
+                                            setFitMode('cover');
+                                            setCropScale(1);
+                                            const s = Math.max(CROP_BOX_WIDTH / natW, CROP_BOX_HEIGHT / natH);
+                                            const rW = Math.round(natW * s);
+                                            const rH = Math.round(natH * s);
+                                            const initX = Math.round((CROP_BOX_WIDTH - rW) / 2);
+                                            const initY = Math.round(CROP_BOX_HEIGHT - rH);
+                                            cropPanPos.current = { x: initX, y: initY };
+                                            cropPan.setValue({ x: initX, y: initY });
+                                        }}
+                                    >
+                                        <Icon name="arrow-down" size={11} color="#64748B" style={{ marginRight: 4 }} />
+                                        <Text style={styles.presetBtnText}>Bottom</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.presetBtn, fitMode === 'contain' && styles.presetBtnActive]}
+                                        onPress={() => {
+                                            setFitMode('contain');
+                                            setCropScale(1);
+                                            const s = Math.min(CROP_BOX_WIDTH / natW, CROP_BOX_HEIGHT / natH);
+                                            const cW = Math.round(natW * s);
+                                            const cH = Math.round(natH * s);
+                                            const initX = Math.round((CROP_BOX_WIDTH - cW) / 2);
+                                            const initY = Math.round((CROP_BOX_HEIGHT - cH) / 2);
+                                            cropPanPos.current = { x: initX, y: initY };
+                                            cropPan.setValue({ x: initX, y: initY });
+                                        }}
+                                    >
+                                        <Icon name="compress" size={11} color={fitMode === 'contain' ? '#fff' : '#64748B'} style={{ marginRight: 4 }} />
+                                        <Text style={[styles.presetBtnText, fitMode === 'contain' && styles.presetBtnTextActive]}>Fit Full</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Actions */}
+                            <View style={styles.cropActionsRow}>
+                                <TouchableOpacity
+                                    style={styles.cropCancelBtn}
+                                    onPress={() => setCropModalVisible(false)}
+                                    disabled={isCropping}
+                                >
+                                    <Text style={styles.cropCancelText}>Cancel</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.cropSaveBtn, isCropping && { opacity: 0.7 }]}
+                                    onPress={handleApplyCrop}
+                                    disabled={isCropping}
+                                >
+                                    {isCropping ? (
+                                        <ActivityIndicator size="small" color="#fff" />
+                                    ) : (
+                                        <>
+                                            <Icon name="check" size={14} color="#fff" style={{ marginRight: 6 }} />
+                                            <Text style={styles.cropSaveText}>Apply Crop</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     </View>
                 </Modal>
 
@@ -922,12 +1312,13 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     imagePreview: {
-        width: 100,
-        height: 100,
+        width: 120,
+        height: 80,
         marginRight: 10,
         borderRadius: 12,
         overflow: 'hidden',
         position: 'relative',
+        backgroundColor: '#0F172A',
     },
     thumbImage: {
         width: '100%',
@@ -937,19 +1328,37 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 4,
         right: 4,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        backgroundColor: 'rgba(0,0,0,0.65)',
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2,
+    },
+    cropOverlayBtn: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.75)',
+        paddingVertical: 3,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
     },
+    cropOverlayText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
     addImageBtn: {
-        width: 100,
-        height: 100,
+        width: 120,
+        height: 80,
         borderRadius: 12,
         borderWidth: 2,
         borderColor: '#ddd',
+        borderStyle: 'dashed',
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#fafafa',
@@ -1025,6 +1434,188 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: 'center',
         fontWeight: 'bold',
+    },
+
+    // 16:9 Image Crop Modal Styles
+    cropModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 16,
+    },
+    cropModalContainer: {
+        width: '100%',
+        maxWidth: 380,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    cropModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 14,
+    },
+    cropModalTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#0F172A',
+    },
+    cropModalSubtitle: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    cropCloseBtn: {
+        padding: 6,
+    },
+    cropViewportOuter: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 10,
+    },
+    cropViewportBox: {
+        borderRadius: 14,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: COLORS?.primary,
+        backgroundColor: '#0F172A',
+        position: 'relative',
+    },
+    cropGridH1: {
+        position: 'absolute',
+        top: '33.33%',
+        left: 0,
+        right: 0,
+        height: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    },
+    cropGridH2: {
+        position: 'absolute',
+        top: '66.66%',
+        left: 0,
+        right: 0,
+        height: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    },
+    cropGridV1: {
+        position: 'absolute',
+        left: '33.33%',
+        top: 0,
+        bottom: 0,
+        width: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    },
+    cropGridV2: {
+        position: 'absolute',
+        left: '66.66%',
+        top: 0,
+        bottom: 0,
+        width: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    },
+    cropBadge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 12,
+    },
+    cropBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    cropControls: {
+        marginTop: 10,
+    },
+    zoomRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    zoomBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    zoomText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#475569',
+        width: 40,
+        textAlign: 'right',
+    },
+    presetRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    presetBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: '#F1F5F9',
+    },
+    presetBtnActive: {
+        backgroundColor: COLORS?.primary,
+    },
+    presetBtnText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#475569',
+    },
+    presetBtnTextActive: {
+        color: '#fff',
+    },
+    cropActionsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 4,
+    },
+    cropCancelBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cropCancelText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    cropSaveBtn: {
+        flex: 1.5,
+        flexDirection: 'row',
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: COLORS?.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cropSaveText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#fff',
     },
 });
 

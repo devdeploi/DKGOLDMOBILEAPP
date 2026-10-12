@@ -58,5 +58,14 @@ target 'JewelMobileApp' do
         end
       end
     end
+
+    # Strip EXCLUDED_ARCHS from all xcconfigs so Apple Silicon simulators work
+    Dir.glob("#{installer.sandbox.target_support_files_dir}/**/*.xcconfig").each do |path|
+      content = File.read(path)
+      if content.include?('EXCLUDED_ARCHS')
+        new_content = content.lines.reject { |line| line.include?('EXCLUDED_ARCHS') }.join
+        File.open(path, 'w') { |f| f.write(new_content) }
+      end
+    end
   end
 end

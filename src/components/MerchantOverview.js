@@ -324,8 +324,70 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh, fetc
         return paymentItem.user?.acc_no || null;
     };
 
+    const getPaymentTypeInfo = (paymentItem) => {
+        if (!paymentItem) {
+            return {
+                label: 'Razorpay',
+                color: '#2563EB',
+                bg: '#EFF6FF',
+                icon: 'globe'
+            };
+        }
+
+        const rawType = (paymentItem.type || '').toString().trim().toUpperCase();
+        const method = (paymentItem.paymentDetails?.method || '').toString().trim().toLowerCase();
+        const paymentId = (paymentItem.paymentId || paymentItem.paymentDetails?.transactionId || '').toString();
+
+        const isCash = rawType === 'CASH' || method === 'cash';
+        const isUPI = rawType === 'UPI' || rawType === 'OFFLINE' || method === 'upi';
+        const isRazorpay = rawType === 'ONLINE' || rawType === 'RAZORPAY' || method === 'razorpay' || paymentId.startsWith('pay_');
+
+        if (isCash) {
+            return {
+                label: 'Cash',
+                color: '#D97706',
+                bg: '#FEF3C7',
+                icon: 'money-bill-wave'
+            };
+        }
+        if (isUPI) {
+            return {
+                label: 'UPI',
+                color: '#10B981',
+                bg: '#ECFDF5',
+                icon: 'qrcode'
+            };
+        }
+        if (isRazorpay) {
+            return {
+                label: 'Razorpay',
+                color: '#2563EB',
+                bg: '#EFF6FF',
+                icon: 'globe'
+            };
+        }
+
+        if (rawType && rawType !== 'UNKNOWN') {
+            const formatted = rawType.charAt(0) + rawType.slice(1).toLowerCase();
+            return {
+                label: formatted,
+                color: '#2563EB',
+                bg: '#EFF6FF',
+                icon: 'globe'
+            };
+        }
+
+        return {
+            label: 'Razorpay',
+            color: '#2563EB',
+            bg: '#EFF6FF',
+            icon: 'globe'
+        };
+    };
+
     const renderRecentItem = ({ item }) => {
         const displayAccNo = getPlanScopedAccNo(item);
+        const payType = getPaymentTypeInfo(item);
         return (
             <View style={styles.recentItem}>
                 <View style={[styles.avatarPlaceholder, { backgroundColor: '#F1F5F9' }]}>
@@ -348,7 +410,13 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh, fetc
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.recentAmount}>₹{item.amount?.toLocaleString()}</Text>
-                    <Text style={styles.recentDate}>{formatDate(item.paymentDate || item.date, true)}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+                        <View style={[styles.paymentBadge, { backgroundColor: payType.bg }]}>
+                            <Icon name={payType.icon} size={8} color={payType.color} style={{ marginRight: 3 }} />
+                            <Text style={[styles.paymentBadgeText, { color: payType.color }]}>{payType.label}</Text>
+                        </View>
+                        <Text style={[styles.recentDate, { marginTop: 0 }]}>{formatDate(item.paymentDate || item.date, true)}</Text>
+                    </View>
                 </View>
             </View>
         );
@@ -1220,6 +1288,18 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#94A3B8',
         marginTop: 2
+    },
+    paymentBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 5,
+        paddingVertical: 1.5,
+        borderRadius: 4,
+        marginRight: 6
+    },
+    paymentBadgeText: {
+        fontSize: 9,
+        fontWeight: '700'
     },
     listDivider: {
         height: 1,

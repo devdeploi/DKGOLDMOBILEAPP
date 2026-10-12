@@ -286,6 +286,58 @@ const MerchantPlans = ({ user, loadingPlans, plans: propPlans, onPlanCreated, on
         setAlertConfig(prev => ({ ...prev, visible: false }));
     };
 
+    const renderInModalAlert = () => {
+        if (!alertConfig.visible) return null;
+        return (
+            <View style={[StyleSheet.absoluteFill, styles.inModalAlertOverlay]}>
+                <View style={styles.inModalAlertCard}>
+                    <View style={[styles.inModalAlertIconWrap, {
+                        backgroundColor: alertConfig.type === 'warning' ? '#FEF2F2' : alertConfig.type === 'error' ? '#FEF2F2' : '#EFF6FF'
+                    }]}>
+                        <Icon
+                            name={alertConfig.type === 'warning' ? 'exclamation-triangle' : alertConfig.type === 'error' ? 'times-circle' : 'info-circle'}
+                            size={28}
+                            color={alertConfig.type === 'warning' ? '#DC2626' : alertConfig.type === 'error' ? '#DC2626' : (COLORS?.primary || '#915200')}
+                        />
+                    </View>
+                    <Text style={styles.inModalAlertTitle}>{alertConfig.title}</Text>
+                    <Text style={styles.inModalAlertMessage}>{alertConfig.message}</Text>
+                    <View style={styles.inModalAlertButtons}>
+                        {alertConfig.buttons && alertConfig.buttons.length > 0 ? (
+                            alertConfig.buttons.map((btn, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={[
+                                        styles.inModalAlertBtn,
+                                        btn.style === 'cancel' ? styles.inModalAlertBtnCancel : styles.inModalAlertBtnDestructive
+                                    ]}
+                                    onPress={() => {
+                                        if (btn.onPress) btn.onPress();
+                                        else hideAlert();
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.inModalAlertBtnText,
+                                        btn.style === 'cancel' ? styles.inModalAlertBtnTextCancel : styles.inModalAlertBtnTextDestructive
+                                    ]}>
+                                        {btn.text}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.inModalAlertBtn, styles.inModalAlertBtnPrimary]}
+                                onPress={hideAlert}
+                            >
+                                <Text style={styles.inModalAlertBtnTextPrimary}>OK</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
     // Derived State
     // Simplified Logic: No KYC or Plan Limits
     const canCreatePlan = true;
@@ -747,6 +799,7 @@ const MerchantPlans = ({ user, loadingPlans, plans: propPlans, onPlanCreated, on
                             </>
                         )}
                     </View>
+                    {renderInModalAlert()}
                 </View>
             </Modal>
 
@@ -807,17 +860,17 @@ const MerchantPlans = ({ user, loadingPlans, plans: propPlans, onPlanCreated, on
                                             style={{ maxHeight: 350 }}
                                             renderItem={({ item: sub }) => (
                                                 <View style={styles.subscriberItem}>
-                                                    <View style={styles.subInfoMain}>
+                                                    <View style={[styles.subInfoMain, { flex: 1, marginRight: 8 }]}>
                                                         <View style={styles.subAvatar}>
                                                             <Text style={styles.subAvatarText}>{sub.user?.name?.charAt(0).toUpperCase()}</Text>
                                                         </View>
-                                                        <View>
-                                                            <Text style={styles.subName}>{sub.user?.name}</Text>
-                                                            <Text style={styles.subAccNo}>Acc: {sub.acc_no || sub.user?.acc_no || 'N/A'}</Text>
+                                                        <View style={{ flex: 1, justifyContent: 'center' }}>
+                                                            <Text style={styles.subName} numberOfLines={1} ellipsizeMode="tail">{sub.user?.name}</Text>
+                                                            <Text style={styles.subAccNo} numberOfLines={1}>Acc: {sub.acc_no || sub.user?.acc_no || 'N/A'}</Text>
                                                         </View>
                                                     </View>
-                                                    <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 10 }}>
-                                                        <View style={{ alignItems: 'flex-end' }}>
+                                                    <View style={{ alignItems: 'center', flexDirection: 'row', gap: 8, flexShrink: 0 }}>
+                                                        <View style={{ alignItems: 'flex-end', minWidth: 55 }}>
                                                             <Text style={styles.subPaid}>₹{sub.totalPaid}</Text>
                                                             <View style={[styles.statusTag, { backgroundColor: sub.status === 'active' ? '#C6F6D5' : '#FEEBC8' }]}>
                                                                 <Text style={[styles.statusTagText, { color: sub.status === 'active' ? '#2F855A' : '#C05621' }]}>{sub.status}</Text>
@@ -827,6 +880,7 @@ const MerchantPlans = ({ user, loadingPlans, plans: propPlans, onPlanCreated, on
                                                         {!user?.isStaff && (
                                                             <TouchableOpacity
                                                                 onPress={() => handleDeleteSubscriber(sub)}
+                                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                                                 style={{
                                                                     width: 32,
                                                                     height: 32,
@@ -878,12 +932,13 @@ const MerchantPlans = ({ user, loadingPlans, plans: propPlans, onPlanCreated, on
                             <Text style={styles.closeModalBtnText}>Done</Text>
                         </TouchableOpacity>
                     </View>
+                    {renderInModalAlert()}
                 </View>
             </Modal>
 
             <Toast />
             <CustomAlert
-                visible={alertConfig.visible}
+                visible={!showDetailsModal && !showCreatePlanModal && alertConfig.visible}
                 title={alertConfig.title}
                 message={alertConfig.message}
                 type={alertConfig.type}
@@ -1376,7 +1431,83 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 16
-    }
+    },
+    inModalAlertOverlay: {
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999,
+        padding: 20,
+    },
+    inModalAlertCard: {
+        width: '90%',
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    inModalAlertIconWrap: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    inModalAlertTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1a202c',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+    inModalAlertMessage: {
+        fontSize: 14,
+        color: '#4a5568',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 20,
+    },
+    inModalAlertButtons: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        width: '100%',
+        gap: 12,
+    },
+    inModalAlertBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    inModalAlertBtnCancel: {
+        backgroundColor: '#F3F4F6',
+    },
+    inModalAlertBtnDestructive: {
+        backgroundColor: '#DC2626',
+    },
+    inModalAlertBtnPrimary: {
+        backgroundColor: COLORS?.primary || '#915200',
+    },
+    inModalAlertBtnText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    inModalAlertBtnTextCancel: {
+        color: '#4B5563',
+    },
+    inModalAlertBtnTextDestructive: {
+        color: '#FFFFFF',
+    },
+    inModalAlertBtnTextPrimary: {
+        color: '#FFFFFF',
+    },
 });
 
 export default MerchantPlans;
