@@ -256,8 +256,25 @@ const MerchantUsers = ({ user }) => {
 
     const executeSettlement = async () => {
         if (!selectedWithdrawalRequest) return;
-        if (!settlementForm.amount || !settlementForm.type) {
-            showCustomAlert("Error", "Please enter amount and select a settlement type", "error");
+        if (!settlementForm.type) {
+            showCustomAlert("Error", "Please select a settlement type", "error");
+            return;
+        }
+
+        if (settlementForm.type === 'Gold') {
+            if (!settlementForm.goldWeight || !settlementForm.amount) {
+                showCustomAlert("Error", "Please enter both total gram and total amount for gold settlement", "error");
+                return;
+            }
+        } else {
+            if (!settlementForm.amount) {
+                showCustomAlert("Error", "Please enter total settling cash", "error");
+                return;
+            }
+        }
+
+        if (!settlementForm.receiptImage) {
+            showCustomAlert("Error", "Please upload a receipt image", "error");
             return;
         }
 
@@ -292,6 +309,8 @@ const MerchantUsers = ({ user }) => {
                 userId: selectedWithdrawalRequest.user._id,
                 subscriptionId: selectedWithdrawalRequest._id || selectedWithdrawalRequest.subscriberId,
                 amount: settlementForm.amount,
+                goldWeight: settlementForm.type === 'Gold' ? (settlementForm.goldWeight || '') : '',
+                type: settlementForm.type,
                 settlementType: settlementForm.type,
                 transactionId: settlementForm.transactionId || '',
                 note: settlementForm.note || '',
@@ -345,11 +364,14 @@ const MerchantUsers = ({ user }) => {
     const executeDelivery = async () => {
         if (!selectedForDelivery) return;
         
-        if (deliveryForm.isPartial) {
-            if (!deliveryForm.goldWeight && !deliveryForm.amount) {
-                showCustomAlert("Error", "Please enter gold weight or amount for partial delivery", "error");
-                return;
-            }
+        if (!deliveryForm.goldWeight || !deliveryForm.amount) {
+            showCustomAlert("Error", "Please enter both total gram and total amount for delivery", "error");
+            return;
+        }
+
+        if (!deliveryForm.receiptImage) {
+            showCustomAlert("Error", "Please upload a receipt image", "error");
+            return;
         }
 
         setSubmittingDelivery(true);
@@ -379,6 +401,9 @@ const MerchantUsers = ({ user }) => {
 
         setSubmittingDeliveryOtp(true);
         try {
+            const selectedPayments = undeliveredPayments.filter(pay => (deliveryForm.paymentIds || []).includes(pay._id));
+            const selectedPaidTotal = selectedPayments.reduce((acc, pay) => acc + (pay.amount || 0), 0);
+
             const payload = {
                 userId: selectedForDelivery.user._id,
                 subscriptionId: selectedForDelivery._id || selectedForDelivery.subscriberId,
@@ -386,6 +411,7 @@ const MerchantUsers = ({ user }) => {
                 deliveryType: deliveryForm.type,
                 goldWeight: deliveryForm.goldWeight || '',
                 amount: deliveryForm.amount || '',
+                deductedPaidAmount: deliveryForm.isPartial ? selectedPaidTotal : (deliveryForm.amount || ''),
                 paymentIds: deliveryForm.paymentIds || [],
                 transactionId: deliveryForm.transactionId || '',
                 notes: deliveryForm.notes || '',
@@ -635,6 +661,7 @@ const MerchantUsers = ({ user }) => {
     const [selectedWithdrawalRequest, setSelectedWithdrawalRequest] = useState(null);
     const [settlementForm, setSettlementForm] = useState({
         amount: '',
+        goldWeight: '',
         type: '',
         note: '',
         transactionId: '',
@@ -824,13 +851,6 @@ const MerchantUsers = ({ user }) => {
     const handleResendOtp = async (type) => {
         let planId, userId;
         if (type === 'settlement' && selectedWithdrawalRequest) {
-            setSettlementForm({
-                amount: '',
-                type: '',
-                note: '',
-                transactionId: '',
-                date: new Date()
-            });
             planId = selectedWithdrawalRequest.plan._id;
             userId = selectedWithdrawalRequest.user._id;
         } else if (type === 'delivery' && selectedForDelivery) {
@@ -1440,6 +1460,12 @@ const MerchantUsers = ({ user }) => {
                             <td style="padding: 10px; border-bottom: 1px solid #eee;">Settlement Amount</td>
                             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee; font-weight: bold;">Rs. ${Number(settlementData.amount).toFixed(2)}</td>
                         </tr>
+                        ${settlementData.goldWeight ? `
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Gold Weight</td>
+                            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee; font-weight: bold;">${Number(settlementData.goldWeight).toFixed(3)}g</td>
+                        </tr>
+                        ` : ''}
                         <tr>
                             <td style="padding: 10px; border-bottom: 1px solid #eee;">Settlement Type</td>
                             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${settlementData.type || 'Cash'}</td>
@@ -1546,7 +1572,7 @@ const MerchantUsers = ({ user }) => {
                             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${Number(deliveryData.goldWeight).toFixed(3)}g</td>
                         </tr>
                          <tr>
-                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Amount Value</td>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Settlement Value</td>
                             <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">Rs. ${Number(deliveryData.amount).toLocaleString()}</td>
                         </tr>
                         <tr>
@@ -1573,6 +1599,106 @@ const MerchantUsers = ({ user }) => {
             `;
 
             await createAndDownloadPDF(html, `PartialDelivery_${subscriber.user.name}_${Date.now()}`);
+        } catch (error) {
+            console.error(error);
+            showCustomAlert("Error", "Failed to generate receipt", "error");
+        } finally {
+            setGeneratingReceipt(false);
+        }
+    };
+
+    const generateDeliveryReceipt = async (subscriber, deliveryData) => {
+        setGeneratingReceipt(true);
+        try {
+            let dkLogoImgTag = 'DK';
+            let safproLogoImgTag = 'Safpro';
+            let shopLogoImgTag = '';
+
+            if (Platform.OS === 'android') {
+                try {
+                    const dkBase64 = await RNFS.readFileAssets('DK.png', 'base64');
+                    if (dkBase64) dkLogoImgTag = `<img src="data:image/png;base64,${dkBase64}" style="width: 70px; height: auto;" />`;
+                } catch (e) {
+                    console.log("Could not read asset DK.png:", e);
+                }
+                try {
+                    const safproBase64 = await RNFS.readFileAssets('Safpro-logo.png', 'base64');
+                    if (safproBase64) safproLogoImgTag = `<img src="data:image/png;base64,${safproBase64}" style="width: 120px; height: auto;" />`;
+                } catch (e) {
+                    console.log("Could not read asset Safpro-logo.png:", e);
+                }
+            }
+
+            if (dkLogoImgTag === 'DK') {
+                const dkLogoUrl = Image.resolveAssetSource(dkLogo).uri;
+                const dkLogoBase64 = await fetchImageAsBase64(dkLogoUrl);
+                if (dkLogoBase64) dkLogoImgTag = `<img src="${dkLogoBase64}" style="width: 70px; height: auto;" />`;
+            }
+
+            if (safproLogoImgTag === 'Safpro') {
+                const safproLogoUrl = Image.resolveAssetSource(safproLogo).uri;
+                const safproLogoBase64 = await fetchImageAsBase64(safproLogoUrl);
+                if (safproLogoBase64) safproLogoImgTag = `<img src="${safproLogoBase64}" style="width: 120px; height: auto;" />`;
+            }
+
+            if (user.shopLogo) {
+                const shopLogoBase64 = await fetchImageAsBase64(`${BASE_URL}${user.shopLogo}`);
+                if (shopLogoBase64) shopLogoImgTag = `<img src="${shopLogoBase64}" style="width: 70px; height: auto;" />`;
+            }
+
+            const html = `
+                <html>
+                <body style="font-family: Helvetica; padding: 20px;">
+                    <div style="text-align: center; border-bottom: 2px solid #915200; padding-bottom: 20px; margin-bottom: 20px;">
+                        ${shopLogoImgTag || dkLogoImgTag}
+                        <h2 style="color: #915200; margin: 10px 0;">${user.name.toUpperCase()}</h2>
+                        <h3 style="margin: 5px 0;">FINAL GOLD DELIVERY RECEIPT</h3>
+                        <p style="color: #666; font-size: 12px;">Date: ${new Date().toLocaleDateString('en-IN')}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <p><strong>To:</strong> ${subscriber.user.name.toUpperCase()}</p>
+                        <p><strong>Plan:</strong> ${subscriber.plan.planName}</p>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr style="background-color: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Details</th>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Delivery Type</td>
+                            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${deliveryData.type || 'Gold'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Gold Delivered</td>
+                            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee; font-weight: bold;">${Number(deliveryData.goldWeight).toFixed(3)}g</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Settlement Value</td>
+                            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee; font-weight: bold;">Rs. ${Number(deliveryData.amount).toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Transaction Ref</td>
+                            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${deliveryData.transactionId || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #eee;">Notes</td>
+                            <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${deliveryData.notes || 'Full delivery completed'}</td>
+                        </tr>
+                    </table>
+
+                    <div style="text-align: center; margin-top: 40px; color: #888; font-size: 12px;">
+                        <p>This receipt acknowledges final delivery and full settlement of the chit plan.</p>
+                        <div style="margin-top: 20px;">
+                            ${safproLogoImgTag}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            await createAndDownloadPDF(html, `Delivery_${subscriber.user.name}_${Date.now()}`);
         } catch (error) {
             console.error(error);
             showCustomAlert("Error", "Failed to generate receipt", "error");
@@ -1946,14 +2072,15 @@ const MerchantUsers = ({ user }) => {
         if (searchQuery) {
             const lower = searchQuery.toLowerCase();
             result = result.filter(sub => {
+                const subAcc = String(sub.subscription?.acc_no || sub.acc_no || sub.user?.acc_no || '').toLowerCase();
                 if (searchType === 'phone') {
                     return (sub.user?.phone || '').includes(lower);
                 } else if (searchType === 'acc_no') {
-                    return (sub.user?.acc_no || '').toLowerCase().includes(lower);
+                    return subAcc.includes(lower);
                 } else {
                     return (sub.user?.name?.toLowerCase() || '').includes(lower) ||
                            (sub.user?.phone || '').includes(lower) ||
-                           (sub.user?.acc_no || '').toLowerCase().includes(lower) ||
+                           subAcc.includes(lower) ||
                            (sub.plan?.planName?.toLowerCase() || '').includes(lower);
                 }
             });
@@ -1977,8 +2104,8 @@ const MerchantUsers = ({ user }) => {
 
             const isFiltered = searchQuery || statusFilter !== 'all' || planFilter !== 'all';
             if (sortBy === 'acc_no' || isFiltered) {
-                const accA = String(a.user?.acc_no || a.subscription?.acc_no || '').trim();
-                const accB = String(b.user?.acc_no || b.subscription?.acc_no || '').trim();
+                const accA = String(a.subscription?.acc_no || a.acc_no || a.user?.acc_no || '').trim();
+                const accB = String(b.subscription?.acc_no || b.acc_no || b.user?.acc_no || '').trim();
                 if (!accA && !accB) return 0;
                 if (!accA) return 1;
                 if (!accB) return -1;
@@ -2112,19 +2239,27 @@ const MerchantUsers = ({ user }) => {
         const planName = (subscriber.plan?.planName || '').toLowerCase();
         const isUnlimited = planName.includes('unlimited') || planName.includes('infinity') || subscriber.plan?.type === 'unlimited';
         
+        const subData = subscriber.subscription || subscriber;
+        const totalGold = subData.totalGoldWeight || 0;
+        const deliveredGold = subData.deliveredGoldWeight || 0;
+        const remainingGold = Math.max(0, totalGold - deliveredGold);
+
+        const totalPaid = subData.totalAmountPaid || subData.totalPaid || 0;
+        const deliveredAmt = subData.deliveredAmount || 0;
+        const remainingAmt = Math.max(0, totalPaid - deliveredAmt);
+
         setDeliveryForm({
             isPartial: isUnlimited,
             type: 'Gold',
-            goldWeight: '',
-            amount: '',
+            goldWeight: isUnlimited ? '' : (remainingGold > 0 ? remainingGold.toFixed(3) : ''),
+            amount: isUnlimited ? '' : (remainingAmt > 0 ? remainingAmt.toString() : ''),
             notes: '',
             paymentIds: [],
-            transactionId: ''
+            transactionId: '',
+            receiptImage: null
         });
         
-        if (isUnlimited) {
-            fetchUndeliveredPayments(subscriber);
-        }
+        fetchUndeliveredPayments(subscriber);
         setDeliveryModalVisible(true);
     };
 
@@ -2378,10 +2513,10 @@ const MerchantUsers = ({ user }) => {
                         <Text style={styles.userName}>{(item.user?.name?.length > 10 ? item.user.name.substring(0, 10) + '...' : item.user?.name) || 'Unknown'}</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Text style={styles.userPhone}>{item.user?.phone}</Text>
-                            {item.user?.acc_no && (
+                            {(item.subAccNo || item.subscription?.acc_no || item.acc_no || item.user?.acc_no) && (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, backgroundColor: '#f0f0f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                     <Icon name="university" size={8} color="#666" style={{ marginRight: 4 }} />
-                                    <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{item.user.acc_no}</Text>
+                                    <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{item.subAccNo || item.subscription?.acc_no || item.acc_no || item.user.acc_no}</Text>
                                 </View>
                             )}
                         </View>
@@ -2484,10 +2619,10 @@ const MerchantUsers = ({ user }) => {
                                 <Text style={styles.withdrawalUserName}>{item.user?.name}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={styles.withdrawalUserPhone}>{item.user?.phone}</Text>
-                                    {item.user?.acc_no && (
+                                    {(item.subscription?.acc_no || item.acc_no || item.user?.acc_no) && (
                                         <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, backgroundColor: '#f0f0f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                             <Icon name="university" size={8} color="#666" style={{ marginRight: 4 }} />
-                                            <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{item.user.acc_no}</Text>
+                                            <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{item.subscription?.acc_no || item.acc_no || item.user.acc_no}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -2547,8 +2682,12 @@ const MerchantUsers = ({ user }) => {
                             onPress={() => {
                                 setSelectedWithdrawalRequest(item);
                                 const defaultType = item.plan?.returnType || item.chitPlan?.returnType || 'Cash';
+                                const subData = item.subscription || item;
+                                const totalPaid = Math.max(0, (subData.totalAmountPaid || 0) - (subData.deliveredAmount || 0));
+                                const totalGold = Math.max(0, (subData.totalGoldWeight || 0) - (subData.deliveredGoldWeight || 0));
                                 setSettlementForm({
-                                    amount: (item.subscription.totalAmountPaid || 0).toString(),
+                                    amount: totalPaid > 0 ? totalPaid.toString() : (subData.totalAmountPaid || 0).toString(),
+                                    goldWeight: totalGold > 0 ? totalGold.toFixed(3) : '',
                                     type: defaultType,
                                     transactionId: '',
                                     note: '',
@@ -2634,10 +2773,10 @@ const MerchantUsers = ({ user }) => {
                             <Text style={styles.userName}>{item.user.name}</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Text style={styles.userPhone}>{item.user.phone}</Text>
-                                {item.user.acc_no && (
+                                {(item.subscription?.acc_no || item.acc_no || item.user?.acc_no) && (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10, backgroundColor: '#f0f0f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                         <Icon name="university" size={10} color="#666" style={{ marginRight: 4 }} />
-                                        <Text style={{ fontSize: 12, color: '#666', fontWeight: 'bold' }}>{item.user.acc_no}</Text>
+                                        <Text style={{ fontSize: 12, color: '#666', fontWeight: 'bold' }}>{item.subscription?.acc_no || item.acc_no || item.user.acc_no}</Text>
                                     </View>
                                 )}
                             </View>
@@ -2810,8 +2949,12 @@ const MerchantUsers = ({ user }) => {
                                     onPress={() => {
                                         setSelectedWithdrawalRequest(item);
                                         const defaultType = item.plan?.returnType || item.chitPlan?.returnType || 'Cash';
+                                        const subData = item.subscription || item;
+                                        const totalPaid = Math.max(0, (subData.totalAmountPaid || 0) - (subData.deliveredAmount || 0));
+                                        const totalGold = Math.max(0, (subData.totalGoldWeight || 0) - (subData.deliveredGoldWeight || 0));
                                         setSettlementForm({
-                                            amount: item.subscription.totalAmountPaid.toString(),
+                                            amount: totalPaid > 0 ? totalPaid.toString() : (subData.totalAmountPaid || 0).toString(),
+                                            goldWeight: totalGold > 0 ? totalGold.toFixed(3) : '',
                                             type: defaultType,
                                             transactionId: '',
                                             note: '',
@@ -2844,8 +2987,12 @@ const MerchantUsers = ({ user }) => {
                                             } else {
                                                 setSelectedWithdrawalRequest(item);
                                                 const defaultType = item.plan?.returnType || item.chitPlan?.returnType || 'Cash';
+                                                const subData = item.subscription || item;
+                                                const totalPaid = Math.max(0, (subData.totalAmountPaid || 0) - (subData.deliveredAmount || 0));
+                                                const totalGold = Math.max(0, (subData.totalGoldWeight || 0) - (subData.deliveredGoldWeight || 0));
                                                 setSettlementForm({
-                                                    amount: item.subscription.totalAmountPaid.toString(),
+                                                    amount: totalPaid > 0 ? totalPaid.toString() : (subData.totalAmountPaid || 0).toString(),
+                                                    goldWeight: totalGold > 0 ? totalGold.toFixed(3) : '',
                                                     type: defaultType,
                                                     transactionId: '',
                                                     note: '',
@@ -2857,7 +3004,7 @@ const MerchantUsers = ({ user }) => {
                                         }}
                                     >
                                         <Text style={[styles.subActionBtnText, { color: item.plan.returnType === 'Gold' ? '#333' : '#fff' }]}>
-                                            {item.plan.returnType === 'Gold' ? 'Gold' : 'Settle'}
+                                            {item.plan.returnType === 'Gold' ? 'Withdraw' : 'Settle'}
                                         </Text>
                                     </TouchableOpacity>
                                 )}
@@ -3248,10 +3395,10 @@ const MerchantUsers = ({ user }) => {
                                                         <Text style={[styles.resultName, { textDecorationLine: 'underline', color: COLORS?.primary }]}>
                                                             {(pay.user?.name?.length > 10 ? pay.user.name.substring(0, 10) + '...' : pay.user?.name) || 'Unknown'}
                                                         </Text>
-                                                        {pay.user?.acc_no && (
+                                                        {(pay.subAccNo || pay.subscription?.acc_no || pay.user?.acc_no) && (
                                                             <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, backgroundColor: '#f0f0f0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                                                 <Icon name="university" size={8} color="#666" style={{ marginRight: 4 }} />
-                                                                <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{pay.user.acc_no}</Text>
+                                                                <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>{pay.subAccNo || pay.subscription?.acc_no || pay.user.acc_no}</Text>
                                                             </View>
                                                         )}
                                                     </View>
@@ -3956,8 +4103,8 @@ const MerchantUsers = ({ user }) => {
                                                     </View>
                                                     <View style={styles.historyRight}>
                                                         {delivery.amount > 0 && (
-                                                            <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: 'bold' }}>
-                                                                - ₹{delivery.amount}
+                                                            <Text style={{ fontSize: 11, color: '#059669', fontWeight: 'bold' }}>
+                                                                Settled: ₹{delivery.amount}
                                                             </Text>
                                                         )}
                                                         {delivery.goldWeight > 0 && (
@@ -4011,20 +4158,15 @@ const MerchantUsers = ({ user }) => {
                         <ScrollView>
                             <View style={styles.modalInfo}>
                                 <Text style={{ color: COLORS?.secondary, fontSize: 13 }}>Plan: <Text style={{ fontWeight: 'bold', color: COLORS?.dark }}>{selectedWithdrawalRequest?.plan?.planName}</Text></Text>
-                                <Text style={{ color: COLORS?.secondary, fontSize: 13, marginTop: 4 }}>Total Paid: <Text style={{ fontWeight: 'bold', color: COLORS?.primary }}>₹{selectedWithdrawalRequest?.subscription?.totalAmountPaid || 0}</Text></Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                                    <Text style={{ color: COLORS?.secondary, fontSize: 13 }}>Total Paid: <Text style={{ fontWeight: 'bold', color: COLORS?.primary }}>₹{selectedWithdrawalRequest?.subscription?.totalAmountPaid || 0}</Text></Text>
+                                    {((selectedWithdrawalRequest?.subscription?.totalGoldWeight || 0) - (selectedWithdrawalRequest?.subscription?.deliveredGoldWeight || 0)) > 0 && (
+                                        <Text style={{ color: '#B45309', fontSize: 12, fontWeight: 'bold' }}>
+                                            Saved: {((selectedWithdrawalRequest?.subscription?.totalGoldWeight || 0) - (selectedWithdrawalRequest?.subscription?.deliveredGoldWeight || 0)).toFixed(3)}g
+                                        </Text>
+                                    )}
+                                </View>
                             </View>
-
-                            {/* Bank details removed */}
-
-                            
-
-                            <Text style={styles.inputLabel}>Amount Settled (₹)</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={settlementForm.amount}
-                                onChangeText={t => setSettlementForm({ ...settlementForm, amount: t })}
-                                keyboardType="numeric"
-                            />
 
                             <Text style={styles.inputLabel}>Settlement Type *</Text>
                             <View style={{ flexDirection: 'row', marginBottom: 15 }}>
@@ -4036,11 +4178,57 @@ const MerchantUsers = ({ user }) => {
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.filterChip, { flex: 1, alignItems: 'center', justifyContent: 'center' }, settlementForm.type === 'Gold' && styles.filterChipActive]}
-                                    onPress={() => setSettlementForm({ ...settlementForm, type: 'Gold' })}
+                                    onPress={() => {
+                                        const subData = selectedWithdrawalRequest?.subscription || selectedWithdrawalRequest || {};
+                                        const totalGold = subData.totalGoldWeight || 0;
+                                        const delGold = subData.deliveredGoldWeight || 0;
+                                        const remGold = Math.max(0, totalGold - delGold);
+                                        setSettlementForm(prev => ({
+                                            ...prev,
+                                            type: 'Gold',
+                                            goldWeight: prev.goldWeight || (remGold > 0 ? remGold.toFixed(3) : '')
+                                        }));
+                                    }}
                                 >
                                     <Text style={[styles.filterChipText, settlementForm.type === 'Gold' && styles.filterChipTextActive]}>Gold</Text>
                                 </TouchableOpacity>
                             </View>
+
+                            {settlementForm.type === 'Gold' ? (
+                                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.inputLabel}>Total Gram (g) *</Text>
+                                        <TextInput
+                                            style={styles.textInput}
+                                            value={settlementForm.goldWeight}
+                                            onChangeText={t => setSettlementForm({ ...settlementForm, goldWeight: t })}
+                                            keyboardType="numeric"
+                                            placeholder="0.000"
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.inputLabel}>Total Amount (₹) *</Text>
+                                        <TextInput
+                                            style={styles.textInput}
+                                            value={settlementForm.amount}
+                                            onChangeText={t => setSettlementForm({ ...settlementForm, amount: t })}
+                                            keyboardType="numeric"
+                                            placeholder="0"
+                                        />
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={{ marginBottom: 15 }}>
+                                    <Text style={styles.inputLabel}>Total Settling Cash (₹) *</Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        value={settlementForm.amount}
+                                        onChangeText={t => setSettlementForm({ ...settlementForm, amount: t })}
+                                        keyboardType="numeric"
+                                        placeholder="Enter settling cash..."
+                                    />
+                                </View>
+                            )}
 
                             <Text style={styles.inputLabel}>Settlement Date</Text>
                             <TouchableOpacity 
@@ -4078,11 +4266,22 @@ const MerchantUsers = ({ user }) => {
                                 )}
                             </TouchableOpacity>
 
-
                             <TouchableOpacity
-                                style={[styles.submitButton, (!settlementForm.type || !settlementForm.amount || !settlementForm.receiptImage) && { opacity: 0.5 }]}
+                                style={[
+                                    styles.submitButton,
+                                    (!settlementForm.type ||
+                                     !settlementForm.amount ||
+                                     !settlementForm.receiptImage ||
+                                     (settlementForm.type === 'Gold' && !settlementForm.goldWeight)) && { opacity: 0.5 }
+                                ]}
                                 onPress={executeSettlement}
-                                disabled={submittingSettlement || !settlementForm.type || !settlementForm.amount || !settlementForm.receiptImage}
+                                disabled={
+                                    submittingSettlement ||
+                                    !settlementForm.type ||
+                                    !settlementForm.amount ||
+                                    !settlementForm.receiptImage ||
+                                    (settlementForm.type === 'Gold' && !settlementForm.goldWeight)
+                                }
                             >
                                 {submittingSettlement ? (
                                     <ActivityIndicator color="#fff" />
@@ -4194,13 +4393,27 @@ const MerchantUsers = ({ user }) => {
                             <View style={{ flexDirection: 'row', marginBottom: 15 }}>
                                 <TouchableOpacity
                                     style={[styles.filterChip, !deliveryForm.isPartial && styles.filterChipActive]}
-                                    onPress={() => setDeliveryForm({ ...deliveryForm, isPartial: false })}
+                                    onPress={() => {
+                                        const subData = selectedForDelivery?.subscription || selectedForDelivery || {};
+                                        const totalGold = subData.totalGoldWeight || 0;
+                                        const delGold = subData.deliveredGoldWeight || 0;
+                                        const remGold = Math.max(0, totalGold - delGold);
+                                        const totalPaid = subData.totalAmountPaid || subData.totalPaid || 0;
+                                        const delAmt = subData.deliveredAmount || 0;
+                                        const remAmt = Math.max(0, totalPaid - delAmt);
+                                        setDeliveryForm(prev => ({
+                                            ...prev,
+                                            isPartial: false,
+                                            goldWeight: prev.goldWeight || (remGold > 0 ? remGold.toFixed(3) : ''),
+                                            amount: prev.amount || (remAmt > 0 ? remAmt.toString() : '')
+                                        }));
+                                    }}
                                 >
                                     <Text style={[styles.filterChipText, !deliveryForm.isPartial && styles.filterChipTextActive]}>Full Delivery</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.filterChip, deliveryForm.isPartial && styles.filterChipActive]}
-                                    onPress={() => setDeliveryForm({ ...deliveryForm, isPartial: true })}
+                                    onPress={() => setDeliveryForm(prev => ({ ...prev, isPartial: true }))}
                                 >
                                     <Text style={[styles.filterChipText, deliveryForm.isPartial && styles.filterChipTextActive]}>Partial Release</Text>
                                 </TouchableOpacity>
@@ -4222,22 +4435,59 @@ const MerchantUsers = ({ user }) => {
                                 </TouchableOpacity>
                             </View>
 
-                            {deliveryForm.isPartial && (
-                                <View style={{ backgroundColor: '#fcf8e3', padding: 12, borderRadius: 8, marginBottom: 15 }}>
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            {!deliveryForm.isPartial ? (
+                                <View style={{ backgroundColor: '#fff9db', padding: 14, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#fef08a' }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#8a6d3b' }}>FULL DELIVERY DETAILS</Text>
+                                        <View style={{ backgroundColor: '#8a6d3b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                                                Total Saved: {((selectedForDelivery?.subscription?.totalGoldWeight || 0) - (selectedForDelivery?.subscription?.deliveredGoldWeight || 0)).toFixed(3)}g
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.inputLabel, { color: '#8a6d3b' }]}>Total Gram (g) *</Text>
+                                            <TextInput
+                                                style={[styles.textInput, { backgroundColor: '#fff', borderColor: '#d4af37' }]}
+                                                value={deliveryForm.goldWeight}
+                                                onChangeText={t => setDeliveryForm({ ...deliveryForm, goldWeight: t })}
+                                                keyboardType="numeric"
+                                                placeholder="0.000"
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.inputLabel, { color: '#8a6d3b' }]}>Total Amount (₹) *</Text>
+                                            <TextInput
+                                                style={[styles.textInput, { backgroundColor: '#fff', borderColor: '#d4af37' }]}
+                                                value={deliveryForm.amount}
+                                                onChangeText={t => setDeliveryForm({ ...deliveryForm, amount: t })}
+                                                keyboardType="numeric"
+                                                placeholder="0"
+                                            />
+                                        </View>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={{ backgroundColor: '#fcf8e3', padding: 14, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#fef3c7' }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                         <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#8a6d3b' }}>PARTIAL DELIVERY DETAILS</Text>
                                         <View style={{ backgroundColor: '#8a6d3b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Total Saved: {((selectedForDelivery?.subscription?.totalGoldWeight || 0) - (selectedForDelivery?.subscription?.deliveredGoldWeight || 0)).toFixed(3)}g</Text>
+                                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                                                Total Saved: {((selectedForDelivery?.subscription?.totalGoldWeight || 0) - (selectedForDelivery?.subscription?.deliveredGoldWeight || 0)).toFixed(3)}g
+                                            </Text>
                                         </View>
                                     </View>
                                     
-                                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.inputLabel}>Weight to Deliver (g)</Text>
+                                            <Text style={styles.inputLabel}>Weight to Deliver (g) *</Text>
                                             <TextInput
-                                                style={[styles.textInput, { backgroundColor: '#f3f4f6', color: '#666' }]}
+                                                style={[styles.textInput, { backgroundColor: '#fff' }]}
                                                 value={deliveryForm.goldWeight}
-                                                editable={false}
+                                                onChangeText={t => setDeliveryForm({ ...deliveryForm, goldWeight: t })}
+                                                editable={true}
                                                 keyboardType="numeric"
                                                 placeholder="0.000"
                                             />
@@ -4246,14 +4496,15 @@ const MerchantUsers = ({ user }) => {
                                             <Text style={styles.inputLabel}>Remaining Gold</Text>
                                             <View style={[styles.textInput, { backgroundColor: '#f3f4f6', justifyContent: 'center' }]}>
                                                 <Text style={{ fontWeight: 'bold', color: '#555' }}>
-                                                    {((selectedForDelivery?.subscription?.totalGoldWeight || 0) - (selectedForDelivery?.subscription?.deliveredGoldWeight || 0) - (Number(deliveryForm.goldWeight) || 0)).toFixed(3)}g
+                                                    {Math.max(0, ((selectedForDelivery?.subscription?.totalGoldWeight || 0) - (selectedForDelivery?.subscription?.deliveredGoldWeight || 0) - (Number(deliveryForm.goldWeight) || 0))).toFixed(3)}g
                                                 </Text>
                                             </View>
                                         </View>
                                     </View>
 
-                                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>Link Payments (Deliver through history)</Text>
-                                    <Text style={{ fontSize: 10, color: '#8a6d3b', marginBottom: 5 }}>Selecting payments will auto-calculate delivery weight.</Text>
+
+                                    <Text style={[styles.inputLabel, { marginTop: 6 }]}>Link Payments (Deliver through history)</Text>
+                                    <Text style={{ fontSize: 10, color: '#8a6d3b', marginBottom: 5 }}>Selecting payments will auto-calculate delivery weight and amount.</Text>
                                     
                                     {loadingPayments ? <ActivityIndicator size="small" color="#915200" /> : (
                                         undeliveredPayments.map((p) => (
@@ -4266,25 +4517,57 @@ const MerchantUsers = ({ user }) => {
                                                         ? deliveryForm.paymentIds.filter(id => id !== p._id) 
                                                         : [...deliveryForm.paymentIds, p._id];
                                                     
-                                                    // Auto-calculate weight and amount
+                                                    // Auto-calculate weight and selected payments total
                                                     const selectedPayments = undeliveredPayments.filter(pay => newIds.includes(pay._id));
                                                     const totalWeight = selectedPayments.reduce((acc, pay) => acc + (pay.goldWeight || 0), 0);
-                                                    const totalAmount = selectedPayments.reduce((acc, pay) => acc + (pay.amount || 0), 0);
+                                                    const totalPaidSelected = selectedPayments.reduce((acc, pay) => acc + (pay.amount || 0), 0);
                                                     
-                                                    setDeliveryForm({
-                                                        ...deliveryForm,
+                                                    setDeliveryForm(prev => ({
+                                                        ...prev,
                                                         paymentIds: newIds,
-                                                        goldWeight: totalWeight > 0 ? totalWeight.toFixed(3) : deliveryForm.goldWeight,
-                                                        amount: totalAmount > 0 ? totalAmount.toString() : deliveryForm.amount
-                                                    });
+                                                        goldWeight: totalWeight > 0 ? totalWeight.toFixed(3) : '',
+                                                        deductedPaidAmount: totalPaidSelected
+                                                    }));
                                                 }}
                                             >
                                                 <Icon name={deliveryForm.paymentIds.includes(p._id) ? "check-square" : "square"} size={16} color="#915200" />
                                                 <Text style={{ marginLeft: 8, fontSize: 13, flex: 1 }}>{new Date(p.paymentDate || p.createdAt).toLocaleDateString()} - ₹{p.amount}</Text>
-                                                <Text style={{ fontSize: 11, color: '#B45309', fontWeight: 'bold' }}>{p.goldWeight.toFixed(3)}g</Text>
+                                                <Text style={{ fontSize: 11, color: '#B45309', fontWeight: 'bold' }}>{(p.goldWeight || 0).toFixed(3)}g</Text>
                                             </TouchableOpacity>
                                         ))
                                     )}
+
+                                    {deliveryForm.paymentIds.length > 0 && (
+                                        <View style={{ backgroundColor: '#fff', padding: 10, borderRadius: 6, marginTop: 8, borderWidth: 1, borderColor: '#fde68a' }}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                <Text style={{ fontSize: 11, color: '#666' }}>Plan Deduction:</Text>
+                                                <Text style={{ fontSize: 11, color: '#915200', fontWeight: 'bold' }}>
+                                                    - ₹{undeliveredPayments.filter(pay => deliveryForm.paymentIds.includes(pay._id)).reduce((acc, pay) => acc + (pay.amount || 0), 0)}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                                <Text style={{ fontSize: 11, color: '#666' }}>Remaining Plan Balance:</Text>
+                                                <Text style={{ fontSize: 11, color: '#2E7D32', fontWeight: 'bold' }}>
+                                                    ₹{Math.max(0, ((selectedForDelivery?.subscription?.totalAmountPaid || 0) - (selectedForDelivery?.subscription?.deliveredAmount || 0) - undeliveredPayments.filter(pay => deliveryForm.paymentIds.includes(pay._id)).reduce((acc, pay) => acc + (pay.amount || 0), 0)))}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    <View style={{ marginTop: 12 }}>
+                                        <Text style={styles.inputLabel}>Settlement Amount (₹) *</Text>
+                                        <Text style={{ fontSize: 10, color: '#8a6d3b', marginBottom: 5 }}>
+                                            Settlement value for records & receipt (not deducted from plan balance).
+                                        </Text>
+                                        <TextInput
+                                            style={[styles.textInput, { backgroundColor: '#fff' }]}
+                                            value={deliveryForm.amount}
+                                            onChangeText={t => setDeliveryForm({ ...deliveryForm, amount: t })}
+                                            editable={true}
+                                            keyboardType="numeric"
+                                            placeholder="Enter settlement payout (e.g. 600)..."
+                                        />
+                                    </View>
                                 </View>
                             )}
 
@@ -4306,9 +4589,13 @@ const MerchantUsers = ({ user }) => {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.submitButton, { backgroundColor: '#d4af37' }, !deliveryForm.receiptImage && { opacity: 0.5 }]}
+                                style={[
+                                    styles.submitButton,
+                                    { backgroundColor: '#d4af37' },
+                                    (!deliveryForm.receiptImage || !deliveryForm.goldWeight || !deliveryForm.amount) && { opacity: 0.5 }
+                                ]}
                                 onPress={executeDelivery}
-                                disabled={submittingDelivery || !deliveryForm.receiptImage}
+                                disabled={submittingDelivery || !deliveryForm.receiptImage || !deliveryForm.goldWeight || !deliveryForm.amount}
                             >
                                 {submittingDelivery ? (
                                     <ActivityIndicator color="#fff" />
@@ -4991,7 +5278,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'flex-end',
-        gap: 8,
+        gap: 6,
     },
     subHistoryBtn: {
         flexDirection: 'row',
@@ -5023,7 +5310,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         height: 32,
-        paddingHorizontal: 14,
+        paddingHorizontal: 10,
         borderRadius: 8,
     },
     subActionBtnText: {

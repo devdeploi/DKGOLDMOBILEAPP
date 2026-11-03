@@ -4,49 +4,129 @@ import {
     Text,
     StyleSheet,
     Image,
-    TouchableOpacity,
     Dimensions,
-    Linking,
     Animated,
     FlatList
 } from 'react-native';
-import { COLORS } from '../styles/theme';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 import { BASE_URL } from '../constants/api';
 
 const { width } = Dimensions.get('window');
 const SLIDE_WIDTH = width - 40;
+const BANNER_HEIGHT = 200;
 
-const AdBanner = ({ ads }) => {
+// Helper to check if an ad is currently active and within valid date range
+const isAdActive = (ad) => {
+    if (!ad) return false;
+
+    if (ad.status && ad.status.toLowerCase() !== 'active') return false;
+    if (ad.isActive === false) return false;
+
+    const now = new Date();
+
+    if (ad.startDate) {
+        const start = new Date(ad.startDate);
+        if (!isNaN(start.getTime()) && now < start) {
+            return false;
+        }
+    }
+
+    if (ad.endDate) {
+        const end = new Date(ad.endDate);
+        if (!isNaN(end.getTime())) {
+            end.setHours(23, 59, 59, 999);
+            if (now > end) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+};
+
+// Reusable Fallback Card with DK Gold Store Information (Light Theme)
+const FallbackBannerCard = () => (
+    <View style={styles.fallbackCard}>
+        <View style={styles.fallbackLeft}>
+            <Image
+                source={require('../assets/logodk.png')}
+                style={styles.fallbackLogo}
+                resizeMode="contain"
+            />
+            <Text style={styles.fallbackShopName}>DK GOLD</Text>
+        </View>
+
+        <View style={styles.fallbackVerticalLine} />
+
+        <View style={styles.fallbackRight}>
+            <View style={styles.fallbackItem}>
+                <View style={styles.fallbackIconBadge}>
+                    <Icon name="phone-alt" size={10} color="#915200" />
+                </View>
+                <Text style={styles.fallbackText}>9786112675</Text>
+            </View>
+
+            <View style={styles.fallbackItem}>
+                <View style={styles.fallbackIconBadge}>
+                    <Icon name="envelope" size={10} color="#915200" />
+                </View>
+                <Text style={styles.fallbackText}>dkgoldambur@gmail.com</Text>
+            </View>
+
+            <View style={styles.fallbackItem}>
+                <View style={styles.fallbackIconBadge}>
+                    <Icon name="map-marker-alt" size={11} color="#915200" />
+                </View>
+                <Text style={styles.fallbackText} numberOfLines={2}>
+                    13/35, Mungil Mandi StreetAmbur - 635802
+                </Text>
+            </View>
+        </View>
+    </View>
+);
+
+const AdBanner = ({ ads = [] }) => {
     const [activeSlide, setActiveSlide] = useState(0);
+    const [failedImages, setFailedImages] = useState({});
     const flatListRef = useRef(null);
     const scrollX = useRef(new Animated.Value(0)).current;
 
-    const brandAds = useMemo(() => [], []);
-
-    // Process ads to expand multiple images into individual slides
+    // Filter out expired ads, extracting only valid banner creatives (popup ads must never display here)
     const validAds = useMemo(() => {
-        const merchantAds = ads.filter(ad => !ad.isBrandAd && (ad.imageUrl || (ad.imageUrls && ad.imageUrls.length > 0)));
+        if (!ads || !Array.isArray(ads) || ads.length === 0) return [];
 
-        if (merchantAds.length > 0) {
-            const flattenedAds = [];
-            merchantAds.forEach((ad, adIdx) => {
-                if (ad.imageUrls && ad.imageUrls.length > 0) {
-                    ad.imageUrls.forEach((imgUrl, imgIdx) => {
-                        flattenedAds.push({
+        const bannerAds = ads.filter(ad => {
+            const isBannerType = (ad.adType || 'banner') === 'banner';
+            return isBannerType && isAdActive(ad);
+        });
+
+        const merchantBannerAds = bannerAds.filter(ad => !ad.isBrandAd);
+        const activeAdsList = merchantBannerAds.length > 0 ? merchantBannerAds : bannerAds;
+
+        if (activeAdsList.length === 0) return [];
+
+        const flattened = [];
+        activeAdsList.forEach((ad, adIdx) => {
+            if (ad.imageUrls && Array.isArray(ad.imageUrls) && ad.imageUrls.length > 0) {
+                ad.imageUrls.forEach((imgUrl, imgIdx) => {
+                    if (imgUrl && typeof imgUrl === 'string' && imgUrl.trim()) {
+                        flattened.push({
                             ...ad,
-                            imageUrl: imgUrl,
-                            // Ensure unique _id for each image slide
+                            imageUrl: imgUrl.trim(),
                             _id: ad._id ? `${ad._id}_image_${imgIdx}` : `merchant_${adIdx}_img_${imgIdx}`
                         });
-                    });
-                } else if (ad.imageUrl) {
-                    flattenedAds.push(ad);
-                }
-            });
-            return flattenedAds;
-        }
-        return brandAds;
-    }, [ads, brandAds]);
+                    }
+                });
+            } else if (ad.imageUrl && typeof ad.imageUrl === 'string' && ad.imageUrl.trim()) {
+                flattened.push({
+                    ...ad,
+                    imageUrl: ad.imageUrl.trim(),
+                    _id: ad._id ? `${ad._id}` : `merchant_${adIdx}`
+                });
+            }
+        });
+        return flattened;
+    }, [ads]);
 
     useEffect(() => {
         if (validAds.length > 1) {
@@ -62,60 +142,36 @@ const AdBanner = ({ ads }) => {
         }
     }, [activeSlide, validAds.length]);
 
-    const handleAdPress = (ad) => {
-        if (ad.link) {
-            Linking.openURL(ad.link).catch(err => console.error("Couldn't load page", err));
-        }
-    };
+    if (validAds.length === 0) {
+        return null;
+    }
 
     const renderItem = ({ item }) => {
-        let imageSource;
-        if (item.source) {
-            // Static local asset (brand ads)
-            imageSource = item.source;
-        } else {
-            // Remote image (merchant ads)
-            let imageUrl = '';
-            if (item.imageUrl) {
-                imageUrl = item.imageUrl.startsWith('http') ? item.imageUrl : `${BASE_URL}${item.imageUrl}`;
-            } else if (item.imageUrls && item.imageUrls.length > 0) {
-                imageUrl = item.imageUrls[0].startsWith('http') ? item.imageUrls[0] : `${BASE_URL}${item.imageUrls[0]}`;
-            }
-            imageSource = { uri: imageUrl || 'https://via.placeholder.com/400x200?text=Exclusive+Offer' };
+        const hasFailed = failedImages[item._id] || !item.imageUrl;
+
+        if (hasFailed) {
+            return <FallbackBannerCard />;
         }
 
+        let imageUrl = '';
+        if (item.imageUrl) {
+            imageUrl = item.imageUrl.startsWith('http') ? item.imageUrl : `${BASE_URL}${item.imageUrl}`;
+        }
+        const imageSource = { uri: imageUrl };
+
         return (
-            <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => handleAdPress(item)}
-                style={styles.adCard}
-            >
+            <View style={styles.adCard}>
                 <Image
                     source={imageSource}
                     style={styles.adImage}
-                    resizeMode="cover"
+                    resizeMode="contain"
+                    onError={() => {
+                        setFailedImages(prev => ({ ...prev, [item._id]: true }));
+                    }}
                 />
-                {(item.title || item.description) ? (
-                    <View style={styles.overlay}>
-                        <View style={styles.textContainer}>
-                            {item.title ? (
-                                <Text style={styles.adTitle} numberOfLines={1}>
-                                    {item.title}
-                                </Text>
-                            ) : null}
-                            {item.description ? (
-                                <Text style={styles.adSubtitle} numberOfLines={2}>
-                                    {item.description}
-                                </Text>
-                            ) : null}
-                        </View>
-                    </View>
-                ) : null}
-            </TouchableOpacity>
+            </View>
         );
     };
-
-    if (validAds.length === 0) return null;
 
     return (
         <View style={styles.container}>
@@ -172,66 +228,111 @@ const AdBanner = ({ ads }) => {
 const styles = StyleSheet.create({
     container: {
         marginVertical: 10,
-        height: 220,
+        height: BANNER_HEIGHT + 24,
     },
     listContent: {
         paddingHorizontal: 0,
     },
     adCard: {
         width: SLIDE_WIDTH,
-        height: 200,
+        height: BANNER_HEIGHT,
         marginHorizontal: 5,
         borderRadius: 20,
         overflow: 'hidden',
-        backgroundColor: '#f0f0f0',
+        backgroundColor: '#1E1E1E',
         elevation: 5,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.25,
         shadowRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 215, 0, 0.25)'
     },
     adImage: {
         width: '100%',
         height: '100%',
     },
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        justifyContent: 'flex-end',
-        padding: 15,
-    },
-    textContainer: {
-        width: '80%',
-    },
-    adTitle: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 10,
-    },
-    adSubtitle: {
-        color: '#e0e0e0',
-        fontSize: 12,
-        marginTop: 4,
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: -1, height: 1 },
-        textShadowRadius: 5,
-    },
     pagination: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 5,
+        marginTop: 6,
     },
     dot: {
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#fff',
+        backgroundColor: '#FFD700',
         marginHorizontal: 4,
     },
+    // Fallback banner styles (Light Theme)
+    fallbackCard: {
+        width: SLIDE_WIDTH,
+        height: BANNER_HEIGHT,
+        marginHorizontal: 5,
+        borderRadius: 20,
+        backgroundColor: '#FFFDF7',
+        borderWidth: 1.5,
+        borderColor: '#D4AF37',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+    },
+    fallbackLeft: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '38%',
+    },
+    fallbackLogo: {
+        width: 48,
+        height: 48,
+        marginBottom: 6,
+    },
+    fallbackShopName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#7A4300',
+        letterSpacing: 1.5,
+        textAlign: 'center',
+    },
+    fallbackVerticalLine: {
+        width: 1,
+        height: '75%',
+        backgroundColor: '#EAD99B',
+        marginHorizontal: 10,
+    },
+    fallbackRight: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    fallbackItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 7,
+    },
+    fallbackIconBadge: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: '#F5E8C7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 8,
+    },
+    fallbackText: {
+        fontSize: 11.5,
+        color: '#1E1E1E',
+        fontWeight: '600',
+        flex: 1,
+    }
 });
 
 export default AdBanner;

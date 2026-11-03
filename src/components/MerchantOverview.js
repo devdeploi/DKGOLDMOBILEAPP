@@ -261,7 +261,8 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh, fetc
                             totalPaid: totalPaid,
                             totalTarget: totalTarget,
                             progress: progress,
-                            isUnlimited: isUnlimited
+                            isUnlimited: isUnlimited,
+                            acc_no: sub.acc_no || null
                         });
                     }
                 });
@@ -311,14 +312,31 @@ const MerchantOverview = ({ user, stats, plans = [], refreshing, onRefresh, fetc
 
     const getPlanScopedAccNo = (paymentItem) => {
         if (!paymentItem) return null;
+        if (paymentItem.subAccNo) return paymentItem.subAccNo;
+
         const targetPlanId = paymentItem.chitPlan?._id || paymentItem.chitPlan;
         const targetUserId = paymentItem.user?._id || paymentItem.user?.id || paymentItem.user;
-        if (!targetPlanId || !targetUserId) return paymentItem.user?.acc_no || null;
-        const plan = plans.find(p => p._id?.toString() === targetPlanId.toString());
-        if (plan && plan.subscribers) {
-            const sub = plan.subscribers.find(s => (s.user?._id || s.user)?.toString() === targetUserId.toString());
-            if (sub && sub.acc_no) {
-                return sub.acc_no;
+        const targetSubId = paymentItem.subscriptionId || paymentItem.paymentDetails?.subscriptionId;
+
+        if (targetPlanId && plans && plans.length > 0) {
+            const plan = plans.find(p => p._id?.toString() === targetPlanId.toString());
+            if (plan && plan.subscribers) {
+                if (targetSubId) {
+                    const subById = plan.subscribers.find(s => (s._id || s.id)?.toString() === targetSubId.toString());
+                    if (subById && subById.acc_no) {
+                        return subById.acc_no;
+                    }
+                }
+                if (targetUserId) {
+                    const activeSub = plan.subscribers.find(s => (s.user?._id || s.user)?.toString() === targetUserId.toString() && s.status === 'active');
+                    if (activeSub && activeSub.acc_no) {
+                        return activeSub.acc_no;
+                    }
+                    const anySub = plan.subscribers.find(s => (s.user?._id || s.user)?.toString() === targetUserId.toString());
+                    if (anySub && anySub.acc_no) {
+                        return anySub.acc_no;
+                    }
+                }
             }
         }
         return paymentItem.user?.acc_no || null;

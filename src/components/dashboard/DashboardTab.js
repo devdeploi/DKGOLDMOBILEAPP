@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ImageBackground, View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, RefreshControl, Image, Linking, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import { COLORS } from '../../styles/theme';
 import { LineChart, PieChart } from 'react-native-chart-kit'; // Ensure this is installed
@@ -7,6 +7,7 @@ import axios from 'axios';
 import { APIURL, BASE_URL } from '../../constants/api';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import Slider from '@react-native-community/slider';
+import AdPopup, { canShowPopupAd } from '../AdPopup';
 import AdBanner from '../AdBanner';
 import Calculator from '../Calculator';
 import { useGoldRate } from '../../context/GoldRateContext';
@@ -18,6 +19,8 @@ const { width } = Dimensions.get('window');
 const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    // If popup is on 10-minute cooldown, show banner immediately without waiting
+    const [showBanner, setShowBanner] = useState(() => !canShowPopupAd());
 
     // Use global synchronized gold rate
     const { goldRate } = useGoldRate();
@@ -26,6 +29,24 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
     const [passwordInput, setPasswordInput] = useState('');
     const [verifyingPassword, setVerifyingPassword] = useState(false);
     const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info' });
+
+    // Separate popup ads and banner ads (Hook rules: must be declared at top-level before early returns)
+    const popupAds = useMemo(() => {
+        if (!ads || !Array.isArray(ads)) return [];
+        return ads.filter(ad => ad.adType === 'popup');
+    }, [ads]);
+
+    const bannerAds = useMemo(() => {
+        if (!ads || !Array.isArray(ads)) return [];
+        return ads.filter(ad => (ad.adType || 'banner') === 'banner');
+    }, [ads]);
+
+    // If there are no popup ads to display or popup is on 10-minute cooldown, show banner immediately
+    useEffect(() => {
+        if (popupAds.length === 0 || !canShowPopupAd()) {
+            setShowBanner(true);
+        }
+    }, [popupAds.length]);
 
     const showAlert = (title, message, type = 'info') => {
         setAlertConfig({ visible: true, title, message, type });
@@ -193,13 +214,14 @@ const DashboardTab = ({ user, ads = [], onRefreshAds }) => {
 
     return (
         <ImageBackground source={require('../../../public/assests/DKGOLDBG.png')} style={styles.wrapper} resizeMode="cover">
+            <AdPopup ads={popupAds} onClose={() => setShowBanner(true)} />
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
             >
-                <AdBanner ads={ads} />
+                {showBanner && <AdBanner ads={bannerAds} />}
                 <View style={styles.headerSection}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>

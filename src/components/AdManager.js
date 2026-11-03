@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     ImageBackground,
     View,
@@ -15,7 +15,8 @@ import {
     Dimensions,
     Alert,
     Animated,
-    PanResponder
+    PanResponder,
+    Switch
 } from 'react-native';
 import { COLORS } from '../styles/theme';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -28,8 +29,10 @@ import Slider from '@react-native-community/slider';
 import CustomAlert from './CustomAlert';
 
 const { width } = Dimensions.get('window');
-const CROP_BOX_WIDTH = Math.min(width - 48, 340);
-const CROP_BOX_HEIGHT = Math.round((CROP_BOX_WIDTH * 9) / 16);
+const BANNER_CROP_WIDTH = Math.min(width - 48, 340);
+const BANNER_CROP_HEIGHT = Math.round((BANNER_CROP_WIDTH * 9) / 16);
+const POPUP_CROP_WIDTH = Math.min(width - 48, 300);
+const POPUP_CROP_HEIGHT = Math.round((POPUP_CROP_WIDTH * 5) / 4);
 
 const SkeletonAdCard = () => {
     const pulseAnim = useRef(new Animated.Value(0.5)).current;
@@ -101,12 +104,31 @@ const formatDateToIndian = (dateObj) => {
     return `${day}/${month}/${year}`;
 };
 
-const AdManager = ({ user }) => {
+const AdManager = ({ user, initialType = 'banner' }) => {
+    const [selectedType, setSelectedType] = useState(initialType);
     const [ads, setAds] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [uploading, setUploading] = useState(false);
+
+    useEffect(() => {
+        if (initialType) {
+            setSelectedType(initialType);
+        }
+    }, [initialType]);
+
+    const isPopup = selectedType === 'popup';
+    const CROP_BOX_WIDTH = isPopup ? POPUP_CROP_WIDTH : BANNER_CROP_WIDTH;
+    const CROP_BOX_HEIGHT = isPopup ? POPUP_CROP_HEIGHT : BANNER_CROP_HEIGHT;
+
+    // Filter ads by selected type
+    const filteredAds = useMemo(() => {
+        if (!ads || !Array.isArray(ads)) return [];
+        return ads.filter(a => (a.adType || 'banner') === selectedType);
+    }, [ads, selectedType]);
+
+    const activeAd = filteredAds.length > 0 ? filteredAds[0] : null;
 
     // Alert State
     const [alertConfig, setAlertConfig] = useState({
@@ -126,6 +148,7 @@ const AdManager = ({ user }) => {
     const [description, setDescription] = useState('');
     const [startDate, setStartDate] = useState(new Date());
     const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    const [isAdActiveToggle, setIsAdActiveToggle] = useState(true);
 
     // Date Picker State
     const [showStartPicker, setShowStartPicker] = useState(false);
@@ -225,7 +248,7 @@ const AdManager = ({ user }) => {
             }
             setCropModalVisible(false);
             setCropTarget(null);
-            showAlert("Image Cropped", "Creative aligned to standard 16:9 banner format for user screens.", "success");
+            showAlert("Image Cropped", `Creative aligned to standard ${isPopup ? '4:5 popup' : '16:9 banner'} format for user screens.`, "success");
         } catch (err) {
             console.error("Crop error:", err);
             showAlert("Crop Failed", "Could not crop image. Please try again.", "danger");
@@ -276,8 +299,6 @@ const AdManager = ({ user }) => {
         }
     };
 
-    const activeAd = ads.length > 0 ? ads[0] : null;
-
     const handleImagePick = async () => {
         const options = {
             mediaType: 'photo',
@@ -316,10 +337,11 @@ const AdManager = ({ user }) => {
             setLink(ad.link || '');
             setTitle(ad.title || '');
             setDescription(ad.description || '');
-            setStartDate(new Date(ad.startDate));
-            setEndDate(new Date(ad.endDate));
-            setExistingImages(ad.imageUrls || [ad.imageUrl]);
+            setStartDate(ad.startDate ? new Date(ad.startDate) : new Date());
+            setEndDate(ad.endDate ? new Date(ad.endDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+            setExistingImages(ad.imageUrls || (ad.imageUrl ? [ad.imageUrl] : []));
             setImageFiles([]);
+            setIsAdActiveToggle(ad.isActive !== false && ad.status !== 'inactive');
         }
         setShowModal(true);
     };
@@ -333,8 +355,38 @@ const AdManager = ({ user }) => {
         setDescription('');
         setStartDate(new Date());
         setEndDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        setIsAdActiveToggle(true);
         setCropTarget(null);
         setCropModalVisible(false);
+    };
+
+    // Upload single image helper with React Native OkHttp retry & connection close
+    const uploadImageFile = async (file) => {
+        const formData = new FormData();
+        const uri = Platform.OS === 'android' ? file.uri : file.uri.replace('file://', '');
+        formData.append('image', {
+            uri,
+            type: file.type || 'image/jpeg',
+            name: file.fileName || `ad_img_${Date.now()}.jpg`,
+        });
+
+        const uploadConfig = {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+                'Connection': 'close',
+            },
+            timeout: 25000,
+        };
+
+        try {
+            const res = await axios.post(`${APIURL}/upload`, formData, uploadConfig);
+            return res.data;
+        } catch (err) {
+            console.log("Upload attempt 1 failed (RN socket bug), retrying...", err?.message);
+            // Retry immediately, which resolves the React Native Android socket reuse issue
+            const res = await axios.post(`${APIURL}/upload`, formData, uploadConfig);
+            return res.data;
+        }
     };
 
     const handleRemoveExistingImage = (index) => {
@@ -359,40 +411,36 @@ const AdManager = ({ user }) => {
             let finalImageUrls = [...existingImages];
 
             if (imageFiles.length > 0) {
-                const formData = new FormData();
-                imageFiles.forEach(file => {
-                    formData.append('images', {
-                        uri: file.uri,
-                        type: file.type || 'image/jpeg',
-                        name: file.fileName || `ad_${Date.now()}.jpg`,
-                    });
-                });
-
-                const uploadConfig = {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
+                const uploadedPaths = [];
+                for (const file of imageFiles) {
+                    const uploadedPath = await uploadImageFile(file);
+                    if (uploadedPath && typeof uploadedPath === 'string') {
+                        uploadedPaths.push(uploadedPath);
                     }
-                };
-                const { data: uploadedPaths } = await axios.post(`${APIURL}/upload/multiple`, formData, uploadConfig);
+                }
                 finalImageUrls = [...finalImageUrls, ...uploadedPaths];
             }
 
+            const isTargetPopup = (editingAd ? editingAd.adType : selectedType) === 'popup';
             const adData = {
                 imageUrls: finalImageUrls,
                 link,
                 title,
                 description,
-                startDate,
-                endDate,
-                displayFrequency: 15
+                startDate: isTargetPopup ? null : startDate,
+                endDate: isTargetPopup ? null : endDate,
+                displayFrequency: 15,
+                adType: editingAd ? (editingAd.adType || selectedType) : selectedType,
+                isActive: isTargetPopup ? isAdActiveToggle : (editingAd ? editingAd.isActive : true),
+                status: isTargetPopup ? (isAdActiveToggle ? 'active' : 'inactive') : 'active'
             };
 
             if (editingAd) {
                 await axios.put(`${APIURL}/ads/${editingAd._id}`, adData, config);
-                showAlert("Success", "Campaign updated successfully", "success");
+                showAlert("Success", `${isTargetPopup ? 'Popup' : 'Banner'} campaign updated successfully`, "success");
             } else {
                 await axios.post(`${APIURL}/ads`, adData, config);
-                showAlert("Success", "Campaign launched successfully", "success");
+                showAlert("Success", `${isTargetPopup ? 'Popup' : 'Banner'} campaign launched successfully`, "success");
             }
 
             setShowModal(false);
@@ -411,10 +459,12 @@ const AdManager = ({ user }) => {
         if (!activeAd) return;
         try {
             const config = { headers: { Authorization: `Bearer ${user.token}` } };
-            const updatedAds = ads.map(a => a._id === activeAd._id ? { ...a, isActive: !a.isActive } : a);
+            const newIsActive = !activeAd.isActive;
+            const updatedAds = ads.map(a => a._id === activeAd._id ? { ...a, isActive: newIsActive, status: newIsActive ? 'active' : 'inactive' } : a);
             setAds(updatedAds); // Optimistic
 
-            await axios.patch(`${APIURL}/ads/${activeAd._id}/status`, {}, config);
+            await axios.patch(`${APIURL}/ads/${activeAd._id}/status`, { status: newIsActive ? 'active' : 'inactive' }, config);
+            showAlert("Status Updated", `${isPopup ? 'Popup' : 'Banner'} is now ${newIsActive ? 'Enabled' : 'Disabled'}`, "success");
         } catch (err) {
             console.error(err);
             showAlert("Error", "Failed to update status", "error");
@@ -425,7 +475,7 @@ const AdManager = ({ user }) => {
     const handleDelete = async () => {
         if (!activeAd) return;
         showAlert(
-            "Delete Campaign",
+            `Delete ${isPopup ? 'Popup' : 'Banner'} Campaign`,
             "Are you sure you want to delete your active campaign? This cannot be undone.",
             "warning",
             [
@@ -437,7 +487,8 @@ const AdManager = ({ user }) => {
                         try {
                             const config = { headers: { Authorization: `Bearer ${user.token}` } };
                             await axios.delete(`${APIURL}/ads/${activeAd._id}`, config);
-                            setAds([]);
+                            setAds(prev => prev.filter(a => a._id !== activeAd._id));
+                            showAlert("Success", "Campaign deleted successfully", "success");
                         } catch (err) {
                             console.error(err);
                             showAlert("Error", "Failed to delete ad", "error");
@@ -473,31 +524,33 @@ const AdManager = ({ user }) => {
     const renderEmptyState = () => (
         <Animated.View style={[styles.emptyContainer, { opacity: fadeAnim }]}>
             <View style={styles.emptyContent}>
-                <View style={[styles.iconCircle, { backgroundColor: '#FFF5F5' }]}>
-                    <Icon name="rocket" size={50} color={COLORS?.primary} />
+                <View style={[styles.iconCircle, { backgroundColor: '#FFF8EE' }]}>
+                    <Icon name={isPopup ? "clone" : "images"} size={44} color={COLORS?.primary || '#915200'} />
                 </View>
 
-                <Text style={styles.emptyTitle}>Boost Your Reach!</Text>
+                <Text style={styles.emptyTitle}>{isPopup ? 'Welcome Popup Ad' : 'Dashboard Banner Ad'}</Text>
                 <Text style={styles.emptySubtitle}>
-                    Promote your business directly to thousands of users on their dashboard.
+                    {isPopup
+                        ? 'Create a high-impact popup ad shown to all users in a modal dialog upon opening the app.'
+                        : 'Promote your business on the sliding carousel banner at the top of the user dashboard.'}
                 </Text>
 
                 <View style={styles.benefitsRow}>
                     <View style={styles.benefitItem}>
-                        <View style={[styles.benefitIconBox, { backgroundColor: '#E6FFFA' }]}>
-                            <Icon name="eye" size={16} color="#38B2AC" />
+                        <View style={[styles.benefitIconBox, { backgroundColor: '#FFF8EE' }]}>
+                            <Icon name={isPopup ? "star" : "eye"} size={16} color={COLORS?.primary || '#915200'} />
                         </View>
-                        <Text style={styles.benefitText}>High Visibility</Text>
+                        <Text style={styles.benefitText}>{isPopup ? 'Instant Pop' : 'High Visibility'}</Text>
                     </View>
                     <View style={styles.benefitItem}>
-                        <View style={[styles.benefitIconBox, { backgroundColor: '#EBF8FF' }]}>
-                            <Icon name="clock" size={16} color="#4299E1" />
+                        <View style={[styles.benefitIconBox, { backgroundColor: '#FFF8EE' }]}>
+                            <Icon name={isPopup ? "toggle-on" : "calendar-alt"} size={16} color={COLORS?.primary || '#915200'} />
                         </View>
-                        <Text style={styles.benefitText}>15m Intervals</Text>
+                        <Text style={styles.benefitText}>{isPopup ? 'Instant Toggle' : 'Custom Dates'}</Text>
                     </View>
                     <View style={styles.benefitItem}>
-                        <View style={[styles.benefitIconBox, { backgroundColor: '#FAF5FF' }]}>
-                            <Icon name="chart-line" size={16} color="#9F7AEA" />
+                        <View style={[styles.benefitIconBox, { backgroundColor: '#FFF8EE' }]}>
+                            <Icon name="chart-line" size={16} color={COLORS?.primary || '#915200'} />
                         </View>
                         <Text style={styles.benefitText}>Track Growth</Text>
                     </View>
@@ -509,27 +562,28 @@ const AdManager = ({ user }) => {
                     activeOpacity={0.8}
                 >
                     <Icon name="plus" size={18} color="#fff" style={{ marginRight: 10 }} />
-                    <Text style={styles.createButtonText}>Launch Campaign</Text>
+                    <Text style={styles.createButtonText}>{isPopup ? 'Create Popup Ad' : 'Launch Banner Ad'}</Text>
                 </TouchableOpacity>
             </View>
         </Animated.View>
     );
 
     const renderActiveState = () => {
-        const isScheduled = activeAd?.startDate && new Date(activeAd.startDate) > new Date();
-        const isExpired = activeAd?.endDate && new Date(activeAd.endDate) < new Date();
-        let statusText = 'Active Campaign';
-        let statusColor = COLORS?.success;
-        if (!activeAd?.isActive) {
-            statusText = 'Paused';
-            statusColor = COLORS?.secondary;
-        } else if (isScheduled) {
+        const isScheduled = !isPopup && activeAd?.startDate && new Date(activeAd.startDate) > new Date();
+        const isExpired = !isPopup && activeAd?.endDate && new Date(activeAd.endDate) < new Date();
+        let statusText = isPopup
+            ? (activeAd?.isActive ? 'Popup Enabled' : 'Popup Disabled')
+            : (activeAd?.isActive ? 'Banner Active' : 'Banner Paused');
+        let statusColor = activeAd?.isActive ? COLORS?.success : COLORS?.secondary;
+        if (!isPopup && isScheduled) {
             statusText = `Scheduled (${formatDateToIndian(activeAd.startDate)})`;
-            statusColor = '#3B82F6';
-        } else if (isExpired) {
+            statusColor = COLORS?.primary || '#915200';
+        } else if (!isPopup && isExpired) {
             statusText = 'Expired';
             statusColor = '#EF4444';
         }
+
+        const adImages = activeAd.imageUrls || (activeAd.imageUrl ? [activeAd.imageUrl] : []);
 
         return (
             <Animated.View style={[styles.activeContainer, { opacity: fadeAnim }]}>
@@ -538,87 +592,146 @@ const AdManager = ({ user }) => {
                     <View style={styles.cardHeader}>
                         <View style={styles.statusContainer}>
                             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                            <Text style={[styles.statusLabel, isScheduled && { color: '#2563EB' }]}>{statusText}</Text>
+                            <Text style={[styles.statusLabel, isScheduled && { color: COLORS?.primary || '#915200' }]}>{statusText}</Text>
                         </View>
-                        <Text style={styles.frequencyBadge}>Runs every 15 min</Text>
+                        <View style={styles.typeBadge}>
+                            <Icon name={isPopup ? "clone" : "images"} size={10} color={COLORS?.primary || '#915200'} style={{ marginRight: 4 }} />
+                            <Text style={styles.typeBadgeText}>
+                                {isPopup ? 'POPUP AD' : 'BANNER AD'}
+                            </Text>
+                        </View>
                     </View>
 
-                {/* Main Preview with Image */}
-                <View style={styles.previewContainer}>
-                    <Image
-                        source={{ uri: `${BASE_URL}${activeAd.imageUrls?.[0] || activeAd.imageUrl}` }}
-                        style={styles.previewImage}
-                        resizeMode="cover"
-                    />
+                    {/* Enable / Disable Switch Banner for Popup */}
+                    {isPopup && (
+                        <View style={styles.toggleRowCard}>
+                            <View style={{ flex: 1, paddingRight: 10 }}>
+                                <Text style={styles.toggleRowTitle}>
+                                    {activeAd.isActive ? 'Popup is Enabled' : 'Popup is Disabled'}
+                                </Text>
+                                <Text style={styles.toggleRowSubtitle}>
+                                    {activeAd.isActive ? 'Active and showing to users on app launch' : 'Hidden from users (disabled)'}
+                                </Text>
+                            </View>
+                            <Switch
+                                value={activeAd.isActive}
+                                onValueChange={handleToggleStatus}
+                                trackColor={{ false: '#CBD5E1', true: COLORS?.primary || '#915200' }}
+                                thumbColor="#fff"
+                            />
+                        </View>
+                    )}
 
-                </View>
+                    {/* Popup Images Section */}
+                    {isPopup ? (
+                        <View style={styles.popupImagesSection}>
+                            <View style={styles.popupImagesHeader}>
+                                <Text style={styles.popupImagesTitle}>Popup Images ({adImages.length}/5)</Text>
+                                <TouchableOpacity
+                                    onPress={() => handleEditClick(activeAd)}
+                                    activeOpacity={0.7}
+                                    style={{ flexDirection: 'row', alignItems: 'center' }}
+                                >
+                                    <Icon name="pen" size={11} color={COLORS?.primary || '#915200'} style={{ marginRight: 4 }} />
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS?.primary || '#915200' }}>Edit Photos</Text>
+                                </TouchableOpacity>
+                            </View>
 
-                {/* Content Block */}
-                <View style={styles.contentBlock}>
-                    <Text style={styles.contentTitle} numberOfLines={1}>
-                        {activeAd.title || 'Untitled Campaign'}
-                    </Text>
-
-                    {activeAd.description ? (
-                        <Text style={styles.contentDesc} numberOfLines={3}>
-                            {activeAd.description}
-                        </Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.popupImagesScroll}>
+                                {adImages.map((imgUrl, idx) => (
+                                    <TouchableOpacity
+                                        key={`active-img-${idx}`}
+                                        style={styles.popupThumbCard}
+                                        onPress={() => handleEditClick(activeAd)}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Image
+                                            source={{ uri: `${BASE_URL}${imgUrl}` }}
+                                            style={styles.popupThumbImg}
+                                            resizeMode="cover"
+                                        />
+                                        <View style={styles.popupIndexBadge}>
+                                            <Text style={styles.popupIndexText}>{idx + 1}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
                     ) : (
-                        <Text style={[styles.contentDesc, { fontStyle: 'italic', opacity: 0.6 }]}>
-                            No description provided.
+                        /* Banner Preview Image */
+                        <View style={styles.previewContainer}>
+                            <Image
+                                source={{ uri: `${BASE_URL}${adImages[0]}` }}
+                                style={styles.previewImage}
+                                resizeMode="cover"
+                            />
+                        </View>
+                    )}
+
+                    {/* Content Block */}
+                    <View style={styles.contentBlock}>
+                        <Text style={styles.contentTitle} numberOfLines={1}>
+                            {activeAd.title || (isPopup ? 'Popup Campaign' : 'Banner Campaign')}
                         </Text>
-                    )}
-                    {activeAd.imageUrls?.length > 1 && (
-                        <View style={styles.multiImageBadge}>
-                            <Icon name="images" size={10} color="#fff" />
-                            <Text style={styles.multiImageText}>+{activeAd.imageUrls.length - 1}</Text>
-                        </View>
-                    )}
-                </View>
 
-                {/* Info Grid */}
-                <View style={styles.infoGrid}>
-                    <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Start Date</Text>
-                        <Text style={styles.infoValue}>{formatDateToIndian(activeAd.startDate)}</Text>
+                        {activeAd.description ? (
+                            <Text style={styles.contentDesc} numberOfLines={3}>
+                                {activeAd.description}
+                            </Text>
+                        ) : (
+                            <Text style={[styles.contentDesc, { fontStyle: 'italic', opacity: 0.6 }]}>
+                                No description provided.
+                            </Text>
+                        )}
+                        {!isPopup && activeAd.imageUrls?.length > 1 && (
+                            <View style={styles.multiImageBadge}>
+                                <Icon name="images" size={10} color="#fff" />
+                                <Text style={styles.multiImageText}>+{activeAd.imageUrls.length - 1}</Text>
+                            </View>
+                        )}
                     </View>
-                    <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>End Date</Text>
-                        <Text style={styles.infoValue}>{formatDateToIndian(activeAd.endDate)}</Text>
+
+                    {/* Info Grid (Only for Banner with dates) */}
+                    {!isPopup && (
+                        <View style={styles.infoGrid}>
+                            <View style={styles.infoItem}>
+                                <Text style={styles.infoLabel}>Start Date</Text>
+                                <Text style={styles.infoValue}>{formatDateToIndian(activeAd.startDate)}</Text>
+                            </View>
+                            <View style={styles.infoItem}>
+                                <Text style={styles.infoLabel}>End Date</Text>
+                                <Text style={styles.infoValue}>{formatDateToIndian(activeAd.endDate)}</Text>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Action Buttons */}
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity style={styles.actionButton} onPress={() => handleEditClick(activeAd)}>
+                            <View style={[styles.iconBox, { backgroundColor: '#fff8e1' }]}>
+                                <Icon name="pen" size={16} color={COLORS?.primary} />
+                            </View>
+                            <Text style={styles.actionText}>Edit</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionButton} onPress={handleToggleStatus}>
+                            <View style={[styles.iconBox, { backgroundColor: activeAd.isActive ? '#fff3cd' : '#d4edda' }]}>
+                                <Icon name={activeAd.isActive ? "pause" : "play"} size={16} color={activeAd.isActive ? COLORS?.warning : COLORS?.success} />
+                            </View>
+                            <Text style={styles.actionText}>{activeAd.isActive ? (isPopup ? 'Disable' : 'Pause') : (isPopup ? 'Enable' : 'Resume')}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
+                            <View style={[styles.iconBox, { backgroundColor: '#f8d7da' }]}>
+                                <Icon name="trash" size={16} color={COLORS?.danger} />
+                            </View>
+                            <Text style={styles.actionText}>Delete</Text>
+                        </TouchableOpacity>
                     </View>
-                    {/* <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Link</Text>
-                        <Text style={styles.infoValue} numberOfLines={1}>{activeAd.link ? 'Active' : 'None'}</Text>
-                    </View> */}
                 </View>
-
-                {/* Action Buttons */}
-                <View style={styles.actionRow}>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => handleEditClick(activeAd)}>
-                        <View style={[styles.iconBox, { backgroundColor: '#fff8e1' }]}>
-                            <Icon name="pen" size={16} color={COLORS?.primary} />
-                        </View>
-                        <Text style={styles.actionText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.actionButton} onPress={handleToggleStatus}>
-                        <View style={[styles.iconBox, { backgroundColor: activeAd.isActive ? '#fff3cd' : '#d4edda' }]}>
-                            <Icon name={activeAd.isActive ? "pause" : "play"} size={16} color={activeAd.isActive ? COLORS?.warning : COLORS?.success} />
-                        </View>
-                        <Text style={styles.actionText}>{activeAd.isActive ? 'Pause' : 'Resume'}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
-                        <View style={[styles.iconBox, { backgroundColor: '#f8d7da' }]}>
-                            <Icon name="trash" size={16} color={COLORS?.danger} />
-                        </View>
-                        <Text style={styles.actionText}>Delete</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </Animated.View>
-    );
-};
+            </Animated.View>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -626,8 +739,30 @@ const AdManager = ({ user }) => {
             <ImageBackground source={require('../../public/assests/DKGOLDBG.png')} style={StyleSheet.absoluteFill} resizeMode="cover">
 
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>My Promotion</Text>
-                    <Text style={styles.headerSubtitle}>Manage your Business Global Ad</Text>
+                    <Text style={styles.headerTitle}>{isPopup ? 'Popup Ads' : 'Banner Ads'}</Text>
+                    <Text style={styles.headerSubtitle}>
+                        {isPopup ? 'Manage your Welcome Popup Ad shown on app launch' : 'Manage your Top Banner Ad on user dashboard'}
+                    </Text>
+
+                    {/* Segmented Tab Switcher */}
+                    <View style={styles.tabSwitcher}>
+                        <TouchableOpacity
+                            style={[styles.tabButton, !isPopup && styles.activeTabButton]}
+                            onPress={() => setSelectedType('banner')}
+                            activeOpacity={0.8}
+                        >
+                            <Icon name="images" size={13} color={!isPopup ? '#fff' : 'rgba(255, 255, 255, 0.75)'} style={{ marginRight: 6 }} />
+                            <Text style={[styles.tabButtonText, !isPopup ? styles.activeTabButtonText : { color: 'rgba(255, 255, 255, 0.75)' }]}>Banner Ads</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tabButton, isPopup && styles.activeTabButton]}
+                            onPress={() => setSelectedType('popup')}
+                            activeOpacity={0.8}
+                        >
+                            <Icon name="clone" size={13} color={isPopup ? '#fff' : 'rgba(255, 255, 255, 0.75)'} style={{ marginRight: 6 }} />
+                            <Text style={[styles.tabButtonText, isPopup ? styles.activeTabButtonText : { color: 'rgba(255, 255, 255, 0.75)' }]}>Popup Ads</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -642,7 +777,14 @@ const AdManager = ({ user }) => {
                 <Modal visible={showModal} animationType="slide" presentationStyle="formSheet">
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>{editingAd ? 'Edit Campaign' : 'New Campaign'}</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.modalTitle}>
+                                    {editingAd ? (isPopup ? 'Edit Popup Ad' : 'Edit Banner Ad') : (isPopup ? 'New Popup Ad' : 'New Banner Ad')}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: COLORS?.secondary, marginTop: 2 }}>
+                                    {isPopup ? 'Shown to users immediately in a popup dialog upon launching app' : 'Shown continuously in sliding carousel on dashboard'}
+                                </Text>
+                            </View>
                             <TouchableOpacity onPress={() => setShowModal(false)} style={styles.closeBtn}>
                                 <Icon name="times" size={18} color={COLORS?.secondary} />
                             </TouchableOpacity>
@@ -664,7 +806,7 @@ const AdManager = ({ user }) => {
                                             activeOpacity={0.8}
                                         >
                                             <Icon name="crop-alt" size={10} color="#fff" style={{ marginRight: 3 }} />
-                                            <Text style={styles.cropOverlayText}>Crop 16:9</Text>
+                                            <Text style={styles.cropOverlayText}>{isPopup ? 'Crop (4:5)' : 'Crop 16:9'}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ))}
@@ -680,7 +822,7 @@ const AdManager = ({ user }) => {
                                             activeOpacity={0.8}
                                         >
                                             <Icon name="crop-alt" size={10} color="#fff" style={{ marginRight: 3 }} />
-                                            <Text style={styles.cropOverlayText}>Crop 16:9</Text>
+                                            <Text style={styles.cropOverlayText}>{isPopup ? 'Crop (4:5)' : 'Crop 16:9'}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ))}
@@ -694,7 +836,9 @@ const AdManager = ({ user }) => {
                             <View style={styles.recommendationBox}>
                                 <Icon name="info-circle" size={14} color={COLORS.primary} />
                                 <Text style={styles.recommendationText}>
-                                    Recommended banner: 16:9 ratio. Tap "Crop 16:9" on any photo to fit standard user dashboard banner format. Maximum 5 images.
+                                    {isPopup
+                                        ? 'Recommended popup creative: 4:5 portrait format. Tap "Crop (4:5)" on any photo to fit the modal dialog neatly. Maximum 5 images.'
+                                        : 'Recommended banner: 16:9 ratio. Tap "Crop 16:9" on any photo to fit standard user dashboard banner format. Maximum 5 images.'}
                                 </Text>
                             </View>
 
@@ -708,11 +852,16 @@ const AdManager = ({ user }) => {
                                 placeholderTextColor="#999"
                             />
 
-                            <Text style={styles.label}>Frequency</Text>
-                            <View style={styles.readOnlyInput}>
-                                <Icon name="clock" size={14} color={COLORS?.secondary} style={{ marginRight: 8 }} />
-                                <Text style={styles.readOnlyText}>Ad runs automatically every 15 minutes</Text>
-                            </View>
+                            {/* Frequency (Only for Banner) */}
+                            {!isPopup && (
+                                <>
+                                    <Text style={styles.label}>Frequency</Text>
+                                    <View style={styles.readOnlyInput}>
+                                        <Icon name="clock" size={14} color={COLORS?.secondary} style={{ marginRight: 8 }} />
+                                        <Text style={styles.readOnlyText}>Ad runs automatically every 15 minutes</Text>
+                                    </View>
+                                </>
+                            )}
 
                             <Text style={styles.label}>Description</Text>
                             <TextInput
@@ -735,40 +884,60 @@ const AdManager = ({ user }) => {
                                 placeholderTextColor="#999"
                             />
 
-                            {/* Dates */}
-                            <View style={styles.row}>
-                                <View style={styles.col}>
-                                    <Text style={styles.label}>Start Date</Text>
-                                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
-                                        <Text style={styles.dateText}>{formatDateToIndian(startDate)}</Text>
-                                        <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
-                                    </TouchableOpacity>
+                            {/* Status Toggle for Popup vs Dates for Banner */}
+                            {isPopup ? (
+                                <View style={styles.toggleRowModal}>
+                                    <View style={{ flex: 1, paddingRight: 10 }}>
+                                        <Text style={[styles.label, { marginBottom: 2, color: COLORS?.primary || '#915200' }]}>Popup Display Status</Text>
+                                        <Text style={{ fontSize: 12, color: COLORS?.secondary }}>
+                                            {isAdActiveToggle ? 'Enabled (Showing to users on launch)' : 'Disabled (Hidden from users)'}
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={isAdActiveToggle}
+                                        onValueChange={setIsAdActiveToggle}
+                                        trackColor={{ false: '#CBD5E1', true: COLORS?.primary || '#915200' }}
+                                        thumbColor="#fff"
+                                    />
                                 </View>
-                                <View style={styles.col}>
-                                    <Text style={styles.label}>End Date</Text>
-                                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
-                                        <Text style={styles.dateText}>{formatDateToIndian(endDate)}</Text>
-                                        <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
+                            ) : (
+                                <>
+                                    {/* Dates for Banner */}
+                                    <View style={styles.row}>
+                                        <View style={styles.col}>
+                                            <Text style={styles.label}>Start Date</Text>
+                                            <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
+                                                <Text style={styles.dateText}>{formatDateToIndian(startDate)}</Text>
+                                                <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <View style={styles.col}>
+                                            <Text style={styles.label}>End Date</Text>
+                                            <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
+                                                <Text style={styles.dateText}>{formatDateToIndian(endDate)}</Text>
+                                                <Icon name="calendar-alt" size={14} color={COLORS?.primary} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
 
-                            <DateTimePickerModal
-                                isVisible={showStartPicker}
-                                mode="date"
-                                date={startDate}
-                                onConfirm={handleStartDateConfirm}
-                                onCancel={() => setShowStartPicker(false)}
-                            />
+                                    <DateTimePickerModal
+                                        isVisible={showStartPicker}
+                                        mode="date"
+                                        date={startDate}
+                                        onConfirm={handleStartDateConfirm}
+                                        onCancel={() => setShowStartPicker(false)}
+                                    />
 
-                            <DateTimePickerModal
-                                isVisible={showEndPicker}
-                                mode="date"
-                                date={endDate}
-                                onConfirm={handleEndDateConfirm}
-                                onCancel={() => setShowEndPicker(false)}
-                                minimumDate={startDate}
-                            />
+                                    <DateTimePickerModal
+                                        isVisible={showEndPicker}
+                                        mode="date"
+                                        date={endDate}
+                                        onConfirm={handleEndDateConfirm}
+                                        onCancel={() => setShowEndPicker(false)}
+                                        minimumDate={startDate}
+                                    />
+                                </>
+                            )}
 
                             <TouchableOpacity
                                 style={[styles.saveBtn, uploading && { opacity: 0.8 }]}
@@ -777,7 +946,7 @@ const AdManager = ({ user }) => {
                             >
 
                                 <Text style={styles.saveBtnText}>
-                                    {uploading ? 'LAUNCHING...' : (editingAd ? 'Save Changes' : 'Go Active')}
+                                    {uploading ? 'SAVING...' : (editingAd ? 'Save Changes' : (isPopup ? 'Save & Enable Popup' : 'Go Active'))}
                                 </Text>
                             </TouchableOpacity>
 
@@ -792,8 +961,12 @@ const AdManager = ({ user }) => {
                         <View style={styles.cropModalContainer}>
                             <View style={styles.cropModalHeader}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.cropModalTitle}>Crop Ad Banner (16:9)</Text>
-                                    <Text style={styles.cropModalSubtitle}>Drag to pan, use slider to zoom. Formats for user dashboard.</Text>
+                                    <Text style={styles.cropModalTitle}>{isPopup ? 'Crop Popup Ad (4:5 Portrait)' : 'Crop Ad Banner (16:9)'}</Text>
+                                    <Text style={styles.cropModalSubtitle}>
+                                        {isPopup
+                                            ? 'Drag to pan, use slider to zoom. Formats for user startup popup dialog.'
+                                            : 'Drag to pan, use slider to zoom. Formats for user dashboard banner.'}
+                                    </Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setCropModalVisible(false)} style={styles.cropCloseBtn}>
                                     <Icon name="times" size={16} color="#64748B" />
@@ -849,7 +1022,7 @@ const AdManager = ({ user }) => {
                                         <View style={styles.cropGridV2} />
                                         <View style={styles.cropBadge}>
                                             <Icon name="crop-alt" size={10} color="#fff" style={{ marginRight: 4 }} />
-                                            <Text style={styles.cropBadgeText}>16:9 Banner</Text>
+                                            <Text style={styles.cropBadgeText}>{isPopup ? '4:5 Popup' : '16:9 Banner'}</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -1021,6 +1194,133 @@ const styles = StyleSheet.create({
         color: '#fff',
         marginTop: 4,
     },
+    tabSwitcher: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 255, 255, 0.22)',
+        borderRadius: 12,
+        padding: 4,
+        marginTop: 14,
+    },
+    tabButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 9,
+        borderRadius: 9,
+    },
+    activeTabButton: {
+        backgroundColor: COLORS?.primary || '#915200',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    tabButtonText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    activeTabButtonText: {
+        color: '#fff',
+    },
+    typeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: '#FFF8EE',
+        borderWidth: 1,
+        borderColor: 'rgba(145, 82, 0, 0.25)',
+    },
+    typeBadgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+        color: COLORS?.primary || '#915200',
+    },
+    toggleRowCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF8EE',
+        borderWidth: 1,
+        borderColor: 'rgba(145, 82, 0, 0.25)',
+        borderRadius: 12,
+        padding: 14,
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 8,
+    },
+    toggleRowTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS?.primary || '#915200',
+    },
+    toggleRowSubtitle: {
+        fontSize: 11,
+        color: COLORS?.textSecondary || 'rgba(145, 82, 0, 0.7)',
+        marginTop: 2,
+    },
+    toggleRowModal: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF8EE',
+        borderWidth: 1,
+        borderColor: 'rgba(145, 82, 0, 0.25)',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 16,
+    },
+    popupImagesSection: {
+        marginHorizontal: 16,
+        marginTop: 10,
+        marginBottom: 8,
+    },
+    popupImagesHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    popupImagesTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS?.dark || '#1E293B',
+    },
+    popupImagesScroll: {
+        flexDirection: 'row',
+    },
+    popupThumbCard: {
+        width: 110,
+        height: 145,
+        borderRadius: 12,
+        marginRight: 10,
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    popupThumbImg: {
+        width: '100%',
+        height: '100%',
+    },
+    popupIndexBadge: {
+        position: 'absolute',
+        bottom: 6,
+        left: 6,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    popupIndexText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
     scrollContent: {
         padding: 24,
         paddingTop: 8,
@@ -1040,25 +1340,38 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: '#FFF5F5',
+        backgroundColor: '#FFF8EE',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,
+        borderWidth: 2,
+        borderColor: 'rgba(255, 255, 255, 0.45)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 4,
     },
     emptyTitle: {
         fontSize: 26,
         fontWeight: '800',
-        color: COLORS?.dark,
+        color: '#FFFFFF',
         marginBottom: 12,
         textAlign: 'center',
+        textShadowColor: 'rgba(0, 0, 0, 0.55)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
     },
     emptySubtitle: {
         fontSize: 15,
-        color: COLORS?.secondary,
+        color: 'rgba(255, 255, 255, 0.92)',
         textAlign: 'center',
         marginBottom: 32,
         lineHeight: 24,
         paddingHorizontal: 20,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
     },
     benefitsRow: {
         flexDirection: 'row',

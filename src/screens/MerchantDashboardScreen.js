@@ -360,7 +360,10 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
             case 'new-users':
                 return <UnsubscribedUsersList user={stabilizedUser} />;
             case 'ads':
-                return <AdManager user={stabilizedUser} />;
+            case 'banner-ads':
+                return <AdManager user={stabilizedUser} initialType="banner" key="banner-ads" />;
+            case 'popup-ads':
+                return <AdManager user={stabilizedUser} initialType="popup" key="popup-ads" />;
             case 'set-rates':
                 return (
                     <SetGoldRates
@@ -470,13 +473,22 @@ const MerchantDashboardScreen = ({ user, onLogout, onUserUpdate, onRefreshAds })
                         <View style={styles.sidebarMenu}>
 
                             {!user?.isStaff && (
-                                <TouchableOpacity
-                                    style={[styles.sidebarMenuItem, activeTab === 'ads' && styles.sidebarActiveMenuItem]}
-                                    onPress={() => { setActiveTab('ads'); closeSidebar(); }}
-                                >
-                                    <Icon name="bullhorn" size={18} color={activeTab === 'ads' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
-                                    <Text style={[styles.sidebarMenuText, activeTab === 'ads' && styles.sidebarActiveMenuText]}>My Ads</Text>
-                                </TouchableOpacity>
+                                <>
+                                    <TouchableOpacity
+                                        style={[styles.sidebarMenuItem, (activeTab === 'ads' || activeTab === 'banner-ads') && styles.sidebarActiveMenuItem]}
+                                        onPress={() => { setActiveTab('ads'); closeSidebar(); }}
+                                    >
+                                        <Icon name="images" size={18} color={(activeTab === 'ads' || activeTab === 'banner-ads') ? '#fff' : '#915200'} style={styles.sidebarIcon} />
+                                        <Text style={[styles.sidebarMenuText, (activeTab === 'ads' || activeTab === 'banner-ads') && styles.sidebarActiveMenuText]}>Banner Ads</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.sidebarMenuItem, activeTab === 'popup-ads' && styles.sidebarActiveMenuItem]}
+                                        onPress={() => { setActiveTab('popup-ads'); closeSidebar(); }}
+                                    >
+                                        <Icon name="clone" size={18} color={activeTab === 'popup-ads' ? '#fff' : '#915200'} style={styles.sidebarIcon} />
+                                        <Text style={[styles.sidebarMenuText, activeTab === 'popup-ads' && styles.sidebarActiveMenuText]}>Popup Ads</Text>
+                                    </TouchableOpacity>
+                                </>
                             )}
                             <TouchableOpacity
                                 style={[styles.sidebarMenuItem, activeTab === 'set-rates' && styles.sidebarActiveMenuItem]}
